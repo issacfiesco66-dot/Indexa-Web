@@ -16,6 +16,7 @@ import {
   Radar,
   Building2,
   Video,
+  TrendingUp,
 } from "lucide-react";
 import {
   collection,
@@ -35,6 +36,7 @@ const NAV_ITEMS = [
   { href: "/admin/seguimientos", label: "Seguimientos", icon: Clock },
   { href: "/admin/mensajeria", label: "Mensajería", icon: MessageSquare },
   { href: "/admin/radar", label: "Radar", icon: Radar },
+  { href: "/admin/ventas", label: "Ventas", icon: TrendingUp },
   { href: "/admin/campanas/tiktok", label: "TikTok Ads", icon: Video },
   { href: "/admin/configuracion", label: "Configuración", icon: Settings },
 ];
