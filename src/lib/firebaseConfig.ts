@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import { initializeFirestore, type Firestore } from "firebase/firestore";
 import { getAuth, type Auth } from "firebase/auth";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 import { getAnalytics, type Analytics } from "firebase/analytics";
@@ -24,7 +24,9 @@ let analytics: Analytics | undefined;
 
 if (isConfigured) {
   app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  db = getFirestore(app);
+  db = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+  });
   auth = getAuth(app);
   storage = getStorage(app);
 
