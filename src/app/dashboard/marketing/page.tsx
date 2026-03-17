@@ -32,7 +32,10 @@ import {
   Link2,
   ShieldCheck,
   ArrowLeft,
+  Wand2,
+  ImagePlus,
 } from "lucide-react";
+import Link from "next/link";
 
 // ── Types ────────────────────────────────────────────────────────────
 interface Campaign {
@@ -127,6 +130,8 @@ export default function MarketingPage() {
   const [adAccountId, setAdAccountId] = useState("");
   const [savedToken, setSavedToken] = useState("");
   const [savedAccount, setSavedAccount] = useState("");
+  const [nanoBananaKey, setNanoBananaKey] = useState("");
+  const [savedNanoBananaKey, setSavedNanoBananaKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [showGuide, setShowGuide] = useState(true);
@@ -157,6 +162,10 @@ export default function MarketingPage() {
             setSavedAccount(data.metaAdAccountId);
             setAdAccountId(data.metaAdAccountId);
           }
+          if (data.nanoBananaApiKey) {
+            setSavedNanoBananaKey(data.nanoBananaApiKey);
+            setNanoBananaKey(data.nanoBananaApiKey);
+          }
           if (data.metaAccessToken && data.metaAdAccountId) {
             setShowGuide(false);
           }
@@ -182,7 +191,9 @@ export default function MarketingPage() {
       await updateDoc(doc(db, "usuarios", user.uid), {
         metaAccessToken: metaToken.trim(),
         metaAdAccountId: adAccountId.trim().replace("act_", ""),
+        ...(nanoBananaKey.trim() ? { nanoBananaApiKey: nanoBananaKey.trim() } : {}),
       });
+      if (nanoBananaKey.trim()) setSavedNanoBananaKey(nanoBananaKey.trim());
       setSavedToken(metaToken.trim());
       setSavedAccount(adAccountId.trim().replace("act_", ""));
       setSaveMsg("Credenciales guardadas correctamente.");
@@ -456,6 +467,17 @@ export default function MarketingPage() {
                     />
                     <p className="mt-1 text-[10px] text-gray-400">Solo el número, sin &quot;act_&quot;</p>
                   </div>
+                  <div className="border-t border-gray-200 pt-3 mt-1">
+                    <label className="block text-xs font-semibold text-gray-500">NanoBanana API Key <span className="font-normal text-gray-400">(para generar imágenes con IA)</span></label>
+                    <input
+                      type="password"
+                      value={nanoBananaKey}
+                      onChange={(e) => setNanoBananaKey(e.target.value)}
+                      placeholder="Tu API key de NanoBanana..."
+                      className={`mt-1 ${inputClass}`}
+                    />
+                    <p className="mt-1 text-[10px] text-gray-400">Obténla gratis en <a href="https://nanobananaapi.ai" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline">nanobananaapi.ai</a></p>
+                  </div>
                 </div>
                 {saveMsg && (
                   <p className={`mt-3 text-xs font-medium ${saveMsg.includes("Error") || saveMsg.includes("Completa") ? "text-red-600" : "text-green-600"}`}>
@@ -652,6 +674,27 @@ export default function MarketingPage() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Ad Creator CTA */}
+          {savedNanoBananaKey && (
+            <div className="mt-8">
+              <Link
+                href="/dashboard/marketing/crear-anuncio"
+                className="flex items-center justify-between rounded-2xl border border-gray-200 bg-gradient-to-r from-purple-50 to-orange-50 p-5 shadow-sm transition-shadow hover:shadow-md"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indexa-orange">
+                    <Wand2 size={20} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-indexa-gray-dark">Crear Anuncio con IA</h3>
+                    <p className="text-xs text-gray-500">Genera imágenes profesionales y previsualiza tus anuncios de Facebook e Instagram.</p>
+                  </div>
+                </div>
+                <ImagePlus size={18} className="text-gray-400" />
+              </Link>
             </div>
           )}
 
