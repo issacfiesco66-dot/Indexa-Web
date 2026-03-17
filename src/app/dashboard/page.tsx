@@ -26,7 +26,6 @@ import {
   Building2,
   Phone,
   Palette,
-  Construction,
   LogOut,
   ChevronLeft,
   CreditCard,
@@ -188,35 +187,6 @@ function docToSitio(data: DocumentData): SitioData {
   };
 }
 
-// ── "En construcción" component ────────────────────────────────────
-function EnConstruccion({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md text-center">
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-indexa-blue/10">
-          <Construction size={36} className="text-indexa-blue" />
-        </div>
-        <h1 className="mt-6 text-2xl font-extrabold text-indexa-gray-dark">
-          Tu panel está en construcción
-        </h1>
-        <p className="mt-3 text-gray-500 leading-relaxed">
-          Estamos preparando tu espacio de gestión. Un asesor de INDEXA se pondrá en contacto contigo
-          cuando tu sitio esté vinculado a esta cuenta.
-        </p>
-        <p className="mt-2 text-sm text-gray-400">
-          Si crees que esto es un error, contacta a soporte.
-        </p>
-        <button
-          onClick={onBack}
-          className="mt-8 inline-flex items-center gap-2 rounded-xl bg-indexa-blue px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-indexa-blue/90"
-        >
-          <ChevronLeft size={16} />
-          Volver al inicio
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // ── Stat card ──────────────────────────────────────────────────────
 function StatCard({
@@ -255,7 +225,7 @@ export default function ClientDashboardPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [sitio, setSitio] = useState<SitioData>(DEFAULT_SITIO);
   const [sitioId, setSitioId] = useState("");
-  const [pageState, setPageState] = useState<"loading" | "no-access" | "no-sitio" | "ready">("loading");
+  const [pageState, setPageState] = useState<"loading" | "no-sitio" | "ready">("loading");
   const [activeTab, setActiveTab] = useState<Tab>("general");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -276,7 +246,7 @@ export default function ClientDashboardPage() {
     }
 
     if (!db) {
-      setPageState("no-access");
+      setPageState("no-sitio");
       return;
     }
 
@@ -303,7 +273,7 @@ export default function ClientDashboardPage() {
         const profileSnap = await getDoc(doc(db!, "usuarios", user!.uid));
 
         if (!profileSnap.exists()) {
-          setPageState("no-access");
+          setPageState("no-sitio");
           return;
         }
 
@@ -322,7 +292,7 @@ export default function ClientDashboardPage() {
         }
 
         if (userProfile.role !== "cliente") {
-          setPageState("no-access");
+          setPageState("no-sitio");
           return;
         }
 
@@ -345,7 +315,7 @@ export default function ClientDashboardPage() {
         // Last-resort admin check before showing error
         const isAdmin = await checkRoleAndRedirect();
         if (!isAdmin) {
-          setPageState("no-access");
+          setPageState("no-sitio");
         }
       }
     }
@@ -438,11 +408,6 @@ export default function ClientDashboardPage() {
         </div>
       </div>
     );
-  }
-
-  // ── No access state (DashboardGuard already blocks admins at layout level) ──
-  if (pageState === "no-access") {
-    return <EnConstruccion onBack={() => router.push("/")} />;
   }
 
   // ── No sitio state — new client welcome ───────────────────────
