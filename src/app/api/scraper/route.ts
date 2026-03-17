@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { spawn } from "child_process";
 import path from "path";
-import { verifyIdToken } from "@/lib/verifyAuth";
+import { verifyAdmin } from "@/lib/verifyAuth";
 import { createRateLimiter } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
@@ -23,10 +23,10 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const user = await verifyIdToken(token);
+  const user = await verifyAdmin(token);
   if (!user) {
-    return new Response(JSON.stringify({ error: "Token inválido o expirado." }), {
-      status: 401,
+    return new Response(JSON.stringify({ error: "No autorizado. Se requiere rol admin." }), {
+      status: 403,
       headers: { "Content-Type": "application/json" },
     });
   }

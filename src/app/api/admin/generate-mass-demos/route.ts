@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyIdToken } from "@/lib/verifyAuth";
+import { verifyAdmin } from "@/lib/verifyAuth";
 
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -115,9 +115,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "No autorizado." }, { status: 401 });
     }
 
-    const user = await verifyIdToken(authToken);
+    const user = await verifyAdmin(authToken);
     if (!user) {
-      return NextResponse.json({ success: false, message: "Token inválido." }, { status: 401 });
+      return NextResponse.json({ success: false, message: "No autorizado. Se requiere rol admin." }, { status: 403 });
     }
 
     if (!prospectos || prospectos.length === 0) {

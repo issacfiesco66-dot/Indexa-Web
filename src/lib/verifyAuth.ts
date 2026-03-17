@@ -45,6 +45,31 @@ export async function verifyIdToken(idToken: string): Promise<TokenPayload | nul
 }
 
 /**
+ * Verifies a Firebase ID token AND checks that the user has the "admin" role in Firestore.
+ * Returns the user payload if admin, null otherwise.
+ */
+export async function verifyAdmin(idToken: string): Promise<TokenPayload | null> {
+  const user = await verifyIdToken(idToken);
+  if (!user) return null;
+
+  try {
+    const res = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/usuarios/${user.uid}?key=${process.env.NEXT_PUBLIC_FIREBASE_API_KEY}`,
+      {
+        headers: { Authorization: `Bearer ${idToken}` },
+      }
+    );
+    if (!res.ok) return null;
+    const doc = await res.json();
+    const role = doc.fields?.role?.stringValue;
+    if (role !== "admin") return null;
+    return user;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Extracts Bearer token from Authorization header or from request body's authToken field.
  */
 export function extractToken(request: Request, bodyAuthToken?: string): string | null {

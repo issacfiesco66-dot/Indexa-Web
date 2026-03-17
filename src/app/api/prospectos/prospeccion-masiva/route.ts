@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { getProspectEmailSubject, getProspectEmailHtml } from "@/lib/emailTemplates";
-import { verifyIdToken } from "@/lib/verifyAuth";
+import { verifyAdmin } from "@/lib/verifyAuth";
 
 let _resend: Resend | null = null;
 function getResend() {
@@ -127,11 +127,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify auth token
-    const tokenUser = await verifyIdToken(authToken);
+    const tokenUser = await verifyAdmin(authToken);
     if (!tokenUser) {
       return NextResponse.json(
-        { success: false, message: "No autorizado. Token inválido o expirado." },
-        { status: 401 }
+        { success: false, message: "No autorizado. Se requiere rol admin." },
+        { status: 403 }
       );
     }
 
