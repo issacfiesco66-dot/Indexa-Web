@@ -163,11 +163,13 @@ export default function MensajeriaPage() {
   // ── Contact handler ─────────────────────────────────────────────────
   const handleContact = useCallback(
     async (prospecto: ProspectoFrio, template: MessageTemplate) => {
-      if (!db || !prospecto.telefono || !prospecto.demoSlug) return;
+      if (!db || !prospecto.telefono) return;
 
       setContactingId(prospecto.id);
 
-      const demoUrl = `${window.location.origin}/sitio/${prospecto.demoSlug}`;
+      const demoUrl = prospecto.demoSlug
+        ? `${window.location.origin}/sitio/${prospecto.demoSlug}`
+        : `${window.location.origin}/demo/${encodeURIComponent(prospecto.slug || prospecto.nombre)}`;
       const message = template.buildMessage(
         prospecto.nombre,
         prospecto.ciudad,
