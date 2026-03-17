@@ -4,7 +4,11 @@ import { addDocument } from "@/lib/firestoreRest";
 import { createRateLimiter } from "@/lib/rateLimit";
 import type { LeadFormData, ContactApiResponse } from "@/types/lead";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend: Resend | null = null;
+function getResend() {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@indexa.com.mx";
 const FROM_EMAIL = process.env.FROM_EMAIL || "INDEXA <onboarding@resend.dev>";
@@ -92,7 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 2. Correo de confirmación al cliente ──────────────────────
-    const clientEmailPromise = resend.emails.send({
+    const clientEmailPromise = getResend().emails.send({
       from: FROM_EMAIL,
       to: email.trim(),
       subject: "¡Gracias por contactar a INDEXA!",
@@ -137,7 +141,7 @@ export async function POST(request: NextRequest) {
          </tr>`
       : "";
 
-    const adminEmailPromise = resend.emails.send({
+    const adminEmailPromise = getResend().emails.send({
       from: FROM_EMAIL,
       to: ADMIN_EMAIL,
       subject: `🟠 ¡Nuevo prospecto en INDEXA! — ${contactName.trim()} de ${businessName.trim()}`,

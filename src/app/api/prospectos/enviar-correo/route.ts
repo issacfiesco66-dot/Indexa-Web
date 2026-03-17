@@ -3,7 +3,11 @@ import { Resend } from "resend";
 import { getProspectEmailSubject, getProspectEmailHtml } from "@/lib/emailTemplates";
 import { verifyIdToken } from "@/lib/verifyAuth";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend: Resend | null = null;
+function getResend() {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
 const FROM_EMAIL = process.env.FROM_EMAIL || "INDEXA <onboarding@resend.dev>";
 
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
@@ -106,7 +110,7 @@ export async function POST(request: NextRequest) {
     const demoUrl = `${origin}/demo/${encodeURIComponent(slug)}`;
 
     // 3. Send email via Resend
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: FROM_EMAIL,
       to: prospecto.email,
       subject: getProspectEmailSubject(prospecto.nombre),

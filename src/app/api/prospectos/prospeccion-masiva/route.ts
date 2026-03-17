@@ -3,7 +3,11 @@ import { Resend } from "resend";
 import { getProspectEmailSubject, getProspectEmailHtml } from "@/lib/emailTemplates";
 import { verifyIdToken } from "@/lib/verifyAuth";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend: Resend | null = null;
+function getResend() {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
 const FROM_EMAIL = process.env.FROM_EMAIL || "INDEXA <onboarding@resend.dev>";
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -76,7 +80,7 @@ async function createSitioDraft(p: ProspectoInput, authToken: string): Promise<b
 async function sendProspectEmail(p: ProspectoInput, demoUrl: string): Promise<boolean> {
   if (!p.email) return false;
 
-  const { error } = await resend.emails.send({
+  const { error } = await getResend().emails.send({
     from: FROM_EMAIL,
     to: p.email,
     subject: getProspectEmailSubject(p.nombre),
