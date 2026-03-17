@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { Suspense, useState, useEffect, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
@@ -9,6 +9,23 @@ import { auth, db } from "@/lib/firebaseConfig";
 import { useAuth } from "@/lib/AuthContext";
 
 export default function RegistroPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <h1 className="text-3xl font-extrabold tracking-tight text-indexa-blue">INDEXA</h1>
+            <p className="mt-4 text-sm text-gray-400">Cargando...</p>
+          </div>
+        </div>
+      }
+    >
+      <RegistroContent />
+    </Suspense>
+  );
+}
+
+function RegistroContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
