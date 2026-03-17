@@ -40,6 +40,16 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // ── Vercel check — Python/Playwright not available in serverless ──
+  if (process.env.VERCEL) {
+    return new Response(
+      JSON.stringify({
+        error: "El scraper solo funciona en modo local (localhost). Ejecuta 'npm run dev' en tu máquina para usar esta función.",
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   const query = request.nextUrl.searchParams.get("query");
   const max = request.nextUrl.searchParams.get("max") || "20";
 

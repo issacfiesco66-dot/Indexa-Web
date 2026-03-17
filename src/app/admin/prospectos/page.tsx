@@ -606,9 +606,14 @@ export default function ProspectosPage() {
           <div className="flex items-center gap-2">
             <MapPin size={18} className="text-indexa-orange" />
             <h3 className="text-sm font-bold text-indexa-gray-dark">Buscar Prospectos en Google Maps</h3>
+            {typeof window !== "undefined" && !window.location.hostname.includes("localhost") && !window.location.hostname.includes("127.0.0.1") && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Solo local</span>
+            )}
           </div>
           <p className="mt-1 text-xs text-gray-400">
-            Busca por servicio/producto y ubicación. El sistema encontrará negocios sin sitio web y los agregará.
+            {typeof window !== "undefined" && !window.location.hostname.includes("localhost") && !window.location.hostname.includes("127.0.0.1")
+              ? "Esta función requiere Python + Playwright. Ejecuta 'npm run dev' en tu máquina local para buscar prospectos."
+              : "Busca por servicio/producto y ubicación. El sistema encontrará negocios sin sitio web y los agregará."}
           </p>
         </div>
 
