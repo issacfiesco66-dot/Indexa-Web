@@ -79,6 +79,8 @@ function AdminShell({ children }: { children: React.ReactNode }) {
         if (t >= cutoff48h && (raw.vistas ?? 0) >= 5) count++;
       }
       setHotCount(count);
+    }, (err) => {
+      console.error("Hot prospect listener error:", err.message);
     });
     return unsubscribe;
   }, [user]);
