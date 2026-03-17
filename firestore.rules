@@ -44,7 +44,8 @@ service cloud.firestore {
     // Escribir: admin tiene acceso total; owner solo puede actualizar campos de integración
     match /usuarios/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create, delete: if isAdmin();
+      allow create: if isAdmin() || (isOwner(userId) && request.resource.data.role == "cliente");
+      allow delete: if isAdmin();
       allow update: if isAdmin()
         || (
           isOwner(userId)
