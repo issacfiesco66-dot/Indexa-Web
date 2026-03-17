@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   X,
+  MessageSquare,
 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/admin/leads", label: "Leads", icon: Users },
   { href: "/admin/prospectos", label: "Prospección Fría", icon: UserSearch },
   { href: "/admin/seguimientos", label: "Seguimientos", icon: Clock },
+  { href: "/admin/mensajeria", label: "Mensajería", icon: MessageSquare },
   { href: "/admin/configuracion", label: "Configuración", icon: Settings },
 ];
 
