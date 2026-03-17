@@ -7,7 +7,8 @@ import {
   signOut as firebaseSignOut,
   type User,
 } from "firebase/auth";
-import { auth } from "@/lib/firebaseConfig";
+import { auth, db } from "@/lib/firebaseConfig";
+import { doc, getDoc } from "firebase/firestore";
 
 interface AuthContextType {
   user: User | null;
@@ -40,8 +41,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (u) {
         const token = await u.getIdToken();
         document.cookie = `firebaseAuthToken=${token}; path=/; max-age=${60 * 60}; SameSite=Lax`;
+
+        // Set role cookie for maintenance mode bypass
+        if (db) {
+          try {
+            const snap = await getDoc(doc(db, "usuarios", u.uid));
+            const role = snap.exists() ? snap.data().role : "cliente";
+            document.cookie = `indexa_role=${role}; path=/; max-age=${60 * 60}; SameSite=Lax`;
+          } catch {
+            // Firestore may not be ready yet — role cookie will be set on next auth state change
+          }
+        }
       } else {
         document.cookie = "firebaseAuthToken=; path=/; max-age=0";
+        document.cookie = "indexa_role=; path=/; max-age=0";
       }
     });
     return unsubscribe;
