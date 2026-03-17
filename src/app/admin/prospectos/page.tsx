@@ -104,20 +104,24 @@ export default function ProspectosPage() {
   const [scraperLog, setScraperLog] = useState<string[]>([]);
   const scraperAbortRef = useRef<AbortController | null>(null);
 
+  // Strip trailing "en [location]" from service field to prevent double "en"
+  const cleanService = (s: string) => s.trim().replace(/\s+en\s+.+$/i, "").trim();
+
   // Build the composed query in Google Maps friendly format: "Servicio en Ciudad, País"
-  const scraperQueryParts = [scraperServicio.trim(), scraperCiudad.trim()].filter(Boolean);
-  const scraperQuery = scraperQueryParts.length === 2
-    ? `${scraperServicio.trim()} en ${scraperCiudad.trim()}${scraperPais.trim() ? `, ${scraperPais.trim()}` : ""}`
-    : scraperQueryParts[0] || "";
-  const scraperCanSearch = scraperServicio.trim().length > 0 && scraperCiudad.trim().length > 0;
+  const svcClean = cleanService(scraperServicio);
+  const cityClean = scraperCiudad.trim();
+  const scraperQuery = svcClean && cityClean
+    ? `${svcClean} en ${cityClean}${scraperPais.trim() ? `, ${scraperPais.trim()}` : ""}`
+    : svcClean || cityClean || "";
+  const scraperCanSearch = svcClean.length > 0 && cityClean.length > 0;
 
   // Count existing prospectos in the same city to show duplicates indicator
-  const existingInCity = scraperCiudad.trim()
-    ? prospectos.filter((p) => p.ciudad.toLowerCase() === scraperCiudad.trim().toLowerCase()).length
+  const existingInCity = cityClean
+    ? prospectos.filter((p) => p.ciudad.toLowerCase() === cityClean.toLowerCase()).length
     : 0;
 
   const startScraper = useCallback(async () => {
-    const svc = scraperServicio.trim();
+    const svc = cleanService(scraperServicio);
     const city = scraperCiudad.trim();
     const country = scraperPais.trim();
     const q = svc && city
