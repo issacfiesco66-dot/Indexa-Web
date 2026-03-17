@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { initializeFirestore, type Firestore } from "firebase/firestore";
+import { initializeFirestore, getFirestore, type Firestore } from "firebase/firestore";
 import { getAuth, type Auth } from "firebase/auth";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 import { getAnalytics, type Analytics } from "firebase/analytics";
@@ -24,9 +24,14 @@ let analytics: Analytics | undefined;
 
 if (isConfigured) {
   app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  db = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
-  });
+  try {
+    db = initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+    });
+  } catch {
+    // Already initialized (hot reload / multiple imports) — just get the existing instance
+    db = getFirestore(app);
+  }
   auth = getAuth(app);
   storage = getStorage(app);
 
