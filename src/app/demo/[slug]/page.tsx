@@ -19,41 +19,148 @@ export async function generateMetadata({ params }: DemoPageProps): Promise<Metad
   };
 }
 
-const SERVICES = [
-  {
-    title: "Menú / Catálogo Digital",
-    desc: "Presenta tus productos o servicios de forma clara y atractiva. Tus clientes podrán ver todo desde su celular.",
-    d: "M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12",
-  },
-  {
-    title: "Reservaciones en Línea",
-    desc: "Permite que tus clientes agenden citas o reserven directamente desde tu sitio web.",
-    d: "M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5",
-  },
-  {
-    title: "Ubicación y Contacto",
-    desc: "Mapa interactivo, botón de WhatsApp directo y toda tu información de contacto en un solo lugar.",
-    d: "M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z",
-  },
-  {
-    title: "Posicionamiento en Google",
-    desc: "Aparece en los primeros resultados cuando alguien busque tu tipo de negocio en tu ciudad.",
-    d: "m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z",
-  },
-];
+// ── Business type detection and dynamic content ─────────────────────────
+type BusinessType = "restaurante" | "salon" | "tienda" | "salud" | "taller" | "general";
 
-const GALLERY = [
-  { label: "Fachada del negocio", bg: "from-blue-900 to-blue-700" },
-  { label: "Interior / Ambiente", bg: "from-orange-600 to-amber-500" },
-  { label: "Productos destacados", bg: "from-blue-800 to-indigo-600" },
-  { label: "Equipo de trabajo", bg: "from-gray-700 to-gray-500" },
-  { label: "Clientes satisfechos", bg: "from-orange-700 to-orange-500" },
-  { label: "Promociones", bg: "from-blue-700 to-cyan-600" },
-];
+interface ServiceItem {
+  title: string;
+  desc: string;
+  d: string;
+}
+
+interface GalleryItem {
+  label: string;
+  bg: string;
+}
+
+const ICON_PATHS = {
+  menu: "M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12",
+  calendar: "M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5",
+  location: "M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z",
+  search: "m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z",
+  cart: "M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z",
+  scissors: "M7.848 8.25l1.536.887M7.848 8.25a3 3 0 1 1-5.196-3 3 3 0 0 1 5.196 3Zm1.536.887a2.165 2.165 0 0 1 1.083 1.839c.005.442.17.79.387 1.024m-1.47-2.863a2.17 2.17 0 0 0-1.47 2.863m1.47-2.863 5.848 3.375m-5.848-3.375L3.817 1.5M7.848 15.75l1.536-.887m-1.536.887a3 3 0 1 0-5.196 3 3 3 0 0 0 5.196-3Zm1.536-.887a2.165 2.165 0 0 0 1.083-1.838c.005-.443.17-.792.387-1.025m-1.47 2.863a2.17 2.17 0 0 1-1.47-2.863",
+  heart: "M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z",
+  wrench: "M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.049.58.025 1.193-.14 1.743",
+  star: "M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z",
+  truck: "M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25m-2.25 0h2.25m0 0v5.25",
+};
+
+const BUSINESS_KEYWORDS: Record<BusinessType, string[]> = {
+  restaurante: ["taco", "pizza", "burger", "hambur", "comida", "restaurant", "cocina", "sushi", "antojito", "parrilla", "mariscos", "café", "cafeteria", "bakery", "panaderia", "torta", "ceviche", "birria", "pollo", "carnita"],
+  salon: ["salon", "beauty", "belleza", "estética", "estetica", "barber", "barbería", "peluquer", "nail", "uñas", "spa", "hair", "cabello", "maquillaje"],
+  tienda: ["tienda", "store", "shop", "boutique", "ropa", "fashion", "zapato", "joyería", "accesorio", "mueble", "ferret", "abarrote", "mini super", "papelería"],
+  salud: ["doctor", "dentist", "clínica", "clinica", "hospital", "médico", "medico", "salud", "fisio", "nutri", "psico", "veterinar", "farmacia", "óptica", "optica", "laboratorio"],
+  taller: ["taller", "mecánic", "mecanico", "auto", "llanta", "carrocer", "electri", "plomer", "carpinter", "herrería", "herrero", "pintur", "construccion", "instalaci"],
+  general: [],
+};
+
+function detectBusinessType(slug: string): BusinessType {
+  const lower = decodeURIComponent(slug).toLowerCase().replace(/-/g, " ");
+  for (const [type, keywords] of Object.entries(BUSINESS_KEYWORDS)) {
+    if (keywords.some((kw) => lower.includes(kw))) {
+      return type as BusinessType;
+    }
+  }
+  return "general";
+}
+
+const SERVICES_BY_TYPE: Record<BusinessType, ServiceItem[]> = {
+  restaurante: [
+    { title: "Menú Digital", desc: "Presenta tus platillos con fotos y precios. Tus clientes podrán ver todo desde su celular antes de visitarte.", d: ICON_PATHS.menu },
+    { title: "Reservaciones en Línea", desc: "Permite que tus clientes reserven mesa directamente desde tu sitio web, sin llamadas.", d: ICON_PATHS.calendar },
+    { title: "Pedidos y Delivery", desc: "Recibe pedidos directamente por WhatsApp. Sin comisiones de plataformas externas.", d: ICON_PATHS.truck },
+    { title: "Posicionamiento en Google", desc: "Aparece cuando busquen restaurantes en tu zona. Más visibilidad = más clientes.", d: ICON_PATHS.search },
+  ],
+  salon: [
+    { title: "Catálogo de Servicios", desc: "Muestra tus cortes, tratamientos y precios con fotos de tu trabajo. Genera confianza antes de la visita.", d: ICON_PATHS.scissors },
+    { title: "Agenda de Citas Online", desc: "Tus clientes eligen fecha, hora y servicio desde tu web. Menos llamadas, más organización.", d: ICON_PATHS.calendar },
+    { title: "Galería de Trabajos", desc: "Muestra tu portafolio de antes y después. Nada vende más que resultados reales.", d: ICON_PATHS.star },
+    { title: "Ubicación y WhatsApp", desc: "Mapa interactivo y botón de WhatsApp directo. Que te encuentren y contacten fácilmente.", d: ICON_PATHS.location },
+  ],
+  tienda: [
+    { title: "Catálogo de Productos", desc: "Exhibe tu inventario con fotos, precios y descripciones. Tu vitrina digital abierta 24/7.", d: ICON_PATHS.cart },
+    { title: "Pedidos por WhatsApp", desc: "Tus clientes seleccionan productos y te contactan directo. Ventas sin intermediarios.", d: ICON_PATHS.truck },
+    { title: "Ofertas y Promociones", desc: "Destaca tus mejores ofertas y temporadas. Mantén a tus clientes informados.", d: ICON_PATHS.star },
+    { title: "Posicionamiento en Google", desc: "Aparece cuando busquen tiendas de tu tipo en tu zona. Más tráfico orgánico.", d: ICON_PATHS.search },
+  ],
+  salud: [
+    { title: "Servicios y Especialidades", desc: "Presenta tus servicios médicos, especialidades y equipo profesional con claridad y confianza.", d: ICON_PATHS.heart },
+    { title: "Agenda de Citas", desc: "Tus pacientes agendan cita desde tu web. Menos llamadas, más eficiencia en tu consultorio.", d: ICON_PATHS.calendar },
+    { title: "Ubicación y Contacto", desc: "Mapa con tu ubicación exacta, horarios de atención y botón de WhatsApp para urgencias.", d: ICON_PATHS.location },
+    { title: "Presencia en Google", desc: "Aparece cuando busquen servicios de salud en tu zona. Los pacientes te encontrarán primero.", d: ICON_PATHS.search },
+  ],
+  taller: [
+    { title: "Servicios y Cotizaciones", desc: "Lista tus servicios con precios estimados. Los clientes sabrán qué ofreces antes de llamar.", d: ICON_PATHS.wrench },
+    { title: "Galería de Trabajos", desc: "Muestra fotos de tus trabajos realizados. La prueba de tu experiencia y calidad.", d: ICON_PATHS.star },
+    { title: "WhatsApp Directo", desc: "Cotizaciones rápidas por WhatsApp. El cliente describe su problema y tú respondes al instante.", d: ICON_PATHS.location },
+    { title: "Posicionamiento Local", desc: "Aparece en Google cuando busquen talleres en tu zona. Sé la primera opción.", d: ICON_PATHS.search },
+  ],
+  general: [
+    { title: "Menú / Catálogo Digital", desc: "Presenta tus productos o servicios de forma clara y atractiva. Tus clientes podrán ver todo desde su celular.", d: ICON_PATHS.menu },
+    { title: "Reservaciones en Línea", desc: "Permite que tus clientes agenden citas o reserven directamente desde tu sitio web.", d: ICON_PATHS.calendar },
+    { title: "Ubicación y Contacto", desc: "Mapa interactivo, botón de WhatsApp directo y toda tu información de contacto en un solo lugar.", d: ICON_PATHS.location },
+    { title: "Posicionamiento en Google", desc: "Aparece en los primeros resultados cuando alguien busque tu tipo de negocio en tu ciudad.", d: ICON_PATHS.search },
+  ],
+};
+
+const GALLERY_BY_TYPE: Record<BusinessType, GalleryItem[]> = {
+  restaurante: [
+    { label: "Fachada del restaurante", bg: "from-amber-900 to-amber-700" },
+    { label: "Interior / Ambiente", bg: "from-orange-600 to-amber-500" },
+    { label: "Platillos principales", bg: "from-red-800 to-red-600" },
+    { label: "Cocina en acción", bg: "from-gray-700 to-gray-500" },
+    { label: "Clientes disfrutando", bg: "from-orange-700 to-orange-500" },
+    { label: "Bebidas y postres", bg: "from-amber-700 to-yellow-600" },
+  ],
+  salon: [
+    { label: "Fachada del salón", bg: "from-pink-900 to-pink-700" },
+    { label: "Estaciones de trabajo", bg: "from-rose-600 to-pink-500" },
+    { label: "Antes y después", bg: "from-purple-800 to-purple-600" },
+    { label: "Productos profesionales", bg: "from-gray-700 to-gray-500" },
+    { label: "Clientas satisfechas", bg: "from-pink-700 to-rose-500" },
+    { label: "Ambiente del salón", bg: "from-violet-700 to-purple-600" },
+  ],
+  tienda: [
+    { label: "Fachada de la tienda", bg: "from-blue-900 to-blue-700" },
+    { label: "Exhibición de productos", bg: "from-indigo-600 to-blue-500" },
+    { label: "Productos destacados", bg: "from-teal-800 to-teal-600" },
+    { label: "Interior de la tienda", bg: "from-gray-700 to-gray-500" },
+    { label: "Ofertas especiales", bg: "from-orange-700 to-orange-500" },
+    { label: "Nuevos ingresos", bg: "from-emerald-700 to-emerald-500" },
+  ],
+  salud: [
+    { label: "Fachada del consultorio", bg: "from-cyan-900 to-cyan-700" },
+    { label: "Sala de espera", bg: "from-teal-600 to-cyan-500" },
+    { label: "Equipo médico", bg: "from-blue-800 to-blue-600" },
+    { label: "Equipo profesional", bg: "from-gray-700 to-gray-500" },
+    { label: "Instalaciones", bg: "from-cyan-700 to-teal-500" },
+    { label: "Certificaciones", bg: "from-emerald-700 to-green-500" },
+  ],
+  taller: [
+    { label: "Fachada del taller", bg: "from-gray-900 to-gray-700" },
+    { label: "Área de trabajo", bg: "from-slate-600 to-gray-500" },
+    { label: "Herramientas y equipo", bg: "from-zinc-800 to-zinc-600" },
+    { label: "Trabajos realizados", bg: "from-amber-700 to-amber-500" },
+    { label: "Equipo de trabajo", bg: "from-gray-700 to-slate-500" },
+    { label: "Clientes satisfechos", bg: "from-green-700 to-emerald-500" },
+  ],
+  general: [
+    { label: "Fachada del negocio", bg: "from-blue-900 to-blue-700" },
+    { label: "Interior / Ambiente", bg: "from-orange-600 to-amber-500" },
+    { label: "Productos destacados", bg: "from-blue-800 to-indigo-600" },
+    { label: "Equipo de trabajo", bg: "from-gray-700 to-gray-500" },
+    { label: "Clientes satisfechos", bg: "from-orange-700 to-orange-500" },
+    { label: "Promociones", bg: "from-blue-700 to-cyan-600" },
+  ],
+};
 
 export default async function DemoPage({ params }: DemoPageProps) {
   const { slug } = await params;
   const name = slugToName(slug);
+  const businessType = detectBusinessType(slug);
+  const SERVICES = SERVICES_BY_TYPE[businessType];
+  const GALLERY = GALLERY_BY_TYPE[businessType];
 
   return (
     <div className="min-h-screen bg-white">

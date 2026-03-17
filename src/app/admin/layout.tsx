@@ -14,6 +14,8 @@ import {
   X,
   MessageSquare,
   Radar,
+  Building2,
+  Video,
 } from "lucide-react";
 import {
   collection,
@@ -27,11 +29,13 @@ import { AuthProvider, useAuth } from "@/lib/AuthContext";
 
 const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Resumen", icon: LayoutDashboard },
+  { href: "/admin/clientes", label: "Clientes", icon: Building2 },
   { href: "/admin/leads", label: "Leads", icon: Users },
   { href: "/admin/prospectos", label: "Prospección Fría", icon: UserSearch },
   { href: "/admin/seguimientos", label: "Seguimientos", icon: Clock },
   { href: "/admin/mensajeria", label: "Mensajería", icon: MessageSquare },
   { href: "/admin/radar", label: "Radar", icon: Radar },
+  { href: "/admin/campanas/tiktok", label: "TikTok Ads", icon: Video },
   { href: "/admin/configuracion", label: "Configuración", icon: Settings },
 ];
 
