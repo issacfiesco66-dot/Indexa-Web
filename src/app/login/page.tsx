@@ -48,7 +48,9 @@ export default function ClientLoginPage() {
       await signIn(email, password);
       // redirect handled by useEffect above
     } catch (err: unknown) {
+      console.error("Firebase Auth Error:", err);
       const code = (err as { code?: string })?.code || "";
+      const message = (err as { message?: string })?.message || "";
       if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
         setError("Credenciales inválidas. Verifica tu correo y contraseña.");
       } else if (code === "auth/operation-not-allowed") {
@@ -58,7 +60,7 @@ export default function ClientLoginPage() {
       } else if (code === "auth/user-disabled") {
         setError("Esta cuenta ha sido deshabilitada.");
       } else {
-        setError(`Error al iniciar sesión (${code || "desconocido"}). Intenta de nuevo.`);
+        setError(`Error: ${code || "sin-codigo"} | ${message.slice(0, 150)}`);
       }
     } finally {
       setSubmitting(false);
@@ -208,6 +210,14 @@ export default function ClientLoginPage() {
             Accede aquí
           </Link>
         </p>
+
+        {/* Diagnóstico temporal */}
+        <div className="mt-4 rounded-lg bg-gray-100 p-3 text-[10px] text-gray-500 font-mono break-all">
+          <p>API Key: {process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? `${process.env.NEXT_PUBLIC_FIREBASE_API_KEY.slice(0, 10)}...` : "NO DEFINIDA"}</p>
+          <p>Auth Domain: {process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "NO DEFINIDO"}</p>
+          <p>Project ID: {process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "NO DEFINIDO"}</p>
+          <p>Auth init: {auth ? "✅ OK" : "❌ NO"}</p>
+        </div>
       </div>
     </div>
   );
