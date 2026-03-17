@@ -3,21 +3,40 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebaseConfig";
 import { useAuth } from "@/lib/AuthContext";
 
 function LoginForm() {
-  const { signIn, user, loading } = useAuth();
+  const { signIn, signOut, user, loading } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) {
-      router.replace("/admin/dashboard");
-    }
-  }, [user, loading, router]);
+    if (loading || !user || !db) return;
+
+    setChecking(true);
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "usuarios", user.uid));
+        const role = snap.exists() ? snap.data().role : "cliente";
+        if (role === "admin") {
+          router.replace("/admin/dashboard");
+        } else {
+          // Non-admin user on admin login — sign them out so they can use admin credentials
+          await signOut();
+        }
+      } catch {
+        await signOut();
+      } finally {
+        setChecking(false);
+      }
+    })();
+  }, [user, loading, router, signOut]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

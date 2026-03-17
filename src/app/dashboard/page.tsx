@@ -294,6 +294,11 @@ export default function ClientDashboardPage() {
         };
         setProfile(userProfile);
 
+        if (userProfile.role === "admin") {
+          router.replace("/admin/dashboard");
+          return;
+        }
+
         if (userProfile.role !== "cliente") {
           setPageState("no-access");
           return;
