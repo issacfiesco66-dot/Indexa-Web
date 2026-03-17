@@ -440,17 +440,9 @@ export default function ClientDashboardPage() {
     );
   }
 
-  // ── No access state — redirect to login, never show static page ──
+  // ── No access state (DashboardGuard already blocks admins at layout level) ──
   if (pageState === "no-access") {
-    router.replace("/login");
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-indexa-blue border-t-transparent" />
-          <p className="text-sm text-gray-500">Redirigiendo...</p>
-        </div>
-      </div>
-    );
+    return <EnConstruccion onBack={() => router.push("/")} />;
   }
 
   // ── No sitio state — new client welcome ───────────────────────
