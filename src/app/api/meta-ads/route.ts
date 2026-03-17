@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyIdToken } from "@/lib/verifyAuth";
+import { createRateLimiter } from "@/lib/rateLimit";
+
+// Rate limit: 20 requests per minute per IP
+const limiter = createRateLimiter({ windowMs: 60_000, max: 20 });
 
 const META_GRAPH_URL = "https://graph.facebook.com/v21.0";
 
 export async function GET(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!limiter.check(ip)) {
+    return NextResponse.json({ error: "Demasiadas solicitudes. Intenta en un minuto." }, { status: 429 });
+  }
+
   // ── Auth ──────────────────────────────────────────────────────
   const authHeader = request.headers.get("authorization") || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -109,6 +118,11 @@ async function metaPost(url: string, params: Record<string, string>) {
 }
 
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!limiter.check(ip)) {
+    return NextResponse.json({ error: "Demasiadas solicitudes. Intenta en un minuto." }, { status: 429 });
+  }
+
   // ── Auth ──────────────────────────────────────────────────────
   const authHeader = request.headers.get("authorization") || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;

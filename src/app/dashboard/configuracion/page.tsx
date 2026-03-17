@@ -109,7 +109,7 @@ export default function ConfiguracionPage() {
           if (data.statusPago === "publicado") setLaunched(true);
         }
       } catch (err) {
-        console.error("Error loading sitio:", err);
+        console.error("Error loading sitio:", err instanceof Error ? err.message : "unknown");
       } finally {
         setLoading(false);
       }
@@ -129,7 +129,7 @@ export default function ConfiguracionPage() {
           await updateDoc(doc(db, "sitios", sitioId), { [field]: value });
           setLastSaved(new Date());
         } catch (err) {
-          console.error("Auto-save error:", err);
+          console.error("Auto-save error:", err instanceof Error ? err.message : "unknown");
         } finally {
           setSaving(false);
         }
@@ -153,7 +153,7 @@ export default function ConfiguracionPage() {
         setSitio((prev) => (prev ? { ...prev, logoUrl: url } : prev));
         setLastSaved(new Date());
       } catch (err) {
-        console.error("Logo upload error:", err);
+        console.error("Logo upload error:", err instanceof Error ? err.message : "unknown");
       } finally {
         setUploading(false);
         if (fileRef.current) fileRef.current.value = "";
@@ -193,7 +193,7 @@ export default function ConfiguracionPage() {
         });
       }, 500);
     } catch (err) {
-      console.error("Launch error:", err);
+      console.error("Launch error:", err instanceof Error ? err.message : "unknown");
     } finally {
       setSaving(false);
     }

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { getProspectEmailSubject, getProspectEmailHtml } from "@/lib/emailTemplates";
 import { verifyAdmin } from "@/lib/verifyAuth";
+import { createRateLimiter } from "@/lib/rateLimit";
+
+// Rate limit: 3 bulk operations per minute per IP (each sends up to 10 emails)
+const limiter = createRateLimiter({ windowMs: 60_000, max: 3 });
 
 let _resend: Resend | null = null;
 function getResend() {
@@ -115,6 +119,14 @@ async function updateProspectoStatus(id: string, status: string, authToken: stri
 }
 
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!limiter.check(ip)) {
+    return NextResponse.json(
+      { success: false, message: "Demasiadas solicitudes. Intenta en un minuto." },
+      { status: 429 }
+    );
+  }
+
   try {
     const body: BulkBody = await request.json();
     const { prospectos, authToken, siteOrigin } = body;

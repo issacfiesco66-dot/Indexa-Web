@@ -202,7 +202,7 @@ export default function MarketingPage() {
           }
         }
       } catch (err) {
-        console.error("Error loading meta credentials:", err);
+        console.error("Error loading meta credentials:", err instanceof Error ? err.message : "unknown");
       } finally {
         setPageLoading(false);
       }
@@ -232,7 +232,7 @@ export default function MarketingPage() {
       setSaveMsg("Credenciales guardadas correctamente.");
       setShowGuide(false);
     } catch (err) {
-      console.error("Error saving credentials:", err);
+      console.error("Error saving credentials:", err instanceof Error ? err.message : "unknown");
       setSaveMsg("Error al guardar. Intenta de nuevo.");
     } finally {
       setSaving(false);

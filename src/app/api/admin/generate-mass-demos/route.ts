@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAdmin } from "@/lib/verifyAuth";
+import { createRateLimiter } from "@/lib/rateLimit";
+
+// Rate limit: 3 mass demo generations per minute per IP
+const limiter = createRateLimiter({ windowMs: 60_000, max: 3 });
 
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -107,6 +111,14 @@ async function updateProspectoStatus(
 }
 
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!limiter.check(ip)) {
+    return NextResponse.json(
+      { success: false, message: "Demasiadas solicitudes. Intenta en un minuto." },
+      { status: 429 }
+    );
+  }
+
   try {
     const body: RequestBody = await request.json();
     const { prospectos, authToken } = body;

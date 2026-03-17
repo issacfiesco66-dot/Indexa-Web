@@ -311,7 +311,7 @@ export default function ClientDashboardPage() {
         setSitio(docToSitio(sitioSnap.data()));
         setPageState("ready");
       } catch (err) {
-        console.error("Error loading client data:", err);
+        console.error("Error loading client data:", err instanceof Error ? err.message : "unknown");
         // Last-resort admin check before showing error
         const isAdmin = await checkRoleAndRedirect();
         if (!isAdmin) {
@@ -342,7 +342,7 @@ export default function ClientDashboardPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      console.error("Error saving:", err);
+      console.error("Error saving:", err instanceof Error ? err.message : "unknown");
     } finally {
       setSaving(false);
     }
@@ -362,7 +362,7 @@ export default function ClientDashboardPage() {
       await updateDoc(doc(db, "sitios", sitioId), { logoUrl: url });
       setSitio((prev) => ({ ...prev, logoUrl: url }));
     } catch (err) {
-      console.error("Error uploading logo:", err);
+      console.error("Error uploading logo:", err instanceof Error ? err.message : "unknown");
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";

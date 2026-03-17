@@ -73,6 +73,12 @@ service cloud.firestore {
         );
     }
 
+    // ── webhook_events (audit trail — server-side only via Admin SDK) ──────
+    match /webhook_events/{eventId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only Admin SDK can write (bypasses rules)
+    }
+
     // ── Cualquier otra colección: denegado por defecto ──────────────────────
     match /{document=**} {
       allow read, write: if false;

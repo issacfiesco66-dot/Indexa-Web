@@ -60,7 +60,7 @@ export default function CrearAnuncioPage() {
           }
         }
       } catch (err) {
-        console.error("Error loading API key:", err);
+        console.error("Error loading API key:", err instanceof Error ? err.message : "unknown");
       } finally {
         setPageLoading(false);
       }

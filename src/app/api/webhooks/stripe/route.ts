@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { getAdminDb } from "@/lib/firebaseAdmin";
+import { FieldValue } from "firebase-admin/firestore";
 
 let _stripe: Stripe | null = null;
 function getStripe() {
@@ -9,63 +11,85 @@ function getStripe() {
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
 
-const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+// ── Firestore Admin helpers (bypass security rules) ──────────────────────
 
-// ── Firestore REST helpers ───────────────────────────────────────────────
-
-async function updateSitioPayment(sitioId: string, plan: string) {
-  const now = new Date();
-  const vencimiento = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // +30 days
-
-  const res = await fetch(
-    `${BASE_URL}/sitios/${sitioId}?updateMask.fieldPaths=statusPago&updateMask.fieldPaths=plan&updateMask.fieldPaths=fechaVencimiento&key=${API_KEY}`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fields: {
-          statusPago: { stringValue: "activo" },
-          plan: { stringValue: plan },
-          fechaVencimiento: { timestampValue: vencimiento.toISOString() },
-        },
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    console.error("Failed to update sitio payment:", await res.text());
+async function logWebhookEvent(
+  eventId: string,
+  eventType: string,
+  status: "processing" | "success" | "error",
+  metadata: Record<string, unknown> = {}
+) {
+  try {
+    const db = getAdminDb();
+    await db.collection("webhook_events").doc(eventId).set(
+      {
+        eventId,
+        eventType,
+        status,
+        ...metadata,
+        updatedAt: FieldValue.serverTimestamp(),
+        ...(status === "processing" ? { createdAt: FieldValue.serverTimestamp() } : {}),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error("Failed to log webhook event:", err instanceof Error ? err.message : err);
   }
-  return res.ok;
+}
+
+async function isEventAlreadyProcessed(eventId: string): Promise<boolean> {
+  try {
+    const db = getAdminDb();
+    const doc = await db.collection("webhook_events").doc(eventId).get();
+    return doc.exists && doc.data()?.status === "success";
+  } catch {
+    return false;
+  }
+}
+
+async function updateSitioPayment(sitioId: string, plan: string): Promise<boolean> {
+  try {
+    const db = getAdminDb();
+    const vencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await db.collection("sitios").doc(sitioId).update({
+      statusPago: "activo",
+      plan,
+      fechaVencimiento: vencimiento,
+    });
+    return true;
+  } catch (err) {
+    console.error("Failed to update sitio payment:", err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
+async function cancelSitio(sitioId: string): Promise<boolean> {
+  try {
+    const db = getAdminDb();
+    await db.collection("sitios").doc(sitioId).update({
+      statusPago: "cancelado",
+    });
+    return true;
+  } catch (err) {
+    console.error("Failed to cancel sitio:", err instanceof Error ? err.message : err);
+    return false;
+  }
 }
 
 async function ensureClientRole(ownerId: string) {
-  // Check if user doc exists
-  const getRes = await fetch(`${BASE_URL}/usuarios/${ownerId}?key=${API_KEY}`);
+  try {
+    const db = getAdminDb();
+    const ref = db.collection("usuarios").doc(ownerId);
+    const snap = await ref.get();
 
-  if (getRes.ok) {
-    const doc = await getRes.json();
-    const currentRole = doc.fields?.role?.stringValue;
-    if (currentRole === "cliente" || currentRole === "admin") return; // Already has role
-  }
-
-  // Create or update user doc with role 'cliente'
-  const res = await fetch(
-    `${BASE_URL}/usuarios/${ownerId}?updateMask.fieldPaths=role&key=${API_KEY}`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fields: {
-          role: { stringValue: "cliente" },
-        },
-      }),
+    if (snap.exists) {
+      const role = snap.data()?.role;
+      if (role === "cliente" || role === "admin") return;
     }
-  );
 
-  if (!res.ok) {
-    console.error("Failed to set client role:", await res.text());
+    await ref.set({ role: "cliente" }, { merge: true });
+  } catch (err) {
+    console.error("Failed to set client role:", err instanceof Error ? err.message : err);
   }
 }
 
@@ -85,7 +109,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify webhook signature (native Stripe verification)
     event = getStripe().webhooks.constructEvent(body, signature, WEBHOOK_SECRET);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Webhook verification failed.";
@@ -93,7 +116,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
-  // ── Handle events ──────────────────────────────────────────────────
+  // ── Idempotency: skip already-processed events ─────────────────────
+  if (await isEventAlreadyProcessed(event.id)) {
+    return NextResponse.json({ received: true, deduplicated: true });
+  }
+
+  await logWebhookEvent(event.id, event.type, "processing");
 
   // ── Handle checkout.session.completed ──────────────────────────
   if (event.type === "checkout.session.completed") {
@@ -102,26 +130,24 @@ export async function POST(request: NextRequest) {
 
     if (!sitioId) {
       console.error("Webhook: checkout.session.completed missing sitioId in metadata");
-      // Return 200 — nothing we can do without sitioId, don't retry
+      await logWebhookEvent(event.id, event.type, "error", { error: "Missing sitioId in metadata" });
       return NextResponse.json({ received: true });
     }
 
-    // 1. Activate site — MUST succeed or Stripe retries
     const paymentOk = await updateSitioPayment(sitioId, "profesional");
     if (!paymentOk) {
-      console.error(`CRITICAL: Failed to activate sitio ${sitioId} after payment. Stripe will retry.`);
+      await logWebhookEvent(event.id, event.type, "error", { sitioId, error: "Failed to activate sitio" });
       return NextResponse.json(
         { error: `Failed to activate sitio ${sitioId}` },
         { status: 500 }
       );
     }
 
-    // 2. Ensure owner has 'cliente' role (non-critical, log but don't fail)
     if (ownerId) {
       await ensureClientRole(ownerId);
     }
 
-    console.log(`Payment activated: sitio=${sitioId} owner=${ownerId}`);
+    await logWebhookEvent(event.id, event.type, "success", { sitioId, ownerId, plan: "profesional" });
   }
 
   // ── Handle subscription cancellation ─────────────────────────
@@ -130,28 +156,15 @@ export async function POST(request: NextRequest) {
     const sitioId = subscription.metadata?.sitioId;
 
     if (sitioId) {
-      const res = await fetch(
-        `${BASE_URL}/sitios/${sitioId}?updateMask.fieldPaths=statusPago&key=${API_KEY}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fields: {
-              statusPago: { stringValue: "cancelado" },
-            },
-          }),
-        }
-      );
-
-      if (!res.ok) {
-        console.error(`CRITICAL: Failed to cancel sitio ${sitioId}. Stripe will retry.`);
+      const cancelOk = await cancelSitio(sitioId);
+      if (!cancelOk) {
+        await logWebhookEvent(event.id, event.type, "error", { sitioId, error: "Failed to cancel sitio" });
         return NextResponse.json(
           { error: `Failed to cancel sitio ${sitioId}` },
           { status: 500 }
         );
       }
-
-      console.log(`Subscription canceled: sitio=${sitioId}`);
+      await logWebhookEvent(event.id, event.type, "success", { sitioId });
     }
   }
 

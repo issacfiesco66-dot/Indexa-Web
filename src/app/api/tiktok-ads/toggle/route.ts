@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
 import { updateCampaignStatus, type TikTokCredentials } from "@/lib/tiktokAdsClient";
 import { verifyAdmin, extractToken } from "@/lib/verifyAuth";
+import { createRateLimiter } from "@/lib/rateLimit";
+
+// Rate limit: 10 toggles per minute per IP
+const limiter = createRateLimiter({ windowMs: 60_000, max: 10 });
 
 export async function POST(request: Request) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!limiter.check(ip)) {
+    return NextResponse.json({ error: "Demasiadas solicitudes." }, { status: 429 });
+  }
+
   const token = extractToken(request);
   const admin = token ? await verifyAdmin(token) : null;
   if (!admin) {

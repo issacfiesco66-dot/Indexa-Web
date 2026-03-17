@@ -36,7 +36,7 @@ export default function ClientLoginPage() {
           }
           return;
         } catch (err) {
-          console.error(`Role check attempt ${attempt + 1} failed:`, err);
+          console.error(`Role check attempt ${attempt + 1} failed:`, err instanceof Error ? err.message : "unknown");
           if (attempt < 2) await new Promise((r) => setTimeout(r, 500));
         }
       }
@@ -55,7 +55,7 @@ export default function ClientLoginPage() {
       await signIn(email, password);
       // redirect handled by useEffect above
     } catch (err: unknown) {
-      console.error("Firebase Auth Error:", err);
+      console.error("Firebase Auth Error:", err instanceof Error ? err.message : "unknown");
       const code = (err as { code?: string })?.code || "";
       const message = (err as { message?: string })?.message || "";
       if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {

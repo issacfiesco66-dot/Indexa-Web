@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { verifyIdToken } from "@/lib/verifyAuth";
+import { createRateLimiter } from "@/lib/rateLimit";
+import { getAdminDb } from "@/lib/firebaseAdmin";
 
 let _stripe: Stripe | null = null;
 function getStripe() {
   if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-02-25.clover" });
   return _stripe;
 }
+
+// Rate limit: 5 checkout sessions per minute per IP
+const limiter = createRateLimiter({ windowMs: 60_000, max: 5 });
 
 interface CheckoutBody {
   priceId: string;
@@ -15,6 +20,14 @@ interface CheckoutBody {
 }
 
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!limiter.check(ip)) {
+    return NextResponse.json(
+      { success: false, message: "Demasiadas solicitudes. Intenta en un minuto." },
+      { status: 429 }
+    );
+  }
+
   try {
     const body: CheckoutBody = await request.json();
     const { priceId, sitioId, authToken } = body;
@@ -32,6 +45,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, message: "No autorizado." },
         { status: 401 }
+      );
+    }
+
+    // Verify sitio ownership — only the owner can purchase for their site
+    try {
+      const db = getAdminDb();
+      const sitioSnap = await db.collection("sitios").doc(sitioId).get();
+      if (!sitioSnap.exists) {
+        return NextResponse.json(
+          { success: false, message: "Sitio no encontrado." },
+          { status: 404 }
+        );
+      }
+      const sitioOwner = sitioSnap.data()?.ownerId;
+      if (sitioOwner && sitioOwner !== tokenUser.uid) {
+        return NextResponse.json(
+          { success: false, message: "No tienes permiso para este sitio." },
+          { status: 403 }
+        );
+      }
+    } catch {
+      return NextResponse.json(
+        { success: false, message: "Error al verificar propiedad del sitio." },
+        { status: 500 }
       );
     }
 
