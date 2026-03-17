@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/lib/AuthContext";
 import { AuthProvider } from "@/lib/AuthContext";
 
@@ -90,6 +91,13 @@ function LoginForm() {
             {submitting ? "Ingresando..." : "Ingresar"}
           </button>
         </form>
+
+        <p className="mt-6 text-center text-xs text-gray-400">
+          ¿Eres cliente?{" "}
+          <Link href="/login" className="font-medium text-gray-500 hover:text-indexa-blue">
+            Accede a tu panel aquí
+          </Link>
+        </p>
       </div>
     </div>
   );
