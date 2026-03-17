@@ -24,25 +24,24 @@ export default function ClientLoginPage() {
     if (loading || !user || !db) return;
 
     async function redirect() {
-      try {
-        const snap = await getDoc(doc(db!, "usuarios", user!.uid));
-        const role = snap.exists() ? snap.data().role : "cliente";
-        if (role === "admin") {
-          router.replace("/admin/dashboard");
-        } else {
-          router.replace("/dashboard");
-        }
-      } catch (err) {
-        console.error("Error checking role on login:", err);
-        // Retry once before defaulting — avoids sending admins to wrong dashboard
+      // Try up to 3 times to read role — Firestore can be slow after fresh login
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const snap2 = await getDoc(doc(db!, "usuarios", user!.uid));
-          const role2 = snap2.exists() ? snap2.data().role : "cliente";
-          router.replace(role2 === "admin" ? "/admin/dashboard" : "/dashboard");
-        } catch {
-          router.replace("/dashboard");
+          const snap = await getDoc(doc(db!, "usuarios", user!.uid));
+          const role = snap.exists() ? snap.data().role : "cliente";
+          if (role === "admin") {
+            router.replace("/admin/dashboard");
+          } else {
+            router.replace("/dashboard");
+          }
+          return;
+        } catch (err) {
+          console.error(`Role check attempt ${attempt + 1} failed:`, err);
+          if (attempt < 2) await new Promise((r) => setTimeout(r, 500));
         }
       }
+      // All attempts failed — redirect to dashboard (loadData will handle admin check there)
+      router.replace("/dashboard");
     }
 
     redirect();
