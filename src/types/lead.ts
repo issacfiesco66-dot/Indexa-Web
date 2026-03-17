@@ -68,6 +68,7 @@ export type ProspectoStatus =
   | "contactado"
   | "contactado_wa"
   | "correo_enviado"
+  | "demo_generada"
   | "vendido"
   | "rechazado";
 
@@ -85,4 +86,5 @@ export interface ProspectoFrio {
   fechaUltimoContacto: Date | null;
   vistasDemo: number;
   nivelSeguimiento: number;
+  demoSlug: string;
 }

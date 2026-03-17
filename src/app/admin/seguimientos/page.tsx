@@ -92,6 +92,7 @@ export default function SeguimientosPage() {
           fechaUltimoContacto,
           vistasDemo: raw.vistasDemo ?? 0,
           nivelSeguimiento: raw.nivelSeguimiento ?? 0,
+          demoSlug: raw.demoSlug ?? "",
         });
       }
 

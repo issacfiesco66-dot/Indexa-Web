@@ -30,6 +30,8 @@ import {
   Search,
   Loader2,
   MapPin,
+  Eye,
+  LayoutTemplate,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -55,6 +57,7 @@ const PROSPECTO_STATUS_STYLES: Record<ProspectoStatus, { label: string; classes:
   contactado_wa: { label: "WhatsApp Enviado", classes: "bg-emerald-100 text-emerald-700 border-emerald-200" },
   contactado: { label: "Contactado", classes: "bg-green-100 text-green-700 border-green-200" },
   vendido: { label: "Vendido", classes: "bg-indexa-blue/10 text-indexa-blue border-indexa-blue/20" },
+  demo_generada: { label: "Demo Lista", classes: "bg-teal-100 text-teal-700 border-teal-200" },
   rechazado: { label: "Rechazado", classes: "bg-gray-100 text-gray-500 border-gray-200" },
 };
 
@@ -83,6 +86,9 @@ export default function ProspectosPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkFeedback, setBulkFeedback] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+  const [demoRunning, setDemoRunning] = useState(false);
+  const [demoProgress, setDemoProgress] = useState({ current: 0, total: 0, nombre: "" });
+  const [demoFeedback, setDemoFeedback] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
   const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -196,6 +202,7 @@ export default function ProspectosPage() {
           fechaUltimoContacto: raw.fechaUltimoContacto ? (raw.fechaUltimoContacto as Timestamp).toDate() : null,
           vistasDemo: raw.vistasDemo ?? 0,
           nivelSeguimiento: raw.nivelSeguimiento ?? 0,
+          demoSlug: raw.demoSlug ?? "",
         };
       });
       setProspectos(data);
@@ -382,6 +389,75 @@ export default function ProspectosPage() {
       setBulkFeedback({ type: "err", msg: "Error de conexión al ejecutar prospección masiva." });
     } finally {
       setBulkRunning(false);
+    }
+  }, [user, selectedIds, prospectos]);
+
+  // ── Generar Demos Masivas ────────────────────────────────────────────
+  const handleGenerateDemos = useCallback(async () => {
+    if (!user || selectedIds.size === 0) return;
+    setDemoRunning(true);
+    setDemoFeedback(null);
+    setDemoProgress({ current: 0, total: selectedIds.size, nombre: "" });
+
+    try {
+      const token = await user.getIdToken();
+      const selected = prospectos.filter((p) => selectedIds.has(p.id));
+      const payload = selected.map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+        slug: p.slug,
+        email: p.email,
+        categoria: p.categoria,
+        ciudad: p.ciudad,
+        direccion: p.direccion,
+        telefono: p.telefono,
+      }));
+
+      const res = await fetch("/api/admin/generate-mass-demos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prospectos: payload, authToken: token }),
+      });
+
+      if (!res.ok || !res.body) {
+        setDemoFeedback({ type: "err", msg: "Error al conectar con la API." });
+        setDemoRunning(false);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const dataLine = line.replace(/^data: /, "").trim();
+          if (!dataLine) continue;
+          try {
+            const evt = JSON.parse(dataLine);
+            if (evt.event === "progress") {
+              setDemoProgress({ current: evt.current, total: evt.total, nombre: evt.nombre });
+            }
+            if (evt.event === "done") {
+              setDemoFeedback({ type: "ok", msg: evt.message });
+              setSelectedIds(new Set());
+            }
+          } catch {
+            // skip non-JSON
+          }
+        }
+      }
+    } catch {
+      setDemoFeedback({ type: "err", msg: "Error de conexión al generar demos." });
+    } finally {
+      setDemoRunning(false);
     }
   }, [user, selectedIds, prospectos]);
 
@@ -594,25 +670,77 @@ export default function ProspectosPage() {
         </div>
       )}
 
+      {/* ── Demo generation feedback ───────────────────────────────── */}
+      {demoFeedback && (
+        <div
+          className={`flex items-center gap-3 rounded-xl border px-5 py-3 text-sm ${
+            demoFeedback.type === "ok"
+              ? "border-teal-200 bg-teal-50 text-teal-700"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {demoFeedback.type === "ok" ? <LayoutTemplate size={18} /> : <AlertCircle size={18} />}
+          {demoFeedback.msg}
+        </div>
+      )}
+
+      {/* ── Demo generation progress ─────────────────────────────── */}
+      {demoRunning && (
+        <div className="rounded-2xl border border-teal-200 bg-teal-50 px-5 py-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2 font-medium text-teal-700">
+              <Loader2 size={14} className="animate-spin" />
+              Generando demo {demoProgress.current}/{demoProgress.total}...
+            </span>
+            <span className="text-xs font-bold text-teal-600">
+              {demoProgress.total > 0 ? Math.round((demoProgress.current / demoProgress.total) * 100) : 0}%
+            </span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-teal-100">
+            <div
+              className="h-full rounded-full bg-teal-500 transition-all duration-300 ease-out"
+              style={{ width: `${demoProgress.total > 0 ? (demoProgress.current / demoProgress.total) * 100 : 0}%` }}
+            />
+          </div>
+          {demoProgress.nombre && (
+            <p className="mt-1.5 text-xs text-teal-600 truncate">{demoProgress.nombre}</p>
+          )}
+        </div>
+      )}
+
       {/* ── Bulk action bar ───────────────────────────────────────── */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center justify-between rounded-2xl border border-indexa-blue/20 bg-indexa-blue/5 px-5 py-3">
+        <div className="flex flex-col gap-3 rounded-2xl border border-indexa-blue/20 bg-indexa-blue/5 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-medium text-indexa-blue">
             {selectedIds.size} prospecto{selectedIds.size !== 1 && "s"} seleccionado{selectedIds.size !== 1 && "s"}
             <span className="ml-1 text-xs text-indexa-blue/60">(máx. 10)</span>
           </p>
-          <button
-            onClick={handleBulkProspect}
-            disabled={bulkRunning}
-            className="inline-flex items-center gap-2 rounded-xl bg-indexa-blue px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indexa-blue/90 disabled:opacity-60"
-          >
-            {bulkRunning ? (
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            ) : (
-              <Zap size={16} />
-            )}
-            {bulkRunning ? "Procesando..." : "Prospección Masiva"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleGenerateDemos}
+              disabled={demoRunning || bulkRunning}
+              className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-teal-700 disabled:opacity-60"
+            >
+              {demoRunning ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <LayoutTemplate size={16} />
+              )}
+              {demoRunning ? `Generando ${demoProgress.current}/${demoProgress.total}...` : "Generar Demos"}
+            </button>
+            <button
+              onClick={handleBulkProspect}
+              disabled={bulkRunning || demoRunning}
+              className="inline-flex items-center gap-2 rounded-xl bg-indexa-blue px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indexa-blue/90 disabled:opacity-60"
+            >
+              {bulkRunning ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              ) : (
+                <Zap size={16} />
+              )}
+              {bulkRunning ? "Procesando..." : "Prospección Masiva"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -694,6 +822,18 @@ export default function ProspectosPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
+                        {p.demoSlug && (
+                          <a
+                            href={`/sitio/${p.demoSlug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 transition-colors hover:bg-teal-100"
+                            title="Ver demo del sitio"
+                          >
+                            <Eye size={13} />
+                            Ver Demo
+                          </a>
+                        )}
                         {p.email && p.status !== "correo_enviado" && (
                           <button
                             onClick={() => handleSendEmail(p)}
@@ -761,6 +901,16 @@ export default function ProspectosPage() {
                   </div>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
+                  {p.demoSlug && (
+                    <a
+                      href={`/sitio/${p.demoSlug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-700 transition-colors hover:bg-teal-100"
+                    >
+                      <Eye size={13} />
+                    </a>
+                  )}
                   {p.email && p.status !== "correo_enviado" && (
                     <button
                       onClick={() => handleSendEmail(p)}
