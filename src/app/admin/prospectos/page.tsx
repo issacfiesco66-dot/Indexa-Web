@@ -93,16 +93,40 @@ export default function ProspectosPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Scraper state ──────────────────────────────────────────────────
-  const [scraperQuery, setScraperQuery] = useState("");
+  const [scraperServicio, setScraperServicio] = useState("");
+  const [scraperCiudad, setScraperCiudad] = useState("");
+  const [scraperPais, setScraperPais] = useState("México");
   const [scraperMax, setScraperMax] = useState(15);
+  const [scraperHistory, setScraperHistory] = useState<string[]>([]);
   const [scraperRunning, setScraperRunning] = useState(false);
   const [scraperProgress, setScraperProgress] = useState(0);
   const [scraperMessage, setScraperMessage] = useState("");
   const [scraperLog, setScraperLog] = useState<string[]>([]);
   const scraperAbortRef = useRef<AbortController | null>(null);
 
+  // Build the composed query from structured fields
+  const scraperQuery = [scraperServicio.trim(), scraperCiudad.trim(), scraperPais.trim()]
+    .filter(Boolean)
+    .join(", ");
+  const scraperCanSearch = scraperServicio.trim().length > 0 && scraperCiudad.trim().length > 0;
+
+  // Count existing prospectos in the same city to show duplicates indicator
+  const existingInCity = scraperCiudad.trim()
+    ? prospectos.filter((p) => p.ciudad.toLowerCase() === scraperCiudad.trim().toLowerCase()).length
+    : 0;
+
   const startScraper = useCallback(() => {
-    if (!scraperQuery.trim() || scraperRunning) return;
+    const q = [scraperServicio.trim(), scraperCiudad.trim(), scraperPais.trim()]
+      .filter(Boolean)
+      .join(", ");
+    if (!q || scraperRunning) return;
+
+    // Save to search history (avoid duplicates, max 10)
+    setScraperHistory((prev) => {
+      const next = [q, ...prev.filter((h) => h !== q)].slice(0, 10);
+      try { localStorage.setItem("indexa_scraper_history", JSON.stringify(next)); } catch {}
+      return next;
+    });
 
     setScraperRunning(true);
     setScraperProgress(0);
@@ -112,7 +136,7 @@ export default function ProspectosPage() {
     const abort = new AbortController();
     scraperAbortRef.current = abort;
 
-    const params = new URLSearchParams({ query: scraperQuery.trim(), max: String(scraperMax) });
+    const params = new URLSearchParams({ query: q, max: String(scraperMax) });
 
     fetch(`/api/scraper?${params}`, { signal: abort.signal })
       .then(async (res) => {
@@ -169,12 +193,20 @@ export default function ProspectosPage() {
         }
         setScraperRunning(false);
       });
-  }, [scraperQuery, scraperMax, scraperRunning]);
+  }, [scraperServicio, scraperCiudad, scraperPais, scraperMax, scraperRunning]);
 
   const stopScraper = useCallback(() => {
     scraperAbortRef.current?.abort();
     setScraperRunning(false);
     setScraperMessage("Scraper detenido.");
+  }, []);
+
+  // Load search history from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("indexa_scraper_history");
+      if (saved) setScraperHistory(JSON.parse(saved));
+    } catch {}
   }, []);
 
   // ── Real-time listener ───────────────────────────────────────────
@@ -562,55 +594,124 @@ export default function ProspectosPage() {
             <h3 className="text-sm font-bold text-indexa-gray-dark">Buscar Prospectos en Google Maps</h3>
           </div>
           <p className="mt-1 text-xs text-gray-400">
-            Escribe una categoría y ciudad. El sistema buscará negocios sin sitio web y los agregará automáticamente.
+            Busca por servicio/producto y ubicación. El sistema encontrará negocios sin sitio web y los agregará.
           </p>
         </div>
 
         <div className="px-5 py-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Búsqueda</label>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Servicio / Producto</label>
               <input
                 type="text"
-                value={scraperQuery}
-                onChange={(e) => setScraperQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !scraperRunning && startScraper()}
-                placeholder='Ej: "Dentistas en Monterrey", "Tacos en CDMX"'
+                value={scraperServicio}
+                onChange={(e) => setScraperServicio(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && scraperCanSearch && !scraperRunning && startScraper()}
+                placeholder="Dentistas, Tacos, Plomeros..."
                 disabled={scraperRunning}
                 className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none transition-colors focus:border-indexa-blue focus:bg-white focus:ring-2 focus:ring-indexa-blue/20 disabled:opacity-50"
               />
             </div>
-            <div className="w-24">
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Máx.</label>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Ciudad / Estado</label>
               <input
-                type="number"
-                value={scraperMax}
-                onChange={(e) => setScraperMax(Math.max(1, Math.min(50, Number(e.target.value))))}
-                min={1}
-                max={50}
+                type="text"
+                value={scraperCiudad}
+                onChange={(e) => setScraperCiudad(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && scraperCanSearch && !scraperRunning && startScraper()}
+                placeholder="Monterrey, CDMX, Jalisco..."
                 disabled={scraperRunning}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:bg-white focus:ring-2 focus:ring-indexa-blue/20 disabled:opacity-50"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none transition-colors focus:border-indexa-blue focus:bg-white focus:ring-2 focus:ring-indexa-blue/20 disabled:opacity-50"
               />
             </div>
-            {scraperRunning ? (
-              <button
-                onClick={stopScraper}
-                className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-gray-500">País</label>
+              <select
+                value={scraperPais}
+                onChange={(e) => setScraperPais(e.target.value)}
+                disabled={scraperRunning}
+                className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:bg-white focus:ring-2 focus:ring-indexa-blue/20 disabled:opacity-50"
               >
-                <SearchX size={16} />
-                Detener
-              </button>
-            ) : (
-              <button
-                onClick={startScraper}
-                disabled={!scraperQuery.trim()}
-                className="inline-flex items-center gap-2 rounded-xl bg-indexa-orange px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indexa-orange/90 disabled:opacity-40"
-              >
-                <Search size={16} />
-                Buscar
-              </button>
-            )}
+                <option value="México">México</option>
+                <option value="Colombia">Colombia</option>
+                <option value="Argentina">Argentina</option>
+                <option value="Chile">Chile</option>
+                <option value="Perú">Perú</option>
+                <option value="España">España</option>
+                <option value="Estados Unidos">Estados Unidos</option>
+                <option value="Ecuador">Ecuador</option>
+                <option value="Guatemala">Guatemala</option>
+                <option value="">Sin especificar</option>
+              </select>
+            </div>
+            <div className="flex items-end gap-2">
+              <div className="w-20">
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500">Máx.</label>
+                <input
+                  type="number"
+                  value={scraperMax}
+                  onChange={(e) => setScraperMax(Math.max(1, Math.min(50, Number(e.target.value))))}
+                  min={1}
+                  max={50}
+                  disabled={scraperRunning}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:bg-white focus:ring-2 focus:ring-indexa-blue/20 disabled:opacity-50"
+                />
+              </div>
+              {scraperRunning ? (
+                <button
+                  onClick={stopScraper}
+                  className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+                >
+                  <SearchX size={16} />
+                  Detener
+                </button>
+              ) : (
+                <button
+                  onClick={startScraper}
+                  disabled={!scraperCanSearch}
+                  className="inline-flex items-center gap-2 rounded-xl bg-indexa-orange px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indexa-orange/90 disabled:opacity-40"
+                >
+                  <Search size={16} />
+                  Buscar
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Composed query preview + duplicate indicator */}
+          {scraperCanSearch && (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <p className="text-xs text-gray-400">
+                Buscará: <span className="font-semibold text-indexa-gray-dark">&ldquo;{scraperQuery}&rdquo;</span>
+              </p>
+              {existingInCity > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-700">
+                  Ya tienes {existingInCity} prospecto{existingInCity !== 1 ? "s" : ""} en {scraperCiudad.trim()}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Search history chips */}
+          {scraperHistory.length > 0 && !scraperRunning && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-300">Recientes:</span>
+              {scraperHistory.map((h, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    const parts = h.split(", ");
+                    setScraperServicio(parts[0] || "");
+                    setScraperCiudad(parts[1] || "");
+                    setScraperPais(parts[2] || "México");
+                  }}
+                  className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-indexa-blue hover:bg-indexa-blue/5 hover:text-indexa-blue"
+                >
+                  {h}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Progress bar */}
           {(scraperRunning || scraperProgress > 0) && (
