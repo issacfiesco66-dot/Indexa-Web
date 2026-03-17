@@ -68,18 +68,31 @@ export async function GET(request: NextRequest) {
     }
 
     const res = await fetch(url);
+
+    if (!res.ok) {
+      const text = await res.text();
+      let parsed;
+      try { parsed = JSON.parse(text); } catch { parsed = null; }
+      const metaMsg = parsed?.error?.message || text.slice(0, 300);
+      return NextResponse.json(
+        { error: metaMsg, code: parsed?.error?.code, metaStatus: res.status },
+        { status: 400 }
+      );
+    }
+
     const data = await res.json();
 
     if (data.error) {
       return NextResponse.json(
         { error: data.error.message || "Error de Meta API.", code: data.error.code },
-        { status: res.status === 200 ? 400 : res.status }
+        { status: 400 }
       );
     }
 
     return NextResponse.json(data);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error al conectar con Meta.";
+    console.error("[meta-ads GET] error:", msg);
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 }

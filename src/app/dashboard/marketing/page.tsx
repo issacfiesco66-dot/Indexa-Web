@@ -254,7 +254,9 @@ export default function MarketingPage() {
       const res = await fetch(`/api/meta-ads?${params}`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { error: `Error del servidor (${res.status}): ${text.slice(0, 200)}` }; }
       if (data.error) {
         setError(data.error);
         setCampaigns([]);
@@ -262,7 +264,7 @@ export default function MarketingPage() {
         setCampaigns(data.data || []);
       }
     } catch (err) {
-      setError("Error de conexión. Verifica tu token.");
+      setError(`Error de conexión: ${err instanceof Error ? err.message : 'Verifica tu token.'}`);
     } finally {
       setLoadingCampaigns(false);
     }
