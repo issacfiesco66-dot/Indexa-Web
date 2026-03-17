@@ -28,6 +28,14 @@ export function middleware(request: NextRequest) {
     request.cookies.get("__session")?.value;
 
   if (!authCookie) {
+    // For RSC/prefetch requests, don't redirect — let the client-side handle it.
+    // This avoids race conditions where the cookie hasn't been set yet after signIn.
+    const isRSC = request.headers.get("RSC") === "1" ||
+      request.headers.get("Next-Router-State-Tree") !== null;
+    if (isRSC) {
+      return NextResponse.next();
+    }
+
     const loginUrl = new URL("/admin/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);

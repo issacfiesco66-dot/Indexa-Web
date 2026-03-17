@@ -32,8 +32,16 @@ export default function ClientLoginPage() {
         } else {
           router.replace("/dashboard");
         }
-      } catch {
-        router.replace("/dashboard");
+      } catch (err) {
+        console.error("Error checking role on login:", err);
+        // Retry once before defaulting — avoids sending admins to wrong dashboard
+        try {
+          const snap2 = await getDoc(doc(db!, "usuarios", user!.uid));
+          const role2 = snap2.exists() ? snap2.data().role : "cliente";
+          router.replace(role2 === "admin" ? "/admin/dashboard" : "/dashboard");
+        } catch {
+          router.replace("/dashboard");
+        }
       }
     }
 

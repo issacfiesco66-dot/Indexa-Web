@@ -41,14 +41,24 @@ function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hotCount, setHotCount] = useState(0);
+  const [authSettled, setAuthSettled] = useState(false);
 
   const isLoginPage = pathname === "/admin/login";
 
+  // Wait a tick after loading finishes so onAuthStateChanged can propagate
   useEffect(() => {
-    if (!loading && !user && !isLoginPage) {
+    if (!loading) {
+      const t = setTimeout(() => setAuthSettled(true), 500);
+      return () => clearTimeout(t);
+    }
+  }, [loading]);
+
+  useEffect(() => {
+    if (!authSettled || loading) return;
+    if (!user && !isLoginPage) {
       router.replace("/admin/login");
     }
-  }, [user, loading, router, isLoginPage]);
+  }, [user, authSettled, loading, router, isLoginPage]);
 
   // ── Hot prospect counter for Radar badge ─────────────────────────
   useEffect(() => {
@@ -73,7 +83,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, [user]);
 
-  if (loading) {
+  if (loading || (!authSettled && !isLoginPage)) {
     return (
       <div className="flex h-screen items-center justify-center bg-indexa-gray-light">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-indexa-blue border-t-transparent" />

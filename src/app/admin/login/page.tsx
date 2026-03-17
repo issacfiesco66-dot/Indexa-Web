@@ -44,7 +44,9 @@ function LoginForm() {
     setSubmitting(true);
     try {
       await signIn(email, password);
-      router.push("/admin/dashboard");
+      // Don't router.push here — the useEffect above will detect
+      // the new user via onAuthStateChanged and redirect properly
+      // after verifying the role in Firestore.
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code || "";
       if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
