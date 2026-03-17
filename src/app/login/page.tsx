@@ -47,8 +47,19 @@ export default function ClientLoginPage() {
     try {
       await signIn(email, password);
       // redirect handled by useEffect above
-    } catch {
-      setError("Credenciales inválidas. Verifica tu correo y contraseña.");
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code || "";
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+        setError("Credenciales inválidas. Verifica tu correo y contraseña.");
+      } else if (code === "auth/operation-not-allowed") {
+        setError("El inicio de sesión por email no está habilitado. Actívalo en Firebase Console → Authentication → Sign-in method.");
+      } else if (code === "auth/too-many-requests") {
+        setError("Demasiados intentos. Espera unos minutos e intenta de nuevo.");
+      } else if (code === "auth/user-disabled") {
+        setError("Esta cuenta ha sido deshabilitada.");
+      } else {
+        setError(`Error al iniciar sesión (${code || "desconocido"}). Intenta de nuevo.`);
+      }
     } finally {
       setSubmitting(false);
     }
