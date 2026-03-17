@@ -37,6 +37,8 @@ async function getSitioBySlug(slug: string): Promise<{ id: string; data: SitioDa
       fechaVencimiento: (raw.fechaVencimiento as string) ?? null,
       stripeCustomerId: (raw.stripeCustomerId as string) ?? "",
       templateId: (raw.templateId as SitioData["templateId"]) ?? "modern",
+      horarios: (raw.horarios as string) ?? "",
+      googleMapsUrl: (raw.googleMapsUrl as string) ?? "",
     },
   };
 }

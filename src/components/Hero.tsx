@@ -1,11 +1,19 @@
 export default function Hero() {
   return (
-    <section className="bg-indexa-gray-light">
-      <div className="mx-auto max-w-7xl px-4 py-20 text-center sm:px-6 sm:py-28 lg:px-8 lg:py-36">
-        <h1 className="mx-auto max-w-4xl text-4xl font-extrabold leading-tight tracking-tight text-indexa-blue sm:text-5xl lg:text-6xl">
+    <section className="relative overflow-hidden">
+      {/* Background image */}
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/hero-bg.jpg')" }}
+      />
+      {/* Dark overlay for readability */}
+      <div className="absolute inset-0 bg-black/65" />
+
+      <div className="relative mx-auto max-w-7xl px-4 py-20 text-center sm:px-6 sm:py-28 lg:px-8 lg:py-36">
+        <h1 className="mx-auto max-w-4xl text-4xl font-extrabold leading-tight tracking-tight text-white drop-shadow-lg sm:text-5xl lg:text-6xl">
           INDEXA tu negocio en el mundo digital.
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-indexa-gray-dark sm:text-xl">
+        <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-white/85 sm:text-xl">
           Creamos tu página web profesional, tienda en línea y estrategia SEO.
           Llevamos clientes a tu puerta, mientras tú te enfocas en vender.
         </p>

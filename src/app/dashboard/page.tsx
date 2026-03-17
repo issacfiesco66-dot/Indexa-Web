@@ -157,6 +157,8 @@ const DEFAULT_SITIO: SitioData = {
   fechaVencimiento: null,
   stripeCustomerId: "",
   templateId: "modern",
+  horarios: "",
+  googleMapsUrl: "",
 };
 
 function docToSitio(data: DocumentData): SitioData {
@@ -179,6 +181,8 @@ function docToSitio(data: DocumentData): SitioData {
     fechaVencimiento: data.fechaVencimiento ?? null,
     stripeCustomerId: data.stripeCustomerId ?? "",
     templateId: data.templateId ?? "modern",
+    horarios: data.horarios ?? "",
+    googleMapsUrl: data.googleMapsUrl ?? "",
   };
 }
 
