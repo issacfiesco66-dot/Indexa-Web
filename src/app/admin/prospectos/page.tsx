@@ -156,7 +156,15 @@ export default function ProspectosPage() {
 
     const params = new URLSearchParams({ query: q, max: String(scraperMax), token: authToken });
 
-    fetch(`/api/scraper?${params}`, { signal: abort.signal })
+    // On production, call Railway scraper service directly (Vercel can't run Python).
+    // On localhost, use the local /api/scraper route.
+    const isLocal = typeof window !== "undefined"
+      && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    const scraperBaseUrl = !isLocal && process.env.NEXT_PUBLIC_SCRAPER_URL
+      ? `${process.env.NEXT_PUBLIC_SCRAPER_URL}/scrape`
+      : "/api/scraper";
+
+    fetch(`${scraperBaseUrl}?${params}`, { signal: abort.signal })
       .then(async (res) => {
         if (!res.ok || !res.body) {
           setScraperMessage("Error al iniciar el scraper.");
@@ -610,14 +618,9 @@ export default function ProspectosPage() {
           <div className="flex items-center gap-2">
             <MapPin size={18} className="text-indexa-orange" />
             <h3 className="text-sm font-bold text-indexa-gray-dark">Buscar Prospectos en Google Maps</h3>
-            {typeof window !== "undefined" && !window.location.hostname.includes("localhost") && !window.location.hostname.includes("127.0.0.1") && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Solo local</span>
-            )}
           </div>
           <p className="mt-1 text-xs text-gray-400">
-            {typeof window !== "undefined" && !window.location.hostname.includes("localhost") && !window.location.hostname.includes("127.0.0.1")
-              ? "Esta función requiere Python + Playwright. Ejecuta 'npm run dev' en tu máquina local para buscar prospectos."
-              : "Busca por servicio/producto y ubicación. El sistema encontrará negocios sin sitio web y los agregará."}
+            Busca por servicio/producto y ubicación. El sistema encontrará negocios sin sitio web y los agregará.
           </p>
         </div>
 
