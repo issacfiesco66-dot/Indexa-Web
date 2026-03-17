@@ -84,6 +84,17 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// ── Helper: post to Meta Graph ─────────────────────────────────
+async function metaPost(url: string, params: Record<string, string>) {
+  const body = new URLSearchParams(params);
+  const res = await fetch(url, { method: "POST", body });
+  const data = await res.json();
+  if (data.error) {
+    throw new Error(data.error.message || "Error de Meta API.");
+  }
+  return data;
+}
+
 export async function POST(request: NextRequest) {
   // ── Auth ──────────────────────────────────────────────────────
   const authHeader = request.headers.get("authorization") || "";
@@ -100,34 +111,193 @@ export async function POST(request: NextRequest) {
 
   // ── Body ──────────────────────────────────────────────────────
   const body = await request.json();
-  const { metaToken, campaignId, action } = body;
+  const { metaToken, action } = body;
 
-  if (!metaToken || !campaignId || !action) {
+  if (!metaToken || !action) {
     return NextResponse.json({ error: "Faltan parámetros." }, { status: 400 });
   }
 
-  const allowedActions = ["pause", "resume"];
-  if (!allowedActions.includes(action)) {
-    return NextResponse.json({ error: "Acción no permitida." }, { status: 400 });
+  try {
+    // ── Pause / Resume ──────────────────────────────────────────
+    if (action === "pause" || action === "resume") {
+      const { campaignId } = body;
+      if (!campaignId) return NextResponse.json({ error: "Falta campaignId." }, { status: 400 });
+
+      const status = action === "pause" ? "PAUSED" : "ACTIVE";
+      const data = await metaPost(
+        `${META_GRAPH_URL}/${campaignId}`,
+        { status, access_token: metaToken }
+      );
+      return NextResponse.json({ success: true, status, data });
+    }
+
+    // ── Delete campaign ─────────────────────────────────────────
+    if (action === "delete") {
+      const { campaignId } = body;
+      if (!campaignId) return NextResponse.json({ error: "Falta campaignId." }, { status: 400 });
+
+      const data = await metaPost(
+        `${META_GRAPH_URL}/${campaignId}`,
+        { status: "DELETED", access_token: metaToken }
+      );
+      return NextResponse.json({ success: true, data });
+    }
+
+    // ── Create full campaign ────────────────────────────────────
+    if (action === "createCampaign") {
+      const {
+        adAccountId,
+        pageId,
+        campaignName,
+        dailyBudget,  // in MXN (e.g. 100)
+        targetCountry, // e.g. "MX"
+        targetCities,  // optional array of city keys
+        ageMin,
+        ageMax,
+        adText,        // primary text for the ad
+        adHeadline,    // headline
+        adLink,        // destination URL
+        ctaType,       // e.g. "LEARN_MORE", "SHOP_NOW"
+        imageBase64,   // base64 encoded image (no prefix)
+      } = body;
+
+      if (!adAccountId || !pageId || !campaignName || !dailyBudget || !imageBase64) {
+        return NextResponse.json(
+          { error: "Faltan parámetros requeridos para crear la campaña." },
+          { status: 400 }
+        );
+      }
+
+      const actId = `act_${adAccountId.replace("act_", "")}`;
+      const budgetCents = String(Math.round(parseFloat(dailyBudget) * 100));
+
+      // 1. Upload image
+      const imageData = await metaPost(
+        `${META_GRAPH_URL}/${actId}/adimages`,
+        { bytes: imageBase64, access_token: metaToken }
+      );
+      const imageHashes = imageData.images;
+      const imageHash = imageHashes ? Object.values(imageHashes)[0] as { hash: string } : null;
+
+      if (!imageHash?.hash) {
+        return NextResponse.json(
+          { error: "No se pudo subir la imagen a Meta." },
+          { status: 400 }
+        );
+      }
+
+      // 2. Create campaign
+      const campaignData = await metaPost(
+        `${META_GRAPH_URL}/${actId}/campaigns`,
+        {
+          name: campaignName,
+          objective: "OUTCOME_TRAFFIC",
+          status: "PAUSED",
+          special_ad_categories: "[]",
+          access_token: metaToken,
+        }
+      );
+      const newCampaignId = campaignData.id;
+
+      // 3. Build targeting
+      const targeting: Record<string, unknown> = {
+        age_min: ageMin || "18",
+        age_max: ageMax || "65",
+        geo_locations: {
+          countries: [targetCountry || "MX"],
+          ...(targetCities?.length ? { cities: targetCities } : {}),
+        },
+      };
+
+      // 4. Create ad set
+      const adSetData = await metaPost(
+        `${META_GRAPH_URL}/${actId}/adsets`,
+        {
+          campaign_id: newCampaignId,
+          name: `${campaignName} - Ad Set`,
+          daily_budget: budgetCents,
+          billing_event: "IMPRESSIONS",
+          optimization_goal: "LINK_CLICKS",
+          targeting: JSON.stringify(targeting),
+          status: "PAUSED",
+          bid_strategy: "LOWEST_COST_WITHOUT_CAP",
+          access_token: metaToken,
+        }
+      );
+      const adSetId = adSetData.id;
+
+      // 5. Create ad creative
+      const objectStorySpec: Record<string, unknown> = {
+        page_id: pageId,
+        link_data: {
+          image_hash: imageHash.hash,
+          message: adText || campaignName,
+          link: adLink || "https://indexa.com.mx",
+          name: adHeadline || campaignName,
+          call_to_action: {
+            type: ctaType || "LEARN_MORE",
+            value: { link: adLink || "https://indexa.com.mx" },
+          },
+        },
+      };
+
+      const creativeData = await metaPost(
+        `${META_GRAPH_URL}/${actId}/adcreatives`,
+        {
+          name: `${campaignName} - Creative`,
+          object_story_spec: JSON.stringify(objectStorySpec),
+          access_token: metaToken,
+        }
+      );
+      const creativeId = creativeData.id;
+
+      // 6. Create ad
+      const adData = await metaPost(
+        `${META_GRAPH_URL}/${actId}/ads`,
+        {
+          name: `${campaignName} - Ad`,
+          adset_id: adSetId,
+          creative: JSON.stringify({ creative_id: creativeId }),
+          status: "PAUSED",
+          access_token: metaToken,
+        }
+      );
+
+      return NextResponse.json({
+        success: true,
+        campaignId: newCampaignId,
+        adSetId,
+        creativeId,
+        adId: adData.id,
+        imageHash: imageHash.hash,
+      });
+    }
+
+    return NextResponse.json({ error: "Acción no válida." }, { status: 400 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error al conectar con Meta.";
+    return NextResponse.json({ error: msg }, { status: 502 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const authHeader = request.headers.get("authorization") || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+  const u = await verifyIdToken(token);
+  if (!u) return NextResponse.json({ error: "Token inválido." }, { status: 401 });
+
+  const body = await request.json();
+  const { metaToken, campaignId } = body;
+  if (!metaToken || !campaignId) {
+    return NextResponse.json({ error: "Faltan parámetros." }, { status: 400 });
   }
 
   try {
-    const status = action === "pause" ? "PAUSED" : "ACTIVE";
-    const url = `${META_GRAPH_URL}/${campaignId}?status=${status}&access_token=${metaToken}`;
-
-    const res = await fetch(url, { method: "POST" });
-    const data = await res.json();
-
-    if (data.error) {
-      return NextResponse.json(
-        { error: data.error.message || "Error de Meta API." },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json({ success: true, status });
+    await metaPost(`${META_GRAPH_URL}/${campaignId}`, { status: "DELETED", access_token: metaToken });
+    return NextResponse.json({ success: true });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Error al conectar con Meta.";
+    const msg = err instanceof Error ? err.message : "Error al eliminar.";
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 }

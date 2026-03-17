@@ -34,6 +34,10 @@ import {
   ArrowLeft,
   Wand2,
   ImagePlus,
+  Trash2,
+  Plus,
+  Upload,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -132,6 +136,29 @@ export default function MarketingPage() {
   const [savedAccount, setSavedAccount] = useState("");
   const [nanoBananaKey, setNanoBananaKey] = useState("");
   const [savedNanoBananaKey, setSavedNanoBananaKey] = useState("");
+  const [metaPageId, setMetaPageId] = useState("");
+  const [savedPageId, setSavedPageId] = useState("");
+
+  // Campaign creation modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [newCampaign, setNewCampaign] = useState({
+    name: "",
+    adText: "",
+    headline: "",
+    link: "",
+    dailyBudget: "100",
+    targetCountry: "MX",
+    ageMin: "18",
+    ageMax: "65",
+    ctaType: "LEARN_MORE",
+  });
+  const [adImageBase64, setAdImageBase64] = useState("");
+  const [adImagePreview, setAdImagePreview] = useState("");
+  const [generatingAdImage, setGeneratingAdImage] = useState(false);
+  const [adImagePrompt, setAdImagePrompt] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [showGuide, setShowGuide] = useState(true);
@@ -166,6 +193,10 @@ export default function MarketingPage() {
             setSavedNanoBananaKey(data.nanoBananaApiKey);
             setNanoBananaKey(data.nanoBananaApiKey);
           }
+          if (data.metaPageId) {
+            setSavedPageId(data.metaPageId);
+            setMetaPageId(data.metaPageId);
+          }
           if (data.metaAccessToken && data.metaAdAccountId) {
             setShowGuide(false);
           }
@@ -192,8 +223,10 @@ export default function MarketingPage() {
         metaAccessToken: metaToken.trim(),
         metaAdAccountId: adAccountId.trim().replace("act_", ""),
         ...(nanoBananaKey.trim() ? { nanoBananaApiKey: nanoBananaKey.trim() } : {}),
+        ...(metaPageId.trim() ? { metaPageId: metaPageId.trim() } : {}),
       });
       if (nanoBananaKey.trim()) setSavedNanoBananaKey(nanoBananaKey.trim());
+      if (metaPageId.trim()) setSavedPageId(metaPageId.trim());
       setSavedToken(metaToken.trim());
       setSavedAccount(adAccountId.trim().replace("act_", ""));
       setSaveMsg("Credenciales guardadas correctamente.");
@@ -322,6 +355,122 @@ export default function MarketingPage() {
       setActionLoading(null);
     }
   }, [user, savedToken]);
+
+  // ── Delete campaign ──────────────────────────────────────────
+  const handleDeleteCampaign = useCallback(async (campaignId: string) => {
+    if (!user || !savedToken) return;
+    setActionLoading(campaignId);
+    try {
+      const authToken = await user.getIdToken();
+      const res = await fetch("/api/meta-ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ metaToken: savedToken, campaignId, action: "delete" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCampaigns((prev) => prev.filter((c) => c.id !== campaignId));
+        setDeleteConfirm(null);
+      } else {
+        setError(data.error || "Error al eliminar campaña.");
+      }
+    } catch {
+      setError("Error de conexión.");
+    } finally {
+      setActionLoading(null);
+    }
+  }, [user, savedToken]);
+
+  // ── Generate ad image with NanoBanana ───────────────────────
+  const handleGenerateAdImage = useCallback(async () => {
+    if (!user || !savedNanoBananaKey || !adImagePrompt.trim()) return;
+    setGeneratingAdImage(true);
+    setCreateError("");
+    try {
+      const authToken = await user.getIdToken();
+      const res = await fetch("/api/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          apiKey: savedNanoBananaKey,
+          prompt: `Professional Facebook/Instagram advertisement image. ${adImagePrompt.trim()}. High quality commercial photography, clean composition, vibrant colors, no text overlay.`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCreateError(data.error || "Error al generar imagen.");
+        return;
+      }
+      setAdImageBase64(data.image);
+      setAdImagePreview(`data:${data.mimeType || "image/png"};base64,${data.image}`);
+    } catch {
+      setCreateError("Error de conexión al generar imagen.");
+    } finally {
+      setGeneratingAdImage(false);
+    }
+  }, [user, savedNanoBananaKey, adImagePrompt]);
+
+  // ── Upload image file ───────────────────────────────────────
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1];
+      setAdImageBase64(base64);
+      setAdImagePreview(result);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  // ── Create campaign ─────────────────────────────────────────
+  const handleCreateCampaign = useCallback(async () => {
+    if (!user || !savedToken || !savedAccount || !savedPageId) return;
+    if (!newCampaign.name.trim()) { setCreateError("Ingresa un nombre para la campaña."); return; }
+    if (!adImageBase64) { setCreateError("Necesitas una imagen para el anuncio."); return; }
+
+    setCreating(true);
+    setCreateError("");
+    try {
+      const authToken = await user.getIdToken();
+      const res = await fetch("/api/meta-ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          metaToken: savedToken,
+          action: "createCampaign",
+          adAccountId: savedAccount,
+          pageId: savedPageId,
+          campaignName: newCampaign.name.trim(),
+          dailyBudget: newCampaign.dailyBudget,
+          targetCountry: newCampaign.targetCountry,
+          ageMin: newCampaign.ageMin,
+          ageMax: newCampaign.ageMax,
+          adText: newCampaign.adText,
+          adHeadline: newCampaign.headline,
+          adLink: newCampaign.link || "https://indexa.com.mx",
+          ctaType: newCampaign.ctaType,
+          imageBase64: adImageBase64,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowCreateModal(false);
+        setNewCampaign({ name: "", adText: "", headline: "", link: "", dailyBudget: "100", targetCountry: "MX", ageMin: "18", ageMax: "65", ctaType: "LEARN_MORE" });
+        setAdImageBase64("");
+        setAdImagePreview("");
+        setAdImagePrompt("");
+        fetchCampaigns();
+      } else {
+        setCreateError(data.error || "Error al crear la campaña.");
+      }
+    } catch {
+      setCreateError("Error de conexión.");
+    } finally {
+      setCreating(false);
+    }
+  }, [user, savedToken, savedAccount, savedPageId, newCampaign, adImageBase64, fetchCampaigns]);
 
   // ── Disconnect ────────────────────────────────────────────────
   const handleDisconnect = useCallback(async () => {
@@ -478,6 +627,17 @@ export default function MarketingPage() {
                     />
                     <p className="mt-1 text-[10px] text-gray-400">Obténla gratis en <a href="https://nanobananaapi.ai" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline">nanobananaapi.ai</a></p>
                   </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500">Facebook Page ID <span className="font-normal text-gray-400">(requerido para crear anuncios)</span></label>
+                    <input
+                      type="text"
+                      value={metaPageId}
+                      onChange={(e) => setMetaPageId(e.target.value)}
+                      placeholder="Ej: 123456789012345"
+                      className={`mt-1 ${inputClass}`}
+                    />
+                    <p className="mt-1 text-[10px] text-gray-400">Encuéntralo en tu página de Facebook → Acerca de → ID de la página, o en <a href="https://business.facebook.com/settings/pages" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline">Business Settings → Pages</a></p>
+                  </div>
                 </div>
                 {saveMsg && (
                   <p className={`mt-3 text-xs font-medium ${saveMsg.includes("Error") || saveMsg.includes("Completa") ? "text-red-600" : "text-green-600"}`}>
@@ -571,6 +731,15 @@ export default function MarketingPage() {
                 <RefreshCw size={12} className={loadingCampaigns ? "animate-spin" : ""} />
                 Actualizar
               </button>
+              {savedPageId && (
+                <button
+                  onClick={() => { setShowCreateModal(true); setCreateError(""); }}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indexa-orange to-orange-500 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+                >
+                  <Plus size={14} />
+                  Crear Campaña
+                </button>
+              )}
             </div>
           </div>
 
@@ -593,7 +762,16 @@ export default function MarketingPage() {
             <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white text-center">
               <Megaphone size={32} className="text-gray-300" />
               <p className="mt-3 text-sm text-gray-500">No se encontraron campañas.</p>
-              <p className="mt-1 text-xs text-gray-400">Verifica tu token y Ad Account ID, o crea tu primera campaña en Meta Ads Manager.</p>
+              {savedPageId ? (
+                <button
+                  onClick={() => { setShowCreateModal(true); setCreateError(""); }}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-indexa-orange px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-indexa-orange/90"
+                >
+                  <Plus size={14} /> Crear tu primera campaña
+                </button>
+              ) : (
+                <p className="mt-1 text-xs text-gray-400">Configura tu Facebook Page ID en las credenciales para crear campañas.</p>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -649,6 +827,32 @@ export default function MarketingPage() {
                           >
                             {actionLoading === c.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
                             Reanudar
+                          </button>
+                        )}
+                        {deleteConfirm === c.id ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleDeleteCampaign(c.id)}
+                              disabled={actionLoading === c.id}
+                              className="inline-flex items-center gap-1 rounded-lg bg-red-500 px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+                            >
+                              {actionLoading === c.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                              Confirmar
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirm(null)}
+                              className="rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 hover:bg-gray-100"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setDeleteConfirm(c.id)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                            title="Eliminar campaña"
+                          >
+                            <Trash2 size={12} />
                           </button>
                         )}
                       </div>
@@ -711,6 +915,222 @@ export default function MarketingPage() {
             </a>
           </div>
         </>
+      )}
+
+      {/* ── Campaign Creation Modal ────────────────────────────── */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 backdrop-blur-sm p-4 pt-12">
+          <div className="relative w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-2xl">
+            {/* Modal header */}
+            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+              <h2 className="flex items-center gap-2 text-lg font-bold text-indexa-gray-dark">
+                <Plus size={20} className="text-indexa-orange" />
+                Crear Nueva Campaña
+              </h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="max-h-[70vh] overflow-y-auto px-6 py-5 space-y-5">
+              {createError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-600">{createError}</div>
+              )}
+
+              {/* Campaign info */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Información de la campaña</h3>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600">Nombre de la campaña *</label>
+                  <input
+                    type="text"
+                    value={newCampaign.name}
+                    onChange={(e) => setNewCampaign(p => ({ ...p, name: e.target.value }))}
+                    placeholder="Ej: Venta de lentes en CDMX"
+                    className={`mt-1 ${inputClass}`}
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600">Presupuesto diario (MXN) *</label>
+                    <input
+                      type="number"
+                      min="20"
+                      value={newCampaign.dailyBudget}
+                      onChange={(e) => setNewCampaign(p => ({ ...p, dailyBudget: e.target.value }))}
+                      className={`mt-1 ${inputClass}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600">País objetivo</label>
+                    <select
+                      value={newCampaign.targetCountry}
+                      onChange={(e) => setNewCampaign(p => ({ ...p, targetCountry: e.target.value }))}
+                      className={`mt-1 ${inputClass}`}
+                    >
+                      <option value="MX">México</option>
+                      <option value="US">Estados Unidos</option>
+                      <option value="CO">Colombia</option>
+                      <option value="AR">Argentina</option>
+                      <option value="ES">España</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600">Edad mínima</label>
+                    <input
+                      type="number"
+                      min="13"
+                      max="65"
+                      value={newCampaign.ageMin}
+                      onChange={(e) => setNewCampaign(p => ({ ...p, ageMin: e.target.value }))}
+                      className={`mt-1 ${inputClass}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600">Edad máxima</label>
+                    <input
+                      type="number"
+                      min="13"
+                      max="65"
+                      value={newCampaign.ageMax}
+                      onChange={(e) => setNewCampaign(p => ({ ...p, ageMax: e.target.value }))}
+                      className={`mt-1 ${inputClass}`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Ad copy */}
+              <div className="space-y-3 border-t border-gray-100 pt-5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Texto del anuncio</h3>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600">Texto principal</label>
+                  <textarea
+                    value={newCampaign.adText}
+                    onChange={(e) => setNewCampaign(p => ({ ...p, adText: e.target.value }))}
+                    placeholder="Ej: Descubre nuestra nueva colección de lentes con estilo. Envío gratis a todo México."
+                    rows={2}
+                    className={`mt-1 ${inputClass} resize-none`}
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600">Titular</label>
+                    <input
+                      type="text"
+                      value={newCampaign.headline}
+                      onChange={(e) => setNewCampaign(p => ({ ...p, headline: e.target.value }))}
+                      placeholder="Ej: Lentes con estilo"
+                      className={`mt-1 ${inputClass}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600">Botón CTA</label>
+                    <select
+                      value={newCampaign.ctaType}
+                      onChange={(e) => setNewCampaign(p => ({ ...p, ctaType: e.target.value }))}
+                      className={`mt-1 ${inputClass}`}
+                    >
+                      <option value="LEARN_MORE">Más información</option>
+                      <option value="SHOP_NOW">Comprar ahora</option>
+                      <option value="SIGN_UP">Registrarse</option>
+                      <option value="SEND_MESSAGE">Enviar mensaje</option>
+                      <option value="GET_OFFER">Obtener oferta</option>
+                      <option value="BOOK_NOW">Reservar ahora</option>
+                      <option value="DOWNLOAD">Descargar</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600">URL de destino</label>
+                  <input
+                    type="url"
+                    value={newCampaign.link}
+                    onChange={(e) => setNewCampaign(p => ({ ...p, link: e.target.value }))}
+                    placeholder="https://tu-sitio.com"
+                    className={`mt-1 ${inputClass}`}
+                  />
+                </div>
+              </div>
+
+              {/* Image */}
+              <div className="space-y-3 border-t border-gray-100 pt-5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Imagen del anuncio *</h3>
+
+                {adImagePreview && (
+                  <div className="relative overflow-hidden rounded-xl border border-gray-200">
+                    <img src={adImagePreview} alt="Ad preview" className="w-full max-h-64 object-cover" />
+                    <button
+                      onClick={() => { setAdImageBase64(""); setAdImagePreview(""); }}
+                      className="absolute top-2 right-2 rounded-full bg-black/50 p-1 text-white transition-colors hover:bg-black/70"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {/* Upload */}
+                  <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 p-5 text-center transition-colors hover:border-indexa-blue hover:bg-blue-50/30">
+                    <Upload size={24} className="text-gray-400" />
+                    <span className="text-xs font-semibold text-gray-600">Subir imagen</span>
+                    <span className="text-[10px] text-gray-400">JPG, PNG (recomendado 1200x628)</span>
+                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                  </label>
+
+                  {/* Generate with AI */}
+                  {savedNanoBananaKey && (
+                    <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600">
+                        <Wand2 size={14} /> Generar con IA
+                      </div>
+                      <input
+                        type="text"
+                        value={adImagePrompt}
+                        onChange={(e) => setAdImagePrompt(e.target.value)}
+                        placeholder="Describe la imagen..."
+                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-purple-400"
+                      />
+                      <button
+                        onClick={handleGenerateAdImage}
+                        disabled={generatingAdImage || !adImagePrompt.trim()}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indexa-orange px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+                      >
+                        {generatingAdImage ? <><Loader2 size={12} className="animate-spin" /> Generando...</> : <><Wand2 size={12} /> Generar</>}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal footer */}
+            <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4">
+              <p className="text-[10px] text-gray-400">La campaña se creará en estado PAUSADO. Actívala cuando estés listo.</p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="rounded-xl px-4 py-2.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCreateCampaign}
+                  disabled={creating || !newCampaign.name.trim() || !adImageBase64}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indexa-orange to-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indexa-orange/20 transition-all hover:shadow-xl disabled:opacity-50"
+                >
+                  {creating ? <><Loader2 size={14} className="animate-spin" /> Creando...</> : <><Plus size={14} /> Crear Campaña</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
