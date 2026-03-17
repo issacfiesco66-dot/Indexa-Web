@@ -35,7 +35,9 @@ import {
   Crown,
   Rocket,
   LayoutTemplate,
+  Megaphone,
 } from "lucide-react";
+import Link from "next/link";
 
 // ── Tabs ───────────────────────────────────────────────────────────
 type Tab = "general" | "contacto" | "visual";
@@ -424,6 +426,13 @@ export default function ClientDashboardPage() {
             </span>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/marketing"
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-indexa-orange"
+            >
+              <Megaphone size={16} />
+              <span className="hidden sm:inline">Marketing</span>
+            </Link>
             {saved && (
               <span className="text-xs font-semibold text-green-600">✓ Guardado</span>
             )}
