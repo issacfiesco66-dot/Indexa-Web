@@ -365,9 +365,24 @@ def scroll_resultados(page: Page, max_results: int) -> int:
     return len(_find_result_items(page))
 
 
-def volver_a_lista(page: Page) -> None:
-    """Navigate back to the results list in Google Maps."""
-    # Try back button first (fastest, preserves DOM)
+def volver_a_lista(page: Page, expected_min: int = 0) -> None:
+    """Navigate back to the results list in Google Maps.
+    
+    Strategy order:
+    1. Press Escape (closes detail overlay, preserves feed DOM)
+    2. Click back button  
+    3. Browser back as last resort
+    """
+    # Strategy 1: Escape key — best for closing detail panel overlays
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(1500)
+
+    # Check if feed items are back
+    items = _find_result_items(page)
+    if items and len(items) >= max(expected_min, 1):
+        return
+
+    # Strategy 2: Click back button
     for selector in [
         'button[aria-label="Atrás"]',
         'button[aria-label="Back"]',
@@ -375,21 +390,34 @@ def volver_a_lista(page: Page) -> None:
     ]:
         try:
             btn = page.locator(selector).first
-            if btn.is_visible(timeout=1000):
+            if btn.is_visible(timeout=1500):
                 btn.click()
+                page.wait_for_timeout(2000)
                 break
         except (PwTimeout, Exception):
             continue
     else:
-        # Fallback: browser back
+        # Strategy 3: browser back
         page.go_back()
+        page.wait_for_timeout(2000)
 
-    # Wait for the feed to reappear (confirms we're back on the list)
+    # Wait for the feed to reappear
     try:
-        page.wait_for_selector('div[role="feed"]', timeout=5000)
-        page.wait_for_timeout(800)
+        page.wait_for_selector('div[role="feed"]', timeout=8000)
+        page.wait_for_timeout(1000)
     except (PwTimeout, Exception):
-        page.wait_for_timeout(1500)
+        page.wait_for_timeout(2000)
+
+    # Wait until items are visible again
+    if expected_min > 0:
+        for _ in range(8):
+            items = _find_result_items(page)
+            if len(items) >= expected_min:
+                return
+            page.wait_for_timeout(800)
+        # If still not enough, log it
+        actual = len(_find_result_items(page))
+        print(f"  ⚠ Esperaba {expected_min} items, encontró {actual} tras volver.")
 
 
 def extraer_prospectos(page: Page, max_results: int) -> list[Prospecto]:
@@ -533,7 +561,7 @@ def extraer_prospectos(page: Page, max_results: int) -> list[Prospecto]:
             print(f"  [{i+1}/{total}] ⚠ Error: {type(e).__name__}")
 
         # Go back to the list using back button (preserves DOM state)
-        volver_a_lista(page)
+        volver_a_lista(page, expected_min=min(total, i + 1))
 
     return prospectos
 
