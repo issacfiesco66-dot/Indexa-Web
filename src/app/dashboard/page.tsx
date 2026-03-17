@@ -263,6 +263,9 @@ export default function ClientDashboardPage() {
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // ── Redirect flag (prevents showing wrong UI while navigating away) ──
+  const [redirecting, setRedirecting] = useState(false);
+
   // ── Load user profile + sitio data ─────────────────────────────
   useEffect(() => {
     if (authLoading) return;
@@ -277,8 +280,26 @@ export default function ClientDashboardPage() {
       return;
     }
 
+    async function checkRoleAndRedirect(): Promise<boolean> {
+      try {
+        const snap = await getDoc(doc(db!, "usuarios", user!.uid));
+        if (snap.exists() && snap.data().role === "admin") {
+          setRedirecting(true);
+          router.replace("/admin/dashboard");
+          return true;
+        }
+      } catch {
+        // Will retry in loadData
+      }
+      return false;
+    }
+
     async function loadData() {
       try {
+        // First: quick admin check — redirect before doing anything else
+        const isAdmin = await checkRoleAndRedirect();
+        if (isAdmin) return;
+
         const profileSnap = await getDoc(doc(db!, "usuarios", user!.uid));
 
         if (!profileSnap.exists()) {
@@ -295,6 +316,7 @@ export default function ClientDashboardPage() {
         setProfile(userProfile);
 
         if (userProfile.role === "admin") {
+          setRedirecting(true);
           router.replace("/admin/dashboard");
           return;
         }
@@ -320,7 +342,11 @@ export default function ClientDashboardPage() {
         setPageState("ready");
       } catch (err) {
         console.error("Error loading client data:", err);
-        setPageState("no-access");
+        // Last-resort admin check before showing error
+        const isAdmin = await checkRoleAndRedirect();
+        if (!isAdmin) {
+          setPageState("no-access");
+        }
       }
     }
 
@@ -403,7 +429,7 @@ export default function ClientDashboardPage() {
   };
 
   // ── Loading state ──────────────────────────────────────────────
-  if (pageState === "loading" || authLoading) {
+  if (pageState === "loading" || authLoading || redirecting) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-4">
