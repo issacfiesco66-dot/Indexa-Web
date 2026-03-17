@@ -15,7 +15,7 @@ import {
 } from "firebase/storage";
 import { db, storage } from "@/lib/firebaseConfig";
 import { useAuth } from "@/lib/AuthContext";
-import type { SitioData, UserProfile } from "@/types/lead";
+import type { SitioData, UserProfile, TemplateId } from "@/types/lead";
 import {
   Eye,
   MousePointerClick,
@@ -34,6 +34,7 @@ import {
   Sparkles,
   Crown,
   Rocket,
+  LayoutTemplate,
 } from "lucide-react";
 
 // ── Tabs ───────────────────────────────────────────────────────────
@@ -114,6 +115,28 @@ const PLANS = [
   },
 ];
 
+// ── Templates ────────────────────────────────────────────────────────
+const TEMPLATES: { id: TemplateId; name: string; desc: string; preview: string }[] = [
+  {
+    id: "modern",
+    name: "Moderno",
+    desc: "Esquinas redondeadas, gradientes en botones, sombras suaves. Ideal para negocios dinámicos.",
+    preview: "rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600",
+  },
+  {
+    id: "elegant",
+    name: "Elegante",
+    desc: "Tipografía serif, bordes finos, colores sobrios. Perfecto para profesionales y consultorios.",
+    preview: "rounded-sm border-2 border-amber-700 bg-stone-100",
+  },
+  {
+    id: "minimalist",
+    name: "Minimalista",
+    desc: "Ultra-limpio, sin sombras, bordes rectos. Enfoque total en contenido y fotos.",
+    preview: "rounded-none border border-gray-900 bg-white",
+  },
+];
+
 // ── Default sitio data ─────────────────────────────────────────────
 const DEFAULT_SITIO: SitioData = {
   nombre: "",
@@ -133,6 +156,7 @@ const DEFAULT_SITIO: SitioData = {
   plan: "",
   fechaVencimiento: null,
   stripeCustomerId: "",
+  templateId: "modern",
 };
 
 function docToSitio(data: DocumentData): SitioData {
@@ -154,6 +178,7 @@ function docToSitio(data: DocumentData): SitioData {
     plan: data.plan ?? "",
     fechaVencimiento: data.fechaVencimiento ?? null,
     stripeCustomerId: data.stripeCustomerId ?? "",
+    templateId: data.templateId ?? "modern",
   };
 }
 
@@ -689,6 +714,58 @@ export default function ClientDashboardPage() {
                     style={{ backgroundColor: sitio.colorPrincipal }}
                   >
                     Vista previa: {sitio.nombre || "Tu negocio"}
+                  </div>
+                </div>
+
+                {/* Template selector */}
+                <div>
+                  <label className="block text-sm font-semibold text-indexa-gray-dark">
+                    <LayoutTemplate size={16} className="mr-1.5 inline-block" />
+                    Estilo de tu sitio web
+                  </label>
+                  <p className="mt-1 text-xs text-gray-400">
+                    Elige el diseño que mejor represente a tu negocio. El cambio se aplica inmediatamente.
+                  </p>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                    {TEMPLATES.map((tmpl) => {
+                      const isActive = sitio.templateId === tmpl.id;
+                      return (
+                        <button
+                          key={tmpl.id}
+                          onClick={() => updateField("templateId", tmpl.id)}
+                          className={`group relative overflow-hidden rounded-2xl border-2 p-4 text-left transition-all ${
+                            isActive
+                              ? "border-indexa-blue ring-2 ring-indexa-blue/20 bg-indexa-blue/5"
+                              : "border-gray-200 hover:border-gray-300 bg-white"
+                          }`}
+                        >
+                          {isActive && (
+                            <div className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-indexa-blue">
+                              <Check size={12} className="text-white" />
+                            </div>
+                          )}
+                          {/* Mini preview */}
+                          <div className={`mx-auto mb-3 h-16 w-full ${tmpl.preview}`}>
+                            <div className="flex h-full flex-col items-center justify-center gap-1 px-2">
+                              <div
+                                className={`h-1.5 w-12 rounded-full ${
+                                  tmpl.id === "elegant" ? "bg-amber-700/40" :
+                                  tmpl.id === "minimalist" ? "bg-gray-900/30" : "bg-white/50"
+                                }`}
+                              />
+                              <div
+                                className={`h-1 w-8 rounded-full ${
+                                  tmpl.id === "elegant" ? "bg-amber-700/25" :
+                                  tmpl.id === "minimalist" ? "bg-gray-900/15" : "bg-white/30"
+                                }`}
+                              />
+                            </div>
+                          </div>
+                          <h4 className="text-sm font-bold text-indexa-gray-dark">{tmpl.name}</h4>
+                          <p className="mt-1 text-[11px] leading-snug text-gray-400">{tmpl.desc}</p>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 

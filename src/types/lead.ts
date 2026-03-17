@@ -34,6 +34,7 @@ export interface Lead {
 
 export type PlanType = "starter" | "profesional" | "enterprise";
 export type StatusPago = "inactivo" | "activo" | "cancelado" | "vencido";
+export type TemplateId = "modern" | "elegant" | "minimalist";
 
 export interface SitioData {
   nombre: string;
@@ -53,6 +54,7 @@ export interface SitioData {
   plan: PlanType | "";
   fechaVencimiento: string | null;
   stripeCustomerId: string;
+  templateId: TemplateId;
 }
 
 export interface UserProfile {
