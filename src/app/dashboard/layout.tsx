@@ -20,14 +20,19 @@ function DashboardGuard({ children }: { children: React.ReactNode }) {
     if (!db) { setAllowed(true); return; }
 
     (async () => {
-      try {
-        const snap = await getDoc(doc(db, "usuarios", user.uid));
-        if (snap.exists() && snap.data().role === "admin") {
-          router.replace("/admin/dashboard");
-          return;
+      // Retry up to 3 times — Firestore can reject reads right after login
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 800));
+          const snap = await getDoc(doc(db, "usuarios", user.uid));
+          if (snap.exists() && snap.data().role === "admin") {
+            router.replace("/admin/dashboard");
+            return;
+          }
+          break; // Read succeeded, user is not admin — allow through
+        } catch {
+          // Retry
         }
-      } catch {
-        // If Firestore fails, allow through — the page will handle it
       }
       setAllowed(true);
     })();

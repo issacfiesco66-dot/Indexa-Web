@@ -21,20 +21,30 @@ function LoginForm() {
 
     setChecking(true);
     (async () => {
-      try {
-        const snap = await getDoc(doc(db, "usuarios", user.uid));
-        const role = snap.exists() ? snap.data().role : "cliente";
-        if (role === "admin") {
-          router.replace("/admin/dashboard");
-        } else {
-          // Non-admin user on admin login — sign them out so they can use admin credentials
-          await signOut();
+      // Retry up to 3 times — Firestore can reject reads right after login
+      // because the auth token hasn't propagated yet
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 800));
+          const snap = await getDoc(doc(db, "usuarios", user.uid));
+          const role = snap.exists() ? snap.data().role : "cliente";
+          if (role === "admin") {
+            router.replace("/admin/dashboard");
+            setChecking(false);
+            return;
+          } else {
+            // Non-admin user on admin login — sign them out
+            await signOut();
+            setChecking(false);
+            return;
+          }
+        } catch (err) {
+          console.error(`Admin role check attempt ${attempt + 1} failed:`, err);
         }
-      } catch {
-        await signOut();
-      } finally {
-        setChecking(false);
       }
+      // All 3 attempts failed — do NOT sign out, just show error
+      setError("Error al verificar permisos. Recarga la página e intenta de nuevo.");
+      setChecking(false);
     })();
   }, [user, loading, router, signOut]);
 
