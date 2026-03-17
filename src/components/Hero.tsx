@@ -1,37 +1,83 @@
 export default function Hero() {
   return (
-    <section className="relative overflow-hidden">
-      {/* Background image */}
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/Gemini_Generated_Image_g4ei4qg4ei4qg4ei.png')" }}
-      />
-      {/* Dark overlay for readability */}
-      <div className="absolute inset-0 bg-black/65" />
+    <section className="relative min-h-screen overflow-hidden bg-[#050816]">
+      {/* Animated grid background */}
+      <div className="absolute inset-0 opacity-[0.07]">
+        <div
+          className="absolute inset-0 animate-grid-move"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,102,0,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,102,0,0.3) 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
+          }}
+        />
+      </div>
 
-      <div className="relative mx-auto max-w-7xl px-4 py-20 text-center sm:px-6 sm:py-28 lg:px-8 lg:py-36">
-        <h1 className="mx-auto max-w-4xl text-4xl font-extrabold leading-tight tracking-tight text-white drop-shadow-lg sm:text-5xl lg:text-6xl">
-          INDEXA tu negocio en el mundo digital.
+      {/* Gradient orbs */}
+      <div className="absolute top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-indexa-blue/20 blur-[120px] animate-pulse-glow" />
+      <div className="absolute bottom-1/4 right-1/4 h-[400px] w-[400px] rounded-full bg-indexa-orange/15 blur-[120px] animate-pulse-glow" style={{ animationDelay: "2s" }} />
+      <div className="absolute top-1/2 left-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-500/10 blur-[100px] animate-pulse-glow" style={{ animationDelay: "4s" }} />
+
+      {/* Content */}
+      <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col items-center justify-center px-4 pt-20 text-center sm:px-6 lg:px-8">
+        {/* Badge */}
+        <div className="animate-fade-up mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-sm">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indexa-orange opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-indexa-orange" />
+          </span>
+          <span className="text-sm font-medium text-white/80">Potenciado por Inteligencia Artificial</span>
+        </div>
+
+        <h1 className="animate-fade-up-delay mx-auto max-w-5xl text-4xl font-extrabold leading-[1.1] tracking-tight text-white sm:text-6xl lg:text-7xl">
+          Tu negocio merece una{" "}
+          <span className="bg-gradient-to-r from-indexa-orange via-orange-400 to-amber-300 bg-clip-text text-transparent">
+            presencia digital
+          </span>{" "}
+          inteligente
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-white/85 sm:text-xl">
-          Creamos tu página web profesional, tienda en línea y estrategia SEO.
-          Llevamos clientes a tu puerta, mientras tú te enfocas en vender.
+
+        <p className="animate-fade-up-delay-2 mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-white/60 sm:text-xl">
+          Creamos tu sitio web profesional con IA, gestionamos tus campañas de
+          Meta Ads y te conectamos con clientes reales. Todo desde un solo panel.
         </p>
-        <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+
+        {/* CTAs */}
+        <div className="animate-fade-up-delay-2 mt-10 flex flex-col items-center gap-4 sm:flex-row">
           <a
             href="/registro"
-            className="inline-block rounded-xl bg-indexa-orange px-8 py-4 text-lg font-bold text-white shadow-lg transition-all hover:bg-indexa-orange/90 hover:shadow-xl hover:-translate-y-0.5"
+            className="group relative inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indexa-orange to-orange-500 px-8 py-4 text-lg font-bold text-white shadow-2xl shadow-indexa-orange/25 transition-all hover:shadow-indexa-orange/40 hover:-translate-y-0.5"
           >
-            Crear mi Cuenta Gratis
+            Comenzar Gratis
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-5 w-5 transition-transform group-hover:translate-x-1">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+            </svg>
           </a>
           <a
-            href="#precios"
-            className="inline-block rounded-xl border-2 border-white/30 px-8 py-4 text-lg font-bold text-white transition-all hover:border-white/60 hover:bg-white/10"
+            href="#como-funciona"
+            className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-8 py-4 text-lg font-bold text-white backdrop-blur-sm transition-all hover:border-white/30 hover:bg-white/10"
           >
-            Ver Planes y Precios
+            Ver cómo funciona
           </a>
         </div>
+
+        {/* Stats bar */}
+        <div className="mt-20 grid w-full max-w-3xl grid-cols-3 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
+          {[
+            { value: "500+", label: "Negocios activos" },
+            { value: "98%", label: "Clientes satisfechos" },
+            { value: "24/7", label: "Soporte con IA" },
+          ].map((stat) => (
+            <div key={stat.label} className="px-6 py-5 text-center">
+              <p className="text-2xl font-extrabold text-white sm:text-3xl">{stat.value}</p>
+              <p className="mt-1 text-xs font-medium text-white/50 sm:text-sm">{stat.label}</p>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Bottom gradient fade */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent" />
     </section>
   );
 }
