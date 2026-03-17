@@ -17,12 +17,18 @@ export default function Hero() {
           Creamos tu página web profesional, tienda en línea y estrategia SEO.
           Llevamos clientes a tu puerta, mientras tú te enfocas en vender.
         </p>
-        <div className="mt-10">
+        <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
           <a
-            href="#contacto"
+            href="/registro"
             className="inline-block rounded-xl bg-indexa-orange px-8 py-4 text-lg font-bold text-white shadow-lg transition-all hover:bg-indexa-orange/90 hover:shadow-xl hover:-translate-y-0.5"
           >
-            Cotizar mi Sitio
+            Crear mi Cuenta Gratis
+          </a>
+          <a
+            href="#precios"
+            className="inline-block rounded-xl border-2 border-white/30 px-8 py-4 text-lg font-bold text-white transition-all hover:border-white/60 hover:bg-white/10"
+          >
+            Ver Planes y Precios
           </a>
         </div>
       </div>

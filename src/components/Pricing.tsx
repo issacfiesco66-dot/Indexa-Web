@@ -1,50 +1,50 @@
 const plans = [
   {
-    name: "Básico",
-    price: "$2,499",
+    name: "Starter",
+    price: "$299",
     period: "/mes",
-    description: "Ideal para negocios que inician su presencia digital.",
+    description: "Todo lo que necesitas para arrancar tu presencia digital.",
     features: [
-      "Página web de 1-3 secciones",
-      "Diseño responsivo (móvil)",
-      "Formulario de contacto",
+      "Página web profesional",
+      "Diseño responsivo (móvil y escritorio)",
+      "Botón de WhatsApp integrado",
+      "SEO básico incluido",
       "Certificado SSL",
       "Soporte por email",
     ],
-    cta: "Elegir Básico",
+    cta: "Comenzar Ahora",
     highlighted: false,
   },
   {
-    name: "Pro",
-    price: "$4,999",
+    name: "Profesional",
+    price: "$599",
     period: "/mes",
-    description: "Para negocios que quieren crecer y vender en línea.",
+    description: "Para negocios que quieren crecer y gestionar su marketing.",
     features: [
-      "Página web hasta 8 secciones",
-      "Tienda en línea (hasta 50 productos)",
-      "SEO básico incluido",
-      "Integración con redes sociales",
-      "Google Analytics",
+      "Todo lo de Starter",
+      "Dominio personalizado",
+      "Panel de marketing (Meta Ads)",
+      "Analíticas avanzadas de visitas",
+      "Panel CMS completo",
       "Soporte prioritario",
     ],
-    cta: "Elegir Pro",
+    cta: "Elegir Profesional",
     highlighted: true,
   },
   {
-    name: "Empresarial",
-    price: "$9,999",
+    name: "Enterprise",
+    price: "$1,299",
     period: "/mes",
-    description: "Solución completa para empresas con alto volumen.",
+    description: "Solución completa con asesoría dedicada para tu negocio.",
     features: [
-      "Sitio web personalizado ilimitado",
-      "E-commerce completo",
-      "SEO avanzado y SEM",
-      "Blog integrado",
-      "Dashboard de métricas",
-      "Soporte 24/7 dedicado",
-      "Capacitación incluida",
+      "Todo lo de Profesional",
+      "Múltiples páginas de destino",
+      "Integración con redes sociales",
+      "Email marketing incluido",
+      "Asesor dedicado",
+      "SLA garantizado",
     ],
-    cta: "Elegir Empresarial",
+    cta: "Elegir Enterprise",
     highlighted: false,
   },
 ];
@@ -107,7 +107,7 @@ export default function Pricing() {
               </ul>
 
               <a
-                href="#contacto"
+                href="/registro"
                 className={`mt-8 block rounded-xl py-3 text-center text-sm font-bold transition-colors ${
                   plan.highlighted
                     ? "bg-indexa-orange text-white hover:bg-indexa-orange/90"

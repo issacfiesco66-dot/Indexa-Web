@@ -26,10 +26,16 @@ export default function Header() {
             Contacto
           </a>
           <Link
-            href="/admin/login"
-            className="rounded-lg bg-indexa-blue px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indexa-blue/90"
+            href="/login"
+            className="text-sm font-medium text-indexa-gray-dark hover:text-indexa-blue transition-colors"
           >
             Iniciar Sesión
+          </Link>
+          <Link
+            href="/registro"
+            className="rounded-lg bg-indexa-orange px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indexa-orange/90"
+          >
+            Crear Cuenta Gratis
           </Link>
         </div>
 
@@ -59,11 +65,18 @@ export default function Header() {
               Contacto
             </a>
             <Link
-              href="/admin/login"
+              href="/login"
               onClick={() => setMenuOpen(false)}
-              className="mt-2 rounded-lg bg-indexa-blue px-5 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-indexa-blue/90"
+              className="text-sm font-medium text-indexa-gray-dark hover:text-indexa-blue"
             >
               Iniciar Sesión
+            </Link>
+            <Link
+              href="/registro"
+              onClick={() => setMenuOpen(false)}
+              className="mt-2 rounded-lg bg-indexa-orange px-5 py-2.5 text-center text-sm font-bold text-white transition-colors hover:bg-indexa-orange/90"
+            >
+              Crear Cuenta Gratis
             </Link>
           </div>
         </div>
