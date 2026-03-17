@@ -1,0 +1,22 @@
+# Python scraper (only runs locally / Windows Task Scheduler)
+scraper_indexa.py
+scripts/
+config_busqueda.json
+ejecutar_scraper.bat
+prospectos_output.json
+logs_scraper.txt
+INSTRUCCIONES_AUTOMATIZACION.md
+
+# Firebase service account
+serviceAccountKey.json
+**/serviceAccountKey.json
+
+# Python artifacts
+__pycache__/
+*.pyc
+
+# Env files
+.env*
+
+# Misc
+.DS_Store

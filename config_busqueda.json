@@ -1,0 +1,21 @@
+{
+  "categorias": [
+    "Restaurantes",
+    "Dentistas",
+    "Talleres mecánicos",
+    "Estéticas y salones de belleza",
+    "Tortillerías",
+    "Veterinarias",
+    "Papelerías",
+    "Gimnasios"
+  ],
+  "ciudades": [
+    "Chalco",
+    "Texcoco",
+    "Ixtapaluca",
+    "Los Reyes La Paz",
+    "Chicoloapan",
+    "Chimalhuacán"
+  ],
+  "max_por_busqueda": 15
+}

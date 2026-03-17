@@ -33,6 +33,19 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# Firebase service account key (NEVER commit)
+serviceAccountKey.json
+**/serviceAccountKey.json
+
+# Python scraper outputs
+scripts/__pycache__/
+scripts/*.json
+!scripts/requirements.txt
+__pycache__/
+*.pyc
+prospectos_output.json
+logs_scraper.txt
+
 # vercel
 .vercel
 

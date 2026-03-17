@@ -1,0 +1,54 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper: verifica si el usuario tiene rol 'admin' en /usuarios/{uid} ──
+    function isAdmin() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == "admin";
+    }
+
+    function isOwner(ownerId) {
+      return request.auth != null && request.auth.uid == ownerId;
+    }
+
+    // ── leads (formulario público) ──────────────────────────────────────────
+    // Crear: público (cualquiera puede enviar el formulario de contacto)
+    // Leer, actualizar, eliminar: solo admin
+    match /leads/{leadId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ── prospectos_frios (CRM / Scraper) ────────────────────────────────────
+    // TODAS las operaciones: solo admin
+    match /prospectos_frios/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ── usuarios (perfiles) ─────────────────────────────────────────────────
+    // Leer: el propio usuario o admin
+    // Escribir: solo admin (para asignar roles)
+    match /usuarios/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ── sitios (páginas públicas de clientes) ───────────────────────────────
+    // Leer: público (las webs deben ser visibles para todos)
+    // Crear: solo admin
+    // Actualizar/Eliminar: admin o propietario del sitio
+    match /sitios/{sitioId} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update, delete: if request.auth != null
+        && (resource.data.ownerId == request.auth.uid || isAdmin());
+    }
+
+    // ── Cualquier otra colección: denegado por defecto ──────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

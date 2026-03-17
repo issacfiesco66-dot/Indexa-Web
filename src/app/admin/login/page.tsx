@@ -1,0 +1,104 @@
+"use client";
+
+import { useState, useEffect, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/AuthContext";
+import { AuthProvider } from "@/lib/AuthContext";
+
+function LoginForm() {
+  const { signIn, user, loading } = useAuth();
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace("/admin/dashboard");
+    }
+  }, [user, loading, router]);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSubmitting(true);
+    try {
+      await signIn(email, password);
+      router.push("/admin/dashboard");
+    } catch {
+      setError("Credenciales inválidas. Verifica tu correo y contraseña.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-indexa-gray-light px-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-extrabold tracking-tight text-indexa-blue">INDEXA</h1>
+          <p className="mt-2 text-sm text-indexa-gray-dark">Panel de Administración</p>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm"
+        >
+          <h2 className="text-lg font-bold text-indexa-gray-dark">Iniciar Sesión</h2>
+
+          {error && (
+            <div className="mt-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          <div className="mt-6 space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-semibold text-indexa-gray-dark">
+                Correo electrónico
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-indexa-gray-light px-4 py-3 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="block text-sm font-semibold text-indexa-gray-dark">
+                Contraseña
+              </label>
+              <input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-indexa-gray-light px-4 py-3 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="mt-6 w-full rounded-xl bg-indexa-blue px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-indexa-blue/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {submitting ? "Ingresando..." : "Ingresar"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <AuthProvider>
+      <LoginForm />
+    </AuthProvider>
+  );
+}
