@@ -261,24 +261,77 @@ def buscar_en_maps(page: Page, query: str) -> None:
     search_box.fill(query)
     page.wait_for_timeout(500)
     search_box.press("Enter")
-    page.wait_for_timeout(4000)
+    page.wait_for_timeout(6000)
+
+    # Wait for results to actually appear (feed or place links)
+    try:
+        page.wait_for_selector('div[role="feed"], a[href*="/maps/place/"]', timeout=10000)
+        page.wait_for_timeout(2000)
+        print(f"  ✓ Resultados cargados para: {query}")
+    except PwTimeout:
+        print(f"  ⚠ Timeout esperando resultados para: {query}")
+        try:
+            page.screenshot(path="debug_after_search.png")
+            print("  📸 Screenshot guardado: debug_after_search.png")
+        except Exception:
+            pass
+
+
+# Multiple selectors for result items (Google Maps changes DOM frequently)
+RESULT_ITEM_SELECTORS = [
+    'div[role="feed"] > div > div > a',
+    'div[role="feed"] a[href*="/maps/place/"]',
+    'div[role="feed"] [jsaction] a[href*="/maps/place/"]',
+    'a[href*="/maps/place/"]',
+]
+
+
+def _find_result_items(page: Page) -> list:
+    """Try multiple selectors to find result items in the feed."""
+    for selector in RESULT_ITEM_SELECTORS:
+        items = page.locator(selector).all()
+        if items:
+            return items
+    return []
+
+
+def _find_feed(page: Page) -> str | None:
+    """Try multiple selectors for the results scrollable container."""
+    for selector in ['div[role="feed"]', 'div[role="main"] div[tabindex="-1"]', 'div[role="main"]']:
+        try:
+            if page.locator(selector).first.is_visible(timeout=2000):
+                return selector
+        except (PwTimeout, Exception):
+            continue
+    return None
 
 
 def scroll_resultados(page: Page, max_results: int) -> int:
     """Hace scroll en el panel de resultados."""
-    feed_selector = 'div[role="feed"]'
+    feed_selector = _find_feed(page)
 
-    try:
-        page.wait_for_selector(feed_selector, timeout=10000)
-    except PwTimeout:
+    if not feed_selector:
+        # Last resort: wait a bit longer and retry
+        page.wait_for_timeout(5000)
+        feed_selector = _find_feed(page)
+
+    if not feed_selector:
         print("  ✗ No se encontró el panel de resultados.")
+        # Debug: take screenshot
+        try:
+            page.screenshot(path="debug_no_feed.png")
+            print("  📸 Screenshot guardado: debug_no_feed.png")
+        except Exception:
+            pass
         return 0
+
+    print(f"  ✓ Feed encontrado: {feed_selector}")
 
     prev_count = 0
     stale_rounds = 0
 
     while True:
-        items = page.locator(f'{feed_selector} > div > div > a').all()
+        items = _find_result_items(page)
         count = len(items)
 
         if count >= max_results:
@@ -309,7 +362,7 @@ def scroll_resultados(page: Page, max_results: int) -> int:
         )
         page.wait_for_timeout(int(SCROLL_PAUSE * 1000))
 
-    return len(page.locator(f'{feed_selector} > div > div > a').all())
+    return len(_find_result_items(page))
 
 
 def volver_a_lista(page: Page) -> None:
@@ -341,10 +394,9 @@ def volver_a_lista(page: Page) -> None:
 
 def extraer_prospectos(page: Page, max_results: int) -> list[Prospecto]:
     """Extract prospects by clicking each Maps result and reading the detail panel."""
-    feed_selector = 'div[role="feed"]'
     prospectos: list[Prospecto] = []
 
-    links = page.locator(f'{feed_selector} > div > div > a').all()
+    links = _find_result_items(page)
     total = min(len(links), max_results)
     print(f"\n── Extrayendo datos de {total} negocios ──\n")
 
@@ -356,7 +408,7 @@ def extraer_prospectos(page: Page, max_results: int) -> list[Prospecto]:
 
         try:
             # Re-query links every iteration (DOM may have changed)
-            current_links = page.locator(f'{feed_selector} > div > div > a').all()
+            current_links = _find_result_items(page)
             if i >= len(current_links):
                 print(f"  [{i+1}/{total}] ⚠ No más items en el DOM, deteniendo.")
                 break
@@ -488,8 +540,7 @@ def extraer_prospectos(page: Page, max_results: int) -> list[Prospecto]:
 
 def extraer_prospectos_with_progress(page: Page, max_results: int, total_visible: int) -> list[Prospecto]:
     """Wrapper that emits JSON progress events during extraction."""
-    feed_selector = 'div[role="feed"]'
-    links = page.locator(f'{feed_selector} > div > div > a').all()
+    links = _find_result_items(page)
     total = min(len(links), max_results)
 
     emit("phase", message=f"Extrayendo datos de {total} negocios...", phase="extracting", progress=42, total_items=total)
@@ -606,7 +657,11 @@ def run_single_query(
         with sync_playwright() as pw:
             browser = pw.chromium.launch(
                 headless=headless,
-                args=["--lang=es-MX", "--no-sandbox"],
+                args=[
+                    "--lang=es-MX",
+                    "--no-sandbox",
+                    "--disable-blink-features=AutomationControlled",
+                ],
             )
             context = browser.new_context(
                 locale="es-MX",

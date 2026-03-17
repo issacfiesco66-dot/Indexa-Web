@@ -104,10 +104,11 @@ export default function ProspectosPage() {
   const [scraperLog, setScraperLog] = useState<string[]>([]);
   const scraperAbortRef = useRef<AbortController | null>(null);
 
-  // Build the composed query from structured fields
-  const scraperQuery = [scraperServicio.trim(), scraperCiudad.trim(), scraperPais.trim()]
-    .filter(Boolean)
-    .join(", ");
+  // Build the composed query in Google Maps friendly format: "Servicio en Ciudad, País"
+  const scraperQueryParts = [scraperServicio.trim(), scraperCiudad.trim()].filter(Boolean);
+  const scraperQuery = scraperQueryParts.length === 2
+    ? `${scraperServicio.trim()} en ${scraperCiudad.trim()}${scraperPais.trim() ? `, ${scraperPais.trim()}` : ""}`
+    : scraperQueryParts[0] || "";
   const scraperCanSearch = scraperServicio.trim().length > 0 && scraperCiudad.trim().length > 0;
 
   // Count existing prospectos in the same city to show duplicates indicator
@@ -116,9 +117,12 @@ export default function ProspectosPage() {
     : 0;
 
   const startScraper = useCallback(() => {
-    const q = [scraperServicio.trim(), scraperCiudad.trim(), scraperPais.trim()]
-      .filter(Boolean)
-      .join(", ");
+    const svc = scraperServicio.trim();
+    const city = scraperCiudad.trim();
+    const country = scraperPais.trim();
+    const q = svc && city
+      ? `${svc} en ${city}${country ? `, ${country}` : ""}`
+      : svc || city || "";
     if (!q || scraperRunning) return;
 
     // Save to search history (avoid duplicates, max 10)
