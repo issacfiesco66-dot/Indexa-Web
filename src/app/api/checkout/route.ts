@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { verifyIdToken } from "@/lib/verifyAuth";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-02-25.clover",
-});
+let _stripe: Stripe | null = null;
+function getStripe() {
+  if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-02-25.clover" });
+  return _stripe;
+}
 
 interface CheckoutBody {
   priceId: string;
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest) {
 
     const origin = request.headers.get("origin") || "http://localhost:3000";
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
       line_items: [

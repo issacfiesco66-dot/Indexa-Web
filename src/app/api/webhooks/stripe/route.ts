@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-02-25.clover",
-});
+let _stripe: Stripe | null = null;
+function getStripe() {
+  if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-02-25.clover" });
+  return _stripe;
+}
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -84,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify webhook signature (native Stripe verification)
-    event = stripe.webhooks.constructEvent(body, signature, WEBHOOK_SECRET);
+    event = getStripe().webhooks.constructEvent(body, signature, WEBHOOK_SECRET);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Webhook verification failed.";
     console.error("Stripe webhook verification error:", message);
