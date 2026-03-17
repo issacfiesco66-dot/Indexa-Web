@@ -116,7 +116,7 @@ export default function ProspectosPage() {
     ? prospectos.filter((p) => p.ciudad.toLowerCase() === scraperCiudad.trim().toLowerCase()).length
     : 0;
 
-  const startScraper = useCallback(() => {
+  const startScraper = useCallback(async () => {
     const svc = scraperServicio.trim();
     const city = scraperCiudad.trim();
     const country = scraperPais.trim();
@@ -140,7 +140,17 @@ export default function ProspectosPage() {
     const abort = new AbortController();
     scraperAbortRef.current = abort;
 
-    const params = new URLSearchParams({ query: q, max: String(scraperMax) });
+    // Get auth token for the scraper API
+    let authToken = "";
+    try {
+      authToken = await user?.getIdToken() ?? "";
+    } catch {
+      setScraperMessage("Error: no se pudo obtener token de autenticación.");
+      setScraperRunning(false);
+      return;
+    }
+
+    const params = new URLSearchParams({ query: q, max: String(scraperMax), token: authToken });
 
     fetch(`/api/scraper?${params}`, { signal: abort.signal })
       .then(async (res) => {
@@ -197,7 +207,7 @@ export default function ProspectosPage() {
         }
         setScraperRunning(false);
       });
-  }, [scraperServicio, scraperCiudad, scraperPais, scraperMax, scraperRunning]);
+  }, [scraperServicio, scraperCiudad, scraperPais, scraperMax, scraperRunning, user]);
 
   const stopScraper = useCallback(() => {
     scraperAbortRef.current?.abort();

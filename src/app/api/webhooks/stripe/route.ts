@@ -93,34 +93,42 @@ export async function POST(request: NextRequest) {
 
   // ── Handle events ──────────────────────────────────────────────────
 
+  // ── Handle checkout.session.completed ──────────────────────────
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const { sitioId, ownerId } = session.metadata ?? {};
 
     if (!sitioId) {
       console.error("Webhook: checkout.session.completed missing sitioId in metadata");
+      // Return 200 — nothing we can do without sitioId, don't retry
       return NextResponse.json({ received: true });
     }
 
-    console.log(`✅ Payment successful for sitio: ${sitioId}, owner: ${ownerId}`);
+    // 1. Activate site — MUST succeed or Stripe retries
+    const paymentOk = await updateSitioPayment(sitioId, "profesional");
+    if (!paymentOk) {
+      console.error(`CRITICAL: Failed to activate sitio ${sitioId} after payment. Stripe will retry.`);
+      return NextResponse.json(
+        { error: `Failed to activate sitio ${sitioId}` },
+        { status: 500 }
+      );
+    }
 
-    // 1. Activate site with 'profesional' plan
-    await updateSitioPayment(sitioId, "profesional");
-
-    // 2. Ensure owner has 'cliente' role
+    // 2. Ensure owner has 'cliente' role (non-critical, log but don't fail)
     if (ownerId) {
       await ensureClientRole(ownerId);
     }
+
+    console.log(`Payment activated: sitio=${sitioId} owner=${ownerId}`);
   }
 
+  // ── Handle subscription cancellation ─────────────────────────
   if (event.type === "customer.subscription.deleted") {
     const subscription = event.data.object as Stripe.Subscription;
     const sitioId = subscription.metadata?.sitioId;
 
     if (sitioId) {
-      console.log(`⚠️ Subscription canceled for sitio: ${sitioId}`);
-
-      await fetch(
+      const res = await fetch(
         `${BASE_URL}/sitios/${sitioId}?updateMask.fieldPaths=statusPago&key=${API_KEY}`,
         {
           method: "PATCH",
@@ -132,6 +140,16 @@ export async function POST(request: NextRequest) {
           }),
         }
       );
+
+      if (!res.ok) {
+        console.error(`CRITICAL: Failed to cancel sitio ${sitioId}. Stripe will retry.`);
+        return NextResponse.json(
+          { error: `Failed to cancel sitio ${sitioId}` },
+          { status: 500 }
+        );
+      }
+
+      console.log(`Subscription canceled: sitio=${sitioId}`);
     }
   }
 

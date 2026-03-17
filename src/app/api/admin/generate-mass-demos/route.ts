@@ -124,6 +124,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "No se proporcionaron prospectos." }, { status: 400 });
     }
 
+    if (prospectos.length > 50) {
+      return NextResponse.json({ success: false, message: "Máximo 50 prospectos por lote." }, { status: 400 });
+    }
+
     // Stream results back as JSON for progress tracking
     const encoder = new TextEncoder();
     const stream = new ReadableStream({

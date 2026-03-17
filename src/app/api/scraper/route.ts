@@ -1,11 +1,45 @@
 import { NextRequest } from "next/server";
 import { spawn } from "child_process";
 import path from "path";
+import { verifyIdToken } from "@/lib/verifyAuth";
+import { createRateLimiter } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Rate limit: 3 scraper runs per minute per IP (expensive operation)
+const limiter = createRateLimiter({ windowMs: 60_000, max: 3 });
+
 export async function GET(request: NextRequest) {
+  // ── Auth check ────────────────────────────────────────────────
+  const authHeader = request.headers.get("authorization") || "";
+  const token = (authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null)
+    ?? request.nextUrl.searchParams.get("token");
+
+  if (!token) {
+    return new Response(JSON.stringify({ error: "No autorizado. Se requiere token." }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const user = await verifyIdToken(token);
+  if (!user) {
+    return new Response(JSON.stringify({ error: "Token inválido o expirado." }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // ── Rate limit ────────────────────────────────────────────────
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!limiter.check(ip)) {
+    return new Response(JSON.stringify({ error: "Demasiadas solicitudes. Espera un minuto." }), {
+      status: 429,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   const query = request.nextUrl.searchParams.get("query");
   const max = request.nextUrl.searchParams.get("max") || "20";
 

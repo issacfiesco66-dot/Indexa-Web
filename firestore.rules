@@ -14,10 +14,22 @@ service cloud.firestore {
     }
 
     // ── leads (formulario público) ──────────────────────────────────────────
-    // Crear: público (cualquiera puede enviar el formulario de contacto)
+    // Crear: público, pero validate required fields + size limits to prevent spam
     // Leer, actualizar, eliminar: solo admin
     match /leads/{leadId} {
-      allow create: if true;
+      allow create: if request.resource.data.keys().hasAll(["contactName", "businessName", "phone", "email", "status"])
+        && request.resource.data.contactName is string
+        && request.resource.data.contactName.size() > 0
+        && request.resource.data.contactName.size() < 200
+        && request.resource.data.businessName is string
+        && request.resource.data.businessName.size() > 0
+        && request.resource.data.businessName.size() < 200
+        && request.resource.data.phone is string
+        && request.resource.data.phone.size() > 7
+        && request.resource.data.phone.size() < 20
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 5
+        && request.resource.data.status == "nuevo";
       allow read, update, delete: if isAdmin();
     }
 
@@ -38,12 +50,20 @@ service cloud.firestore {
     // ── sitios (páginas públicas de clientes) ───────────────────────────────
     // Leer: público (las webs deben ser visibles para todos)
     // Crear: solo admin
-    // Actualizar/Eliminar: admin o propietario del sitio
+    // Actualizar: admin has full access; owner can only update safe fields
+    // Eliminar: solo admin
     match /sitios/{sitioId} {
       allow read: if true;
       allow create: if isAdmin();
-      allow update, delete: if request.auth != null
-        && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+      allow update: if isAdmin()
+        || (
+          request.auth != null
+          && resource.data.ownerId == request.auth.uid
+          // Owners CANNOT change these protected fields
+          && (!request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(["ownerId", "statusPago", "plan", "stripeCustomerId", "fechaVencimiento"]))
+        );
     }
 
     // ── Cualquier otra colección: denegado por defecto ──────────────────────

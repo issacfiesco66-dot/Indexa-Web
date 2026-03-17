@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { addDocument } from "@/lib/firestoreRest";
+import { createRateLimiter } from "@/lib/rateLimit";
 import type { LeadFormData, ContactApiResponse } from "@/types/lead";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@indexa.com.mx";
 const FROM_EMAIL = process.env.FROM_EMAIL || "INDEXA <onboarding@resend.dev>";
+
+// Rate limit: 5 contact form submissions per minute per IP
+const limiter = createRateLimiter({ windowMs: 60_000, max: 5 });
 
 function validateLead(data: unknown): data is LeadFormData {
   if (!data || typeof data !== "object") return false;
@@ -26,6 +30,15 @@ function validateLead(data: unknown): data is LeadFormData {
 const MAX_PAYLOAD_BYTES = 2 * 1024 * 1024; // 2 MB
 
 export async function POST(request: NextRequest) {
+  // ── Rate limit check ──────────────────────────────────────────
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!limiter.check(ip)) {
+    return NextResponse.json<ContactApiResponse>(
+      { success: false, message: "Demasiadas solicitudes. Intenta en un minuto." },
+      { status: 429 }
+    );
+  }
+
   try {
     // ── 0. Payload size guard ────────────────────────────────────
     const contentLength = request.headers.get("content-length");
