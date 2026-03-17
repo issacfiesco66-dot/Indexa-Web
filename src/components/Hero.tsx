@@ -4,7 +4,7 @@ export default function Hero() {
       {/* Background image */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/hero-bg.jpg')" }}
+        style={{ backgroundImage: "url('/Gemini_Generated_Image_g4ei4qg4ei4qg4ei.png')" }}
       />
       {/* Dark overlay for readability */}
       <div className="absolute inset-0 bg-black/65" />
