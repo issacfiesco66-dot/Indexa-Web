@@ -13,7 +13,16 @@ import {
   Menu,
   X,
   MessageSquare,
+  Radar,
 } from "lucide-react";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  type Timestamp,
+} from "firebase/firestore";
+import { db } from "@/lib/firebaseConfig";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 
 const NAV_ITEMS = [
@@ -22,6 +31,7 @@ const NAV_ITEMS = [
   { href: "/admin/prospectos", label: "Prospección Fría", icon: UserSearch },
   { href: "/admin/seguimientos", label: "Seguimientos", icon: Clock },
   { href: "/admin/mensajeria", label: "Mensajería", icon: MessageSquare },
+  { href: "/admin/radar", label: "Radar", icon: Radar },
   { href: "/admin/configuracion", label: "Configuración", icon: Settings },
 ];
 
@@ -30,6 +40,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [hotCount, setHotCount] = useState(0);
 
   const isLoginPage = pathname === "/admin/login";
 
@@ -38,6 +49,29 @@ function AdminShell({ children }: { children: React.ReactNode }) {
       router.replace("/admin/login");
     }
   }, [user, loading, router, isLoginPage]);
+
+  // ── Hot prospect counter for Radar badge ─────────────────────────
+  useEffect(() => {
+    if (!db || !user) return;
+    const q = query(
+      collection(db, "sitios"),
+      where("statusPago", "in", ["demo", "publicado"])
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const now = Date.now();
+      const cutoff48h = now - 48 * 60 * 60 * 1000;
+      let count = 0;
+      for (const d of snapshot.docs) {
+        const raw = d.data();
+        const ts = raw.ultimaVistaAt as Timestamp | undefined;
+        if (!ts) continue;
+        const t = ts.toDate().getTime();
+        if (t >= cutoff48h && (raw.vistas ?? 0) >= 5) count++;
+      }
+      setHotCount(count);
+    });
+    return unsubscribe;
+  }, [user]);
 
   if (loading) {
     return (
@@ -96,6 +130,11 @@ function AdminShell({ children }: { children: React.ReactNode }) {
                   >
                     <item.icon size={18} />
                     {item.label}
+                    {item.href === "/admin/radar" && hotCount > 0 && (
+                      <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                        {hotCount}
+                      </span>
+                    )}
                   </Link>
                 </li>
               );
