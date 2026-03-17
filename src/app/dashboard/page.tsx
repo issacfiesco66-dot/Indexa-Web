@@ -255,7 +255,7 @@ export default function ClientDashboardPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [sitio, setSitio] = useState<SitioData>(DEFAULT_SITIO);
   const [sitioId, setSitioId] = useState("");
-  const [pageState, setPageState] = useState<"loading" | "no-access" | "ready">("loading");
+  const [pageState, setPageState] = useState<"loading" | "no-access" | "no-sitio" | "ready">("loading");
   const [activeTab, setActiveTab] = useState<Tab>("general");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -268,7 +268,7 @@ export default function ClientDashboardPage() {
     if (authLoading) return;
 
     if (!user) {
-      router.replace("/admin/login");
+      router.replace("/login");
       return;
     }
 
@@ -294,14 +294,19 @@ export default function ClientDashboardPage() {
         };
         setProfile(userProfile);
 
-        if (userProfile.role !== "cliente" || !userProfile.sitioId) {
+        if (userProfile.role !== "cliente") {
           setPageState("no-access");
+          return;
+        }
+
+        if (!userProfile.sitioId) {
+          setPageState("no-sitio");
           return;
         }
 
         const sitioSnap = await getDoc(doc(db!, "sitios", userProfile.sitioId));
         if (!sitioSnap.exists()) {
-          setPageState("no-access");
+          setPageState("no-sitio");
           return;
         }
 
@@ -407,6 +412,111 @@ export default function ClientDashboardPage() {
   // ── No access state ────────────────────────────────────────────
   if (pageState === "no-access") {
     return <EnConstruccion onBack={() => router.push("/")} />;
+  }
+
+  // ── No sitio state — new client welcome ───────────────────────
+  if (pageState === "no-sitio") {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
+          <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
+            <span className="text-lg font-extrabold tracking-tight text-indexa-blue">INDEXA</span>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/dashboard/marketing"
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-indexa-orange"
+              >
+                <Megaphone size={16} />
+                <span className="hidden sm:inline">Marketing</span>
+              </Link>
+              <button
+                onClick={signOut}
+                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-500"
+                title="Cerrar sesión"
+              >
+                <LogOut size={18} />
+              </button>
+            </div>
+          </div>
+        </header>
+        <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-indexa-blue/10">
+              <Sparkles size={36} className="text-indexa-blue" />
+            </div>
+            <h1 className="mt-6 text-2xl font-extrabold text-indexa-gray-dark">
+              ¡Bienvenido{profile?.displayName ? `, ${profile.displayName}` : ""}!
+            </h1>
+            <p className="mx-auto mt-3 max-w-md text-gray-500 leading-relaxed">
+              Tu cuenta está lista. Elige un plan para activar tu sitio web profesional,
+              o explora las herramientas de marketing mientras tanto.
+            </p>
+          </div>
+
+          {/* Plans */}
+          <section className="mt-10">
+            <h2 className="text-lg font-bold text-indexa-gray-dark">Elige tu Plan</h2>
+            <p className="mt-1 text-sm text-gray-500">Activa tu sitio web profesional con el plan que mejor se adapte a tu negocio.</p>
+            <div className="mt-6 grid gap-5 sm:grid-cols-3">
+              {PLANS.map((plan) => (
+                <div
+                  key={plan.id}
+                  className={`relative flex flex-col rounded-2xl border p-6 transition-all ${
+                    plan.popular
+                      ? "border-indexa-orange bg-white shadow-lg scale-[1.02]"
+                      : "border-gray-200 bg-white shadow-sm hover:shadow-md"
+                  }`}
+                >
+                  {plan.popular && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-indexa-orange px-3 py-0.5 text-[10px] font-bold uppercase text-white">
+                      Más Popular
+                    </span>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <plan.icon size={20} className="text-indexa-blue" />
+                    <h3 className="font-bold text-indexa-gray-dark">{plan.name}</h3>
+                  </div>
+                  <p className="mt-3">
+                    <span className="text-3xl font-extrabold text-indexa-gray-dark">{plan.price}</span>
+                    <span className="text-sm text-gray-400">/mes</span>
+                  </p>
+                  <ul className="mt-4 flex-1 space-y-2">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-sm text-gray-600">
+                        <Check size={14} className="mt-0.5 flex-shrink-0 text-indexa-orange" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-4 text-center text-xs text-gray-400">
+                    Un asesor de INDEXA te contactará para activar tu plan.
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Marketing CTA */}
+          <section className="mt-10">
+            <Link
+              href="/dashboard/marketing"
+              className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-50">
+                  <Megaphone size={24} className="text-indexa-orange" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-indexa-gray-dark">Panel de Marketing</h3>
+                  <p className="text-sm text-gray-500">Conecta tus anuncios de Meta Ads y gestiónalos desde aquí.</p>
+                </div>
+              </div>
+              <ChevronLeft size={20} className="rotate-180 text-gray-400" />
+            </Link>
+          </section>
+        </div>
+      </div>
+    );
   }
 
   // ── Input helper ───────────────────────────────────────────────

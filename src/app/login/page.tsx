@@ -211,13 +211,6 @@ export default function ClientLoginPage() {
           </Link>
         </p>
 
-        {/* Diagnóstico temporal */}
-        <div className="mt-4 rounded-lg bg-gray-100 p-3 text-[10px] text-gray-500 font-mono break-all">
-          <p>API Key: {process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? `${process.env.NEXT_PUBLIC_FIREBASE_API_KEY.slice(0, 10)}...` : "NO DEFINIDA"}</p>
-          <p>Auth Domain: {process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "NO DEFINIDO"}</p>
-          <p>Project ID: {process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "NO DEFINIDO"}</p>
-          <p>Auth init: {auth ? "✅ OK" : "❌ NO"}</p>
-        </div>
       </div>
     </div>
   );
