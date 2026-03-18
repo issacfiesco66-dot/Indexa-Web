@@ -4,6 +4,7 @@ import Solutions from "@/components/Solutions";
 import HowItWorks from "@/components/HowItWorks";
 import Pricing from "@/components/Pricing";
 import ContactForm from "@/components/ContactForm";
+import FAQ from "@/components/FAQ";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -15,6 +16,7 @@ export default function Home() {
         <Solutions />
         <HowItWorks />
         <Pricing />
+        <FAQ />
         <ContactForm />
       </main>
       <Footer />
