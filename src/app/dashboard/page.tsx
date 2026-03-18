@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   doc,
   getDoc,
@@ -158,6 +158,8 @@ const DEFAULT_SITIO: SitioData = {
   plan: "",
   fechaVencimiento: null,
   stripeCustomerId: "",
+  stripeSubscriptionId: "",
+  ultimoPagoAt: null,
   templateId: "modern",
   horarios: "",
   googleMapsUrl: "",
@@ -182,6 +184,8 @@ function docToSitio(data: DocumentData): SitioData {
     plan: data.plan ?? "",
     fechaVencimiento: data.fechaVencimiento ?? null,
     stripeCustomerId: data.stripeCustomerId ?? "",
+    stripeSubscriptionId: data.stripeSubscriptionId ?? "",
+    ultimoPagoAt: data.ultimoPagoAt ?? null,
     templateId: data.templateId ?? "modern",
     horarios: data.horarios ?? "",
     googleMapsUrl: data.googleMapsUrl ?? "",
@@ -222,6 +226,7 @@ function StatCard({
 export default function ClientDashboardPage() {
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [sitio, setSitio] = useState<SitioData>(DEFAULT_SITIO);
@@ -232,10 +237,27 @@ export default function ClientDashboardPage() {
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [checkoutMsg, setCheckoutMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Redirect flag (prevents showing wrong UI while navigating away) ──
   const [redirecting, setRedirecting] = useState(false);
+
+  // ── Detect checkout success/cancel from Stripe redirect ────────
+  useEffect(() => {
+    const checkout = searchParams.get("checkout");
+    if (checkout === "success") {
+      setCheckoutMsg("¡Pago exitoso! Tu plan se activará en unos segundos.");
+      // Clean URL
+      router.replace("/dashboard", { scroll: false });
+      setTimeout(() => setCheckoutMsg(null), 8000);
+    } else if (checkout === "cancel") {
+      setCheckoutMsg("Pago cancelado. Puedes intentarlo de nuevo cuando quieras.");
+      router.replace("/dashboard", { scroll: false });
+      setTimeout(() => setCheckoutMsg(null), 6000);
+    }
+  }, [searchParams, router]);
 
   // ── Load user profile + sitio data ─────────────────────────────
   useEffect(() => {
@@ -391,6 +413,30 @@ export default function ClientDashboardPage() {
     } catch {
       alert("Error de conexión. Intenta de nuevo.");
       setCheckingOut(null);
+    }
+  }, [user, sitioId]);
+
+  // ── Stripe portal handler ──────────────────────────────────────
+  const handlePortal = useCallback(async () => {
+    if (!user || !sitioId) return;
+    setPortalLoading(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sitioId, authToken: token }),
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.message || "Error al abrir el portal de facturación.");
+        setPortalLoading(false);
+      }
+    } catch {
+      alert("Error de conexión. Intenta de nuevo.");
+      setPortalLoading(false);
     }
   }, [user, sitioId]);
 
@@ -602,6 +648,37 @@ export default function ClientDashboardPage() {
       </header>
 
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+        {/* ── Checkout message banner ─────────────────────────────── */}
+        {checkoutMsg && (
+          <div className={`mb-6 rounded-2xl border px-5 py-4 text-sm font-medium shadow-sm ${
+            checkoutMsg.includes("exitoso")
+              ? "border-green-200 bg-green-50 text-green-800"
+              : "border-amber-200 bg-amber-50 text-amber-800"
+          }`}>
+            {checkoutMsg}
+          </div>
+        )}
+
+        {/* ── Payment failed warning ──────────────────────────────── */}
+        {sitio.statusPago === "vencido" && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 shadow-sm">
+            <p className="text-sm font-bold text-red-800">⚠ Pago fallido</p>
+            <p className="mt-1 text-sm text-red-600">
+              No pudimos procesar tu último pago. Actualiza tu método de pago para mantener tu sitio activo.
+            </p>
+            {sitio.stripeCustomerId && (
+              <button
+                onClick={handlePortal}
+                disabled={portalLoading}
+                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+              >
+                {portalLoading ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
+                Actualizar método de pago
+              </button>
+            )}
+          </div>
+        )}
+
         {/* ── Stats ───────────────────────────────────────────────── */}
         <section className="mb-10">
           <h2 className="text-lg font-bold text-indexa-gray-dark">Éxito de tu Sitio</h2>
@@ -708,6 +785,16 @@ export default function ClientDashboardPage() {
                   </p>
                 </div>
               </div>
+              {sitio.stripeCustomerId && (
+                <button
+                  onClick={handlePortal}
+                  disabled={portalLoading}
+                  className="inline-flex items-center gap-2 rounded-xl border border-green-300 bg-white px-4 py-2 text-xs font-bold text-green-700 transition-colors hover:bg-green-100 disabled:opacity-50"
+                >
+                  {portalLoading ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
+                  Administrar suscripción
+                </button>
+              )}
             </div>
           </section>
         )}

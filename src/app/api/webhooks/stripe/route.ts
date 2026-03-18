@@ -47,18 +47,56 @@ async function isEventAlreadyProcessed(eventId: string): Promise<boolean> {
   }
 }
 
-async function updateSitioPayment(sitioId: string, plan: string): Promise<boolean> {
+async function activateSitio(
+  sitioId: string,
+  plan: string,
+  stripeCustomerId?: string,
+  stripeSubscriptionId?: string
+): Promise<boolean> {
+  try {
+    const db = getAdminDb();
+    const vencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const updates: Record<string, unknown> = {
+      statusPago: "activo",
+      plan,
+      fechaVencimiento: vencimiento,
+      ultimoPagoAt: FieldValue.serverTimestamp(),
+    };
+    if (stripeCustomerId) updates.stripeCustomerId = stripeCustomerId;
+    if (stripeSubscriptionId) updates.stripeSubscriptionId = stripeSubscriptionId;
+    await db.collection("sitios").doc(sitioId).update(updates);
+    return true;
+  } catch (err) {
+    console.error("Failed to activate sitio:", err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
+async function renewSitio(sitioId: string): Promise<boolean> {
   try {
     const db = getAdminDb();
     const vencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     await db.collection("sitios").doc(sitioId).update({
       statusPago: "activo",
-      plan,
       fechaVencimiento: vencimiento,
+      ultimoPagoAt: FieldValue.serverTimestamp(),
     });
     return true;
   } catch (err) {
-    console.error("Failed to update sitio payment:", err instanceof Error ? err.message : err);
+    console.error("Failed to renew sitio:", err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
+async function markPaymentFailed(sitioId: string): Promise<boolean> {
+  try {
+    const db = getAdminDb();
+    await db.collection("sitios").doc(sitioId).update({
+      statusPago: "vencido",
+    });
+    return true;
+  } catch (err) {
+    console.error("Failed to mark payment failed:", err instanceof Error ? err.message : err);
     return false;
   }
 }
@@ -68,6 +106,7 @@ async function cancelSitio(sitioId: string): Promise<boolean> {
     const db = getAdminDb();
     await db.collection("sitios").doc(sitioId).update({
       statusPago: "cancelado",
+      stripeSubscriptionId: "",
     });
     return true;
   } catch (err) {
@@ -123,10 +162,10 @@ export async function POST(request: NextRequest) {
 
   await logWebhookEvent(event.id, event.type, "processing");
 
-  // ── Handle checkout.session.completed ──────────────────────────
+  // ── Handle checkout.session.completed (first payment) ─────────
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
-    const { sitioId, ownerId } = session.metadata ?? {};
+    const { sitioId, ownerId, planId } = session.metadata ?? {};
 
     if (!sitioId) {
       console.error("Webhook: checkout.session.completed missing sitioId in metadata");
@@ -134,20 +173,73 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    const paymentOk = await updateSitioPayment(sitioId, "profesional");
+    const plan = planId || "profesional";
+    const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
+    const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+
+    const paymentOk = await activateSitio(sitioId, plan, customerId, subscriptionId);
     if (!paymentOk) {
       await logWebhookEvent(event.id, event.type, "error", { sitioId, error: "Failed to activate sitio" });
-      return NextResponse.json(
-        { error: `Failed to activate sitio ${sitioId}` },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: `Failed to activate sitio ${sitioId}` }, { status: 500 });
     }
 
-    if (ownerId) {
-      await ensureClientRole(ownerId);
+    if (ownerId) await ensureClientRole(ownerId);
+    await logWebhookEvent(event.id, event.type, "success", { sitioId, ownerId, plan, customerId, subscriptionId });
+  }
+
+  // ── Handle invoice.payment_succeeded (renewals) ──────────────
+  if (event.type === "invoice.payment_succeeded") {
+    const invoice = event.data.object as Stripe.Invoice;
+    // Skip the first invoice (already handled by checkout.session.completed)
+    if (invoice.billing_reason === "subscription_create") {
+      await logWebhookEvent(event.id, event.type, "success", { skipped: true, reason: "initial invoice" });
+      return NextResponse.json({ received: true });
     }
 
-    await logWebhookEvent(event.id, event.type, "success", { sitioId, ownerId, plan: "profesional" });
+    const rawSub = (invoice as unknown as Record<string, unknown>).subscription;
+    const subscriptionId = typeof rawSub === "string" ? rawSub : (rawSub as { id?: string })?.id;
+    let sitioId: string | undefined;
+
+    // Try to get sitioId from subscription metadata
+    if (subscriptionId) {
+      try {
+        const sub = await getStripe().subscriptions.retrieve(subscriptionId);
+        sitioId = sub.metadata?.sitioId;
+      } catch (err) {
+        console.error("Failed to retrieve subscription:", err instanceof Error ? err.message : err);
+      }
+    }
+
+    if (sitioId) {
+      const renewOk = await renewSitio(sitioId);
+      await logWebhookEvent(event.id, event.type, renewOk ? "success" : "error", { sitioId, subscriptionId });
+    } else {
+      await logWebhookEvent(event.id, event.type, "error", { error: "Could not resolve sitioId from invoice", subscriptionId });
+    }
+  }
+
+  // ── Handle invoice.payment_failed ────────────────────────────
+  if (event.type === "invoice.payment_failed") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const rawSubFail = (invoice as unknown as Record<string, unknown>).subscription;
+    const subscriptionId = typeof rawSubFail === "string" ? rawSubFail : (rawSubFail as { id?: string })?.id;
+    let sitioId: string | undefined;
+
+    if (subscriptionId) {
+      try {
+        const sub = await getStripe().subscriptions.retrieve(subscriptionId);
+        sitioId = sub.metadata?.sitioId;
+      } catch (err) {
+        console.error("Failed to retrieve subscription:", err instanceof Error ? err.message : err);
+      }
+    }
+
+    if (sitioId) {
+      const failOk = await markPaymentFailed(sitioId);
+      await logWebhookEvent(event.id, event.type, failOk ? "success" : "error", { sitioId, subscriptionId });
+    } else {
+      await logWebhookEvent(event.id, event.type, "error", { error: "Could not resolve sitioId", subscriptionId });
+    }
   }
 
   // ── Handle subscription cancellation ─────────────────────────
@@ -159,10 +251,7 @@ export async function POST(request: NextRequest) {
       const cancelOk = await cancelSitio(sitioId);
       if (!cancelOk) {
         await logWebhookEvent(event.id, event.type, "error", { sitioId, error: "Failed to cancel sitio" });
-        return NextResponse.json(
-          { error: `Failed to cancel sitio ${sitioId}` },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: `Failed to cancel sitio ${sitioId}` }, { status: 500 });
       }
       await logWebhookEvent(event.id, event.type, "success", { sitioId });
     }

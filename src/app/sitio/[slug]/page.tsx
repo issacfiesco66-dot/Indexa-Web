@@ -36,6 +36,8 @@ async function getSitioBySlug(slug: string): Promise<{ id: string; data: SitioDa
       plan: (raw.plan as string as SitioData["plan"]) ?? "",
       fechaVencimiento: (raw.fechaVencimiento as string) ?? null,
       stripeCustomerId: (raw.stripeCustomerId as string) ?? "",
+      stripeSubscriptionId: (raw.stripeSubscriptionId as string) ?? "",
+      ultimoPagoAt: (raw.ultimoPagoAt as string) ?? null,
       templateId: (raw.templateId as SitioData["templateId"]) ?? "modern",
       horarios: (raw.horarios as string) ?? "",
       googleMapsUrl: (raw.googleMapsUrl as string) ?? "",

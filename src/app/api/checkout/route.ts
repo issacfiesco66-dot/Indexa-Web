@@ -15,6 +15,7 @@ const limiter = createRateLimiter({ windowMs: 60_000, max: 5 });
 
 interface CheckoutBody {
   priceId: string;
+  planId: string;
   sitioId: string;
   authToken: string;
 }
@@ -30,11 +31,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: CheckoutBody = await request.json();
-    const { priceId, sitioId, authToken } = body;
+    const { priceId, planId, sitioId, authToken } = body;
 
-    if (!priceId || !sitioId || !authToken) {
+    if (!priceId || !sitioId || !authToken || !planId) {
       return NextResponse.json(
-        { success: false, message: "Faltan parámetros: priceId, sitioId, authToken." },
+        { success: false, message: "Faltan parámetros: priceId, planId, sitioId, authToken." },
         { status: 400 }
       );
     }
@@ -74,23 +75,38 @@ export async function POST(request: NextRequest) {
 
     const origin = request.headers.get("origin") || "http://localhost:3000";
 
-    const session = await getStripe().checkout.sessions.create({
+    // Look up or reference existing Stripe customer
+    const sitioData = (await getAdminDb().collection("sitios").doc(sitioId).get()).data();
+    const existingCustomerId = sitioData?.stripeCustomerId as string | undefined;
+
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "subscription",
       payment_method_types: ["card"],
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
+      line_items: [{ price: priceId, quantity: 1 }],
       metadata: {
         sitioId,
         ownerId: tokenUser.uid,
+        planId,
       },
-      customer_email: tokenUser.email || undefined,
+      subscription_data: {
+        metadata: {
+          sitioId,
+          ownerId: tokenUser.uid,
+          planId,
+        },
+      },
       success_url: `${origin}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/dashboard?checkout=cancel`,
-    });
+      allow_promotion_codes: true,
+    };
+
+    if (existingCustomerId) {
+      sessionParams.customer = existingCustomerId;
+    } else {
+      sessionParams.customer_email = tokenUser.email || undefined;
+    }
+
+    const session = await getStripe().checkout.sessions.create(sessionParams);
 
     return NextResponse.json({
       success: true,

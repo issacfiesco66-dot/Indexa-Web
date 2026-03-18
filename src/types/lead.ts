@@ -54,6 +54,8 @@ export interface SitioData {
   plan: PlanType | "";
   fechaVencimiento: string | null;
   stripeCustomerId: string;
+  stripeSubscriptionId: string;
+  ultimoPagoAt: string | null;
   templateId: TemplateId;
   horarios: string;
   googleMapsUrl: string;
