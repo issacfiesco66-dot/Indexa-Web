@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   doc,
   getDoc,
+  setDoc,
   updateDoc,
   type DocumentData,
 } from "firebase/firestore";
@@ -369,6 +370,13 @@ export default function ClientDashboardPage() {
         emailContacto: sitio.emailContacto,
         direccion: sitio.direccion,
         colorPrincipal: sitio.colorPrincipal,
+        templateId: sitio.templateId,
+        ciudad: sitio.ciudad,
+        categoria: sitio.categoria,
+        latitud: sitio.latitud,
+        longitud: sitio.longitud,
+        horarios: sitio.horarios,
+        googleMapsUrl: sitio.googleMapsUrl,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -409,7 +417,7 @@ export default function ClientDashboardPage() {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priceId, sitioId, authToken: token }),
+        body: JSON.stringify({ priceId, planId, sitioId, authToken: token }),
       });
       const data = await res.json();
       if (data.success && data.url) {
@@ -423,6 +431,50 @@ export default function ClientDashboardPage() {
       setCheckingOut(null);
     }
   }, [user, sitioId]);
+
+  // ── Auto-create sitio + checkout (for no-sitio users) ─────────
+  const handleNewSitioCheckout = useCallback(async (priceId: string, planId: string) => {
+    if (!user || !db || !priceId) return;
+    setCheckingOut(planId);
+    try {
+      // Generate a slug from the user's display name or email
+      const displayName = profile?.displayName || user.displayName || user.email?.split("@")[0] || "mi-negocio";
+      const slug = displayName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, 40);
+      const newSitioId = `${slug}-${Date.now()}`;
+
+      // Create minimal sitio document
+      const newSitio: SitioData = {
+        ...DEFAULT_SITIO,
+        nombre: displayName,
+        slug,
+        ownerId: user.uid,
+      };
+
+      await setDoc(doc(db, "sitios", newSitioId), newSitio);
+
+      // Link sitio to user profile
+      await updateDoc(doc(db, "usuarios", user.uid), { sitioId: newSitioId });
+
+      // Now proceed with checkout
+      const token = await user.getIdToken();
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceId, planId, sitioId: newSitioId, authToken: token }),
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.message || "Error al crear sesión de pago.");
+        setCheckingOut(null);
+      }
+    } catch (err) {
+      console.error("Error creating sitio + checkout:", err);
+      alert("Error al procesar. Intenta de nuevo.");
+      setCheckingOut(null);
+    }
+  }, [user, profile]);
 
   // ── Stripe portal handler ──────────────────────────────────────
   const handlePortal = useCallback(async () => {
@@ -551,9 +603,22 @@ export default function ClientDashboardPage() {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-4 text-center text-xs text-gray-400">
-                    Un asesor de INDEXA te contactará para activar tu plan.
-                  </p>
+                  <button
+                    onClick={() => handleNewSitioCheckout(plan.priceId, plan.id)}
+                    disabled={!!checkingOut || !plan.priceId}
+                    className={`mt-6 w-full rounded-xl px-4 py-3 text-sm font-bold transition-all disabled:opacity-50 ${plan.btnClass}`}
+                  >
+                    {checkingOut === plan.id ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 size={16} className="animate-spin" />
+                        Procesando...
+                      </span>
+                    ) : !plan.priceId ? (
+                      "Próximamente"
+                    ) : (
+                      "Contratar"
+                    )}
+                  </button>
                 </div>
               ))}
             </div>
