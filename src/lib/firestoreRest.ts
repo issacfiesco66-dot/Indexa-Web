@@ -81,6 +81,117 @@ function toFirestoreValue(val: unknown): FirestoreValue {
 // ── Public API ───────────────────────────────────────────────────────────
 
 /**
+ * Read a single document by collection and document ID.
+ * Returns { id, data } or null if not found.
+ * Pass authToken to authenticate (needed for non-public collections).
+ */
+export async function readDoc(
+  collectionId: string,
+  docId: string,
+  authToken?: string
+): Promise<{ id: string; data: Record<string, unknown> } | null> {
+  if (!PROJECT_ID || !API_KEY) {
+    console.error("Firestore REST: missing PROJECT_ID or API_KEY");
+    return null;
+  }
+
+  const url = `${BASE_URL}/${collectionId}/${docId}?key=${API_KEY}`;
+  const headers: Record<string, string> = {};
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+
+  const res = await fetch(url, { headers, cache: "no-store" });
+
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    console.error("Firestore REST read error:", res.status, await res.text());
+    return null;
+  }
+
+  const doc: FirestoreDocument = await res.json();
+  return { id: extractDocId(doc.name), data: parseFields(doc.fields) };
+}
+
+/**
+ * Update (patch) specific fields on a document.
+ * Only the provided fields are updated; other fields are left unchanged.
+ * Pass authToken to authenticate (needed for protected writes).
+ */
+export async function updateDoc(
+  collectionId: string,
+  docId: string,
+  data: Record<string, unknown>,
+  authToken?: string
+): Promise<boolean> {
+  if (!PROJECT_ID || !API_KEY) {
+    console.error("Firestore REST: missing PROJECT_ID or API_KEY");
+    return false;
+  }
+
+  const fieldPaths = Object.keys(data).map((k) => `updateMask.fieldPaths=${k}`).join("&");
+  const url = `${BASE_URL}/${collectionId}/${docId}?${fieldPaths}&key=${API_KEY}`;
+
+  const fields: Record<string, FirestoreValue> = {};
+  for (const [key, val] of Object.entries(data)) {
+    fields[key] = toFirestoreValue(val);
+  }
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ fields }),
+  });
+
+  if (!res.ok) {
+    console.error("Firestore REST update error:", res.status, await res.text());
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Create a document with a specific ID.
+ * Pass authToken to authenticate.
+ */
+export async function createDoc(
+  collectionId: string,
+  docId: string,
+  data: Record<string, unknown>,
+  authToken?: string
+): Promise<boolean> {
+  if (!PROJECT_ID || !API_KEY) {
+    console.error("Firestore REST: missing PROJECT_ID or API_KEY");
+    return false;
+  }
+
+  const url = `${BASE_URL}/${collectionId}?documentId=${docId}&key=${API_KEY}`;
+
+  const fields: Record<string, FirestoreValue> = {};
+  for (const [key, val] of Object.entries(data)) {
+    fields[key] = toFirestoreValue(val);
+  }
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ fields }),
+  });
+
+  if (!res.ok) {
+    console.error("Firestore REST create error:", res.status, await res.text());
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Query a collection with a single field equality filter.
  * Returns an array of { id, data } objects.
  */

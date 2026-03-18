@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { verifyIdToken } from "@/lib/verifyAuth";
 import { createRateLimiter } from "@/lib/rateLimit";
-import { getAdminDb } from "@/lib/firebaseAdmin";
+import { readDoc } from "@/lib/firestoreRest";
 
 let _stripe: Stripe | null = null;
 function getStripe() {
-  if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-02-25.clover" });
+  if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   return _stripe;
 }
 
@@ -29,7 +29,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Validate env vars upfront
   if (!process.env.STRIPE_SECRET_KEY) {
     console.error("CHECKOUT: STRIPE_SECRET_KEY is not set");
     return NextResponse.json(
@@ -58,34 +57,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify sitio ownership — only the owner can purchase for their site
-    let existingCustomerId: string | undefined;
-    try {
-      const db = getAdminDb();
-      const sitioSnap = await db.collection("sitios").doc(sitioId).get();
-      if (!sitioSnap.exists) {
-        return NextResponse.json(
-          { success: false, message: "Sitio no encontrado." },
-          { status: 404 }
-        );
-      }
-      const sitioData = sitioSnap.data();
-      const sitioOwner = sitioData?.ownerId;
-      if (sitioOwner && sitioOwner !== tokenUser.uid) {
-        return NextResponse.json(
-          { success: false, message: "No tienes permiso para este sitio." },
-          { status: 403 }
-        );
-      }
-      existingCustomerId = sitioData?.stripeCustomerId as string | undefined;
-    } catch (dbErr) {
-      console.error("CHECKOUT: Firestore error:", dbErr);
+    // Read sitio (public read — no auth needed) and verify ownership
+    const sitioDoc = await readDoc("sitios", sitioId);
+    if (!sitioDoc) {
       return NextResponse.json(
-        { success: false, message: "Error al verificar tu sitio. Verifica que tengas conexión e intenta de nuevo." },
-        { status: 500 }
+        { success: false, message: "Sitio no encontrado." },
+        { status: 404 }
       );
     }
 
+    const sitioOwner = sitioDoc.data.ownerId as string | undefined;
+    if (sitioOwner && sitioOwner !== tokenUser.uid) {
+      return NextResponse.json(
+        { success: false, message: "No tienes permiso para este sitio." },
+        { status: 403 }
+      );
+    }
+
+    const existingCustomerId = sitioDoc.data.stripeCustomerId as string | undefined;
     const origin = request.headers.get("origin") || "https://indexa-web-ten.vercel.app";
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
@@ -122,9 +111,8 @@ export async function POST(request: NextRequest) {
       url: session.url,
     });
   } catch (err) {
-    console.error("CHECKOUT: Stripe session error:", err);
+    console.error("CHECKOUT: error:", err);
     const rawMsg = err instanceof Error ? err.message : "Error desconocido";
-    // Surface Stripe-specific errors to help debug
     const message = rawMsg.includes("No such price")
       ? "El precio seleccionado no existe en Stripe. Contacta soporte."
       : rawMsg.includes("api_key")

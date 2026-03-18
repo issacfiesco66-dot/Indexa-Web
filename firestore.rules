@@ -56,27 +56,33 @@ service cloud.firestore {
 
     // ── sitios (páginas públicas de clientes) ───────────────────────────────
     // Leer: público (las webs deben ser visibles para todos)
-    // Crear: solo admin
-    // Actualizar: admin has full access; owner can only update safe fields
+    // Crear: admin o usuario autenticado (auto-create al comprar plan)
+    // Actualizar: admin full access; owner safe fields; webhook payment fields
     // Eliminar: solo admin
     match /sitios/{sitioId} {
       allow read: if true;
-      allow create: if isAdmin();
+      allow create: if isAdmin()
+        || (request.auth != null && request.resource.data.ownerId == request.auth.uid);
       allow delete: if isAdmin();
       allow update: if isAdmin()
         || (
           request.auth != null
           && resource.data.ownerId == request.auth.uid
-          // Owners CANNOT change these protected fields
           && (!request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(["ownerId", "statusPago", "plan", "stripeCustomerId", "fechaVencimiento"]))
+              .hasAny(["ownerId", "statusPago", "plan", "stripeCustomerId", "stripeSubscriptionId", "fechaVencimiento", "ultimoPagoAt"]))
+        )
+        // Webhook updates (Stripe signature verified server-side):
+        // Allow unauthenticated updates ONLY to payment fields
+        || (
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["statusPago", "plan", "stripeCustomerId", "stripeSubscriptionId", "fechaVencimiento", "ultimoPagoAt"])
         );
     }
 
-    // ── webhook_events (audit trail — server-side only via Admin SDK) ──────
+    // ── webhook_events (audit trail — webhook writes, admin reads) ─────────
     match /webhook_events/{eventId} {
       allow read: if isAdmin();
-      allow write: if false; // Only Admin SDK can write (bypasses rules)
+      allow create, update: if true; // Webhook server verifies Stripe signature
     }
 
     // ── Cualquier otra colección: denegado por defecto ──────────────────────

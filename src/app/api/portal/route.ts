@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { verifyIdToken } from "@/lib/verifyAuth";
-import { getAdminDb } from "@/lib/firebaseAdmin";
+import { readDoc } from "@/lib/firestoreRest";
 
 let _stripe: Stripe | null = null;
 function getStripe() {
-  if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-02-25.clover" });
+  if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   return _stripe;
 }
 
@@ -28,25 +28,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get sitio and verify ownership
-    const db = getAdminDb();
-    const sitioSnap = await db.collection("sitios").doc(sitioId).get();
-    if (!sitioSnap.exists) {
+    // Read sitio (public read) and verify ownership
+    const sitioDoc = await readDoc("sitios", sitioId);
+    if (!sitioDoc) {
       return NextResponse.json(
         { success: false, message: "Sitio no encontrado." },
         { status: 404 }
       );
     }
 
-    const sitioData = sitioSnap.data();
-    if (sitioData?.ownerId && sitioData.ownerId !== tokenUser.uid) {
+    if (sitioDoc.data.ownerId && sitioDoc.data.ownerId !== tokenUser.uid) {
       return NextResponse.json(
         { success: false, message: "No tienes permiso." },
         { status: 403 }
       );
     }
 
-    const stripeCustomerId = sitioData?.stripeCustomerId as string | undefined;
+    const stripeCustomerId = sitioDoc.data.stripeCustomerId as string | undefined;
     if (!stripeCustomerId) {
       return NextResponse.json(
         { success: false, message: "No hay suscripción activa." },
@@ -54,7 +52,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const origin = request.headers.get("origin") || "http://localhost:3000";
+    const origin = request.headers.get("origin") || "https://indexa-web-ten.vercel.app";
 
     const portalSession = await getStripe().billingPortal.sessions.create({
       customer: stripeCustomerId,

@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { getAdminDb } from "@/lib/firebaseAdmin";
-import { FieldValue } from "firebase-admin/firestore";
+import { readDoc, updateDoc, createDoc } from "@/lib/firestoreRest";
 
 let _stripe: Stripe | null = null;
 function getStripe() {
-  if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2026-02-25.clover" });
+  if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   return _stripe;
 }
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
 
-// ── Firestore Admin helpers (bypass security rules) ──────────────────────
+// ── Firestore REST helpers (no service account needed) ───────────────────
 
 async function logWebhookEvent(
   eventId: string,
@@ -20,18 +19,14 @@ async function logWebhookEvent(
   metadata: Record<string, unknown> = {}
 ) {
   try {
-    const db = getAdminDb();
-    await db.collection("webhook_events").doc(eventId).set(
-      {
-        eventId,
-        eventType,
-        status,
-        ...metadata,
-        updatedAt: FieldValue.serverTimestamp(),
-        ...(status === "processing" ? { createdAt: FieldValue.serverTimestamp() } : {}),
-      },
-      { merge: true }
-    );
+    await createDoc("webhook_events", eventId, {
+      eventId,
+      eventType,
+      status,
+      ...metadata,
+      updatedAt: new Date().toISOString(),
+      ...(status === "processing" ? { createdAt: new Date().toISOString() } : {}),
+    });
   } catch (err) {
     console.error("Failed to log webhook event:", err instanceof Error ? err.message : err);
   }
@@ -39,9 +34,8 @@ async function logWebhookEvent(
 
 async function isEventAlreadyProcessed(eventId: string): Promise<boolean> {
   try {
-    const db = getAdminDb();
-    const doc = await db.collection("webhook_events").doc(eventId).get();
-    return doc.exists && doc.data()?.status === "success";
+    const doc = await readDoc("webhook_events", eventId);
+    return doc !== null && doc.data?.status === "success";
   } catch {
     return false;
   }
@@ -53,83 +47,36 @@ async function activateSitio(
   stripeCustomerId?: string,
   stripeSubscriptionId?: string
 ): Promise<boolean> {
-  try {
-    const db = getAdminDb();
-    const vencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    const updates: Record<string, unknown> = {
-      statusPago: "activo",
-      plan,
-      fechaVencimiento: vencimiento,
-      ultimoPagoAt: FieldValue.serverTimestamp(),
-    };
-    if (stripeCustomerId) updates.stripeCustomerId = stripeCustomerId;
-    if (stripeSubscriptionId) updates.stripeSubscriptionId = stripeSubscriptionId;
-    await db.collection("sitios").doc(sitioId).update(updates);
-    return true;
-  } catch (err) {
-    console.error("Failed to activate sitio:", err instanceof Error ? err.message : err);
-    return false;
-  }
+  const vencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  const updates: Record<string, unknown> = {
+    statusPago: "activo",
+    plan,
+    fechaVencimiento: vencimiento.toISOString(),
+    ultimoPagoAt: new Date().toISOString(),
+  };
+  if (stripeCustomerId) updates.stripeCustomerId = stripeCustomerId;
+  if (stripeSubscriptionId) updates.stripeSubscriptionId = stripeSubscriptionId;
+  return updateDoc("sitios", sitioId, updates);
 }
 
 async function renewSitio(sitioId: string): Promise<boolean> {
-  try {
-    const db = getAdminDb();
-    const vencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-    await db.collection("sitios").doc(sitioId).update({
-      statusPago: "activo",
-      fechaVencimiento: vencimiento,
-      ultimoPagoAt: FieldValue.serverTimestamp(),
-    });
-    return true;
-  } catch (err) {
-    console.error("Failed to renew sitio:", err instanceof Error ? err.message : err);
-    return false;
-  }
+  const vencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  return updateDoc("sitios", sitioId, {
+    statusPago: "activo",
+    fechaVencimiento: vencimiento.toISOString(),
+    ultimoPagoAt: new Date().toISOString(),
+  });
 }
 
 async function markPaymentFailed(sitioId: string): Promise<boolean> {
-  try {
-    const db = getAdminDb();
-    await db.collection("sitios").doc(sitioId).update({
-      statusPago: "vencido",
-    });
-    return true;
-  } catch (err) {
-    console.error("Failed to mark payment failed:", err instanceof Error ? err.message : err);
-    return false;
-  }
+  return updateDoc("sitios", sitioId, { statusPago: "vencido" });
 }
 
 async function cancelSitio(sitioId: string): Promise<boolean> {
-  try {
-    const db = getAdminDb();
-    await db.collection("sitios").doc(sitioId).update({
-      statusPago: "cancelado",
-      stripeSubscriptionId: "",
-    });
-    return true;
-  } catch (err) {
-    console.error("Failed to cancel sitio:", err instanceof Error ? err.message : err);
-    return false;
-  }
-}
-
-async function ensureClientRole(ownerId: string) {
-  try {
-    const db = getAdminDb();
-    const ref = db.collection("usuarios").doc(ownerId);
-    const snap = await ref.get();
-
-    if (snap.exists) {
-      const role = snap.data()?.role;
-      if (role === "cliente" || role === "admin") return;
-    }
-
-    await ref.set({ role: "cliente" }, { merge: true });
-  } catch (err) {
-    console.error("Failed to set client role:", err instanceof Error ? err.message : err);
-  }
+  return updateDoc("sitios", sitioId, {
+    statusPago: "cancelado",
+    stripeSubscriptionId: "",
+  });
 }
 
 // ── Webhook handler ──────────────────────────────────────────────────────
@@ -183,7 +130,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Failed to activate sitio ${sitioId}` }, { status: 500 });
     }
 
-    if (ownerId) await ensureClientRole(ownerId);
     await logWebhookEvent(event.id, event.type, "success", { sitioId, ownerId, plan, customerId, subscriptionId });
   }
 
