@@ -36,31 +36,45 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Include aspect ratio in prompt text (safest cross-model approach)
+    const fullPrompt = aspectRatio
+      ? `${prompt} (output in ${aspectRatio} aspect ratio)`
+      : prompt;
+
+    const requestBody = {
+      contents: [{ parts: [{ text: fullPrompt }] }],
+      generationConfig: {
+        responseModalities: ["TEXT", "IMAGE"],
+      },
+    };
+
+    console.log("[generate-image] Calling Gemini with model: gemini-2.5-flash-image");
+
     const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt,
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseModalities: ["TEXT", "IMAGE"],
-          ...(aspectRatio ? { imageConfig: { aspectRatio } } : {}),
-        },
-      }),
+      body: JSON.stringify(requestBody),
     });
 
-    const data = await res.json();
+    const rawText = await res.text();
+    console.log(`[generate-image] Gemini status: ${res.status}`);
+
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      console.error("[generate-image] Failed to parse Gemini response:", rawText.slice(0, 300));
+      return NextResponse.json(
+        { error: "Respuesta inválida de Gemini API." },
+        { status: 502 }
+      );
+    }
 
     if (data.error) {
+      const errMsg = data.error.message || "Error de la API de generación.";
+      console.error("[generate-image] Gemini error:", errMsg);
       return NextResponse.json(
-        { error: data.error.message || "Error de la API de generación." },
+        { error: errMsg },
         { status: 400 }
       );
     }
