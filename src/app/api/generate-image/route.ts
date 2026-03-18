@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         ],
         generationConfig: {
           responseModalities: ["TEXT", "IMAGE"],
-          ...(aspectRatio ? { aspectRatio } : {}),
+          ...(aspectRatio ? { imageConfig: { aspectRatio } } : {}),
         },
       }),
     });
