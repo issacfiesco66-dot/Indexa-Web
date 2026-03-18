@@ -1,4 +1,5 @@
 import type { SitioData } from "@/types/lead";
+import OfertasBanner from "./OfertasBanner";
 
 interface TemplateProps {
   data: SitioData;
@@ -111,6 +112,9 @@ export function ModernTemplate({ data, services, whatsAppUrl }: TemplateProps) {
           </div>
         </div>
       </section>
+
+      {/* Ofertas Banner */}
+      <OfertasBanner ofertas={data.ofertasActivas} colorPrincipal={colorPrincipal} />
 
       {/* About */}
       {descripcion && (
@@ -247,6 +251,9 @@ export function ElegantTemplate({ data, services, whatsAppUrl }: TemplateProps) 
           </div>
         </div>
       </section>
+
+      {/* Ofertas Banner */}
+      <OfertasBanner ofertas={data.ofertasActivas} colorPrincipal={colorPrincipal} />
 
       {/* About */}
       {descripcion && (
@@ -388,6 +395,9 @@ export function MinimalistTemplate({ data, services, whatsAppUrl }: TemplateProp
           </div>
         </div>
       </section>
+
+      {/* Ofertas Banner */}
+      <OfertasBanner ofertas={data.ofertasActivas} colorPrincipal={colorPrincipal} />
 
       {/* About */}
       {descripcion && (

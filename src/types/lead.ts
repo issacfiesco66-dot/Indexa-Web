@@ -36,6 +36,15 @@ export type PlanType = "starter" | "profesional" | "enterprise";
 export type StatusPago = "inactivo" | "activo" | "cancelado" | "vencido" | "demo" | "publicado";
 export type TemplateId = "modern" | "elegant" | "minimalist";
 
+export interface Oferta {
+  id: string;
+  titulo: string;
+  descripcion: string;
+  imagenUrl: string;
+  fechaFin: string;
+  activa: boolean;
+}
+
 export interface SitioData {
   nombre: string;
   slug: string;
@@ -63,6 +72,7 @@ export interface SitioData {
   longitud: string;
   horarios: string;
   googleMapsUrl: string;
+  ofertasActivas: Oferta[];
 }
 
 export interface UserProfile {

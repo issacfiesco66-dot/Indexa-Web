@@ -16,7 +16,7 @@ import {
 } from "firebase/storage";
 import { db, storage } from "@/lib/firebaseConfig";
 import { useAuth } from "@/lib/AuthContext";
-import type { SitioData, UserProfile, TemplateId } from "@/types/lead";
+import type { SitioData, UserProfile, TemplateId, Oferta } from "@/types/lead";
 import {
   Eye,
   MousePointerClick,
@@ -37,6 +37,8 @@ import {
   LayoutTemplate,
   Megaphone,
   Video,
+  Tag,
+  Gift,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -171,6 +173,7 @@ const DEFAULT_SITIO: SitioData = {
   longitud: "",
   horarios: "",
   googleMapsUrl: "",
+  ofertasActivas: [],
 };
 
 function docToSitio(data: DocumentData): SitioData {
@@ -201,6 +204,7 @@ function docToSitio(data: DocumentData): SitioData {
     longitud: data.longitud ?? "",
     horarios: data.horarios ?? "",
     googleMapsUrl: data.googleMapsUrl ?? "",
+    ofertasActivas: (data.ofertasActivas as Oferta[]) ?? [],
   };
 }
 
@@ -534,6 +538,13 @@ export default function ClientDashboardPage() {
             </Link>
             <div className="flex items-center gap-2">
               <Link
+                href="/dashboard/ofertas"
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <Gift size={16} />
+                <span className="hidden sm:inline">Ofertas</span>
+              </Link>
+              <Link
                 href="/dashboard/marketing"
                 className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
               >
@@ -687,6 +698,13 @@ export default function ClientDashboardPage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/ofertas"
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <Gift size={16} />
+              <span className="hidden sm:inline">Ofertas</span>
+            </Link>
             <Link
               href="/dashboard/marketing"
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
