@@ -8,15 +8,21 @@ import json
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, Query, HTTPException
+import logging
+
+from fastapi import FastAPI, Query, Header, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
+
+logger = logging.getLogger("indexa_scraper_service")
+logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s")
 
 app = FastAPI(title="INDEXA Scraper Service")
 
 FIREBASE_PROJECT_ID = os.getenv("NEXT_PUBLIC_FIREBASE_PROJECT_ID", "")
+CRON_SECRET = os.getenv("CRON_SECRET", "")
 ALLOWED_ORIGINS = os.getenv(
     "CORS_ORIGINS",
     "https://www.indexa.com.mx,https://indexa.com.mx,http://localhost:3000",
@@ -25,9 +31,12 @@ ALLOWED_ORIGINS = os.getenv(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+# Track running batch jobs
+_batch_running = False
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCRAPER_SCRIPT = SCRIPT_DIR / "scraper_indexa.py"
@@ -123,6 +132,124 @@ async def scrape(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ── Batch endpoint (called by Vercel Cron) ────────────────────────────
+
+async def _run_batch(queries: list[dict], max_per: int):
+    """Background task: run scraper for each query sequentially."""
+    global _batch_running
+    _batch_running = True
+    total_queries = len(queries)
+    total_uploaded = 0
+    total_errors = 0
+
+    logger.info(f"=== BATCH START: {total_queries} queries, max {max_per} each ===")
+
+    for i, q in enumerate(queries, 1):
+        query_str = q["query"]
+        logger.info(f"[{i}/{total_queries}] Running: {query_str}")
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "python",
+                str(SCRAPER_SCRIPT),
+                query_str,
+                "--max", str(max_per),
+                "--headless", "true",
+                "--json-progress",
+                "--categoria", q.get("categoria", ""),
+                "--ciudad", q.get("ciudad", ""),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(SCRIPT_DIR),
+            )
+
+            stdout, stderr = await proc.communicate()
+
+            # Parse last JSON line for stats
+            lines = stdout.decode("utf-8", errors="replace").strip().split("\n")
+            for line in reversed(lines):
+                try:
+                    data = json.loads(line)
+                    if data.get("event") == "done":
+                        total_uploaded += data.get("subidos", 0)
+                        logger.info(f"  -> {data.get('subidos', 0)} uploaded, {data.get('sin_web', 0)} sin web")
+                        break
+                except (json.JSONDecodeError, ValueError):
+                    continue
+
+            if proc.returncode != 0:
+                total_errors += 1
+                err_text = stderr.decode("utf-8", errors="replace").strip()[:200]
+                logger.error(f"  -> Exit code {proc.returncode}: {err_text}")
+
+        except Exception as e:
+            total_errors += 1
+            logger.error(f"  -> Exception: {e}")
+
+    logger.info(f"=== BATCH DONE: {total_uploaded} total uploaded, {total_errors} errors ===")
+    _batch_running = False
+
+
+@app.post("/batch")
+async def batch(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    authorization: str = Header(""),
+):
+    """Start a batch scraping job. Secured with CRON_SECRET."""
+    # Auth: check Bearer <CRON_SECRET>
+    token = authorization.replace("Bearer ", "") if authorization.startswith("Bearer ") else authorization
+    if not CRON_SECRET or token != CRON_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid CRON_SECRET.")
+
+    if _batch_running:
+        return JSONResponse(
+            {"status": "already_running", "message": "A batch job is already in progress."},
+            status_code=409,
+        )
+
+    if not SCRAPER_SCRIPT.exists():
+        raise HTTPException(status_code=500, detail="scraper_indexa.py not found.")
+
+    # Accept config from body or use defaults
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    categorias = body.get("categorias", [
+        "Restaurantes", "Dentistas", "Talleres mecánicos",
+        "Estéticas y salones de belleza", "Tortillerías",
+        "Veterinarias", "Papelerías", "Gimnasios",
+    ])
+    ciudades = body.get("ciudades", [
+        "Chalco", "Texcoco", "Ixtapaluca",
+        "Los Reyes La Paz", "Chicoloapan", "Chimalhuacán",
+    ])
+    max_per = body.get("max_por_busqueda", 15)
+
+    queries = []
+    for cat in categorias:
+        for city in ciudades:
+            queries.append({"query": f"{cat} en {city}", "categoria": cat, "ciudad": city})
+
+    background_tasks.add_task(_run_batch, queries, max_per)
+
+    return JSONResponse(
+        {
+            "status": "started",
+            "total_queries": len(queries),
+            "max_per_query": max_per,
+            "message": f"Batch job started with {len(queries)} queries.",
+        },
+        status_code=202,
+    )
+
+
+@app.get("/batch/status")
+async def batch_status():
+    return {"running": _batch_running}
 
 
 if __name__ == "__main__":
