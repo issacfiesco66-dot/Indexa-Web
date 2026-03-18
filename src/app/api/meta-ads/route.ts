@@ -191,7 +191,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ── Helper: post to Meta Graph ─────────────────────────────────
+// ── Helper: post to Meta Graph (form-encoded, for simple key-value) ────
 async function metaPost(url: string, params: Record<string, string>, step?: string) {
   const body = new URLSearchParams(params);
   const res = await fetch(url, { method: "POST", body });
@@ -200,10 +200,25 @@ async function metaPost(url: string, params: Record<string, string>, step?: stri
   try { data = JSON.parse(text); } catch { throw new Error(`[${step || "meta"}] Respuesta no-JSON de Meta: ${text.slice(0, 200)}`); }
   if (data.error) {
     const msg = data.error.error_user_msg || data.error.message || "Error de Meta API.";
-    const code = data.error.code || "";
-    const subcode = data.error.error_subcode || "";
-    console.error(`[meta-ads POST] step=${step} code=${code} subcode=${subcode} msg:`, msg);
-    console.error(`[meta-ads POST] full error:`, JSON.stringify(data.error).slice(0, 500));
+    console.error(`[meta-ads POST] step=${step} code=${data.error.code} error:`, msg);
+    throw new Error(`[${step || "meta"}] ${msg}`);
+  }
+  return data;
+}
+
+// ── Helper: post to Meta Graph (JSON body, for arrays/nested objects) ──
+async function metaPostJson(url: string, payload: Record<string, unknown>, step?: string) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error(`[${step || "meta"}] Respuesta no-JSON de Meta: ${text.slice(0, 200)}`); }
+  if (data.error) {
+    const msg = data.error.error_user_msg || data.error.message || "Error de Meta API.";
+    console.error(`[meta-ads POST-JSON] step=${step} code=${data.error.code} error:`, msg);
     throw new Error(`[${step || "meta"}] ${msg}`);
   }
   return data;
@@ -352,12 +367,13 @@ export async function POST(request: NextRequest) {
 
       // 2. Create campaign
       console.log(`[meta-ads] createCampaign step 2: creating campaign "${campaignName}"`);
-      const campaignData = await metaPost(
+      const campaignData = await metaPostJson(
         `${META_GRAPH_URL}/${actId}/campaigns`,
         {
           name: campaignName,
           objective: "OUTCOME_TRAFFIC",
           status: "PAUSED",
+          special_ad_categories: [],
           access_token: metaToken,
         },
         "create_campaign"
@@ -376,15 +392,15 @@ export async function POST(request: NextRequest) {
 
       // 4. Create ad set
       console.log(`[meta-ads] createCampaign step 4: creating ad set, budget=${budgetCents} cents`);
-      const adSetData = await metaPost(
+      const adSetData = await metaPostJson(
         `${META_GRAPH_URL}/${actId}/adsets`,
         {
-          campaign_id: newCampaignId as string,
+          campaign_id: newCampaignId,
           name: `${campaignName} - Ad Set`,
           daily_budget: budgetCents,
           billing_event: "IMPRESSIONS",
           optimization_goal: "LINK_CLICKS",
-          targeting: JSON.stringify(targeting),
+          targeting,
           status: "PAUSED",
           bid_strategy: "LOWEST_COST_WITHOUT_CAP",
           access_token: metaToken,
@@ -409,11 +425,11 @@ export async function POST(request: NextRequest) {
       };
 
       console.log(`[meta-ads] createCampaign step 5: creating ad creative`);
-      const creativeData = await metaPost(
+      const creativeData = await metaPostJson(
         `${META_GRAPH_URL}/${actId}/adcreatives`,
         {
           name: `${campaignName} - Creative`,
-          object_story_spec: JSON.stringify(objectStorySpec),
+          object_story_spec: objectStorySpec,
           access_token: metaToken,
         },
         "create_creative"
@@ -422,12 +438,12 @@ export async function POST(request: NextRequest) {
 
       // 6. Create ad
       console.log(`[meta-ads] createCampaign step 6: creating ad`);
-      const adData = await metaPost(
+      const adData = await metaPostJson(
         `${META_GRAPH_URL}/${actId}/ads`,
         {
           name: `${campaignName} - Ad`,
-          adset_id: adSetId as string,
-          creative: JSON.stringify({ creative_id: creativeId }),
+          adset_id: adSetId,
+          creative: { creative_id: creativeId },
           status: "PAUSED",
           access_token: metaToken,
         },
