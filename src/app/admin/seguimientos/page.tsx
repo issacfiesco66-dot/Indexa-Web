@@ -93,6 +93,8 @@ export default function SeguimientosPage() {
           vistasDemo: raw.vistasDemo ?? 0,
           nivelSeguimiento: raw.nivelSeguimiento ?? 0,
           demoSlug: raw.demoSlug ?? "",
+          whatsappCount: raw.whatsappCount ?? 0,
+          ultimoWhatsAppAt: raw.ultimoWhatsAppAt ? (raw.ultimoWhatsAppAt as Timestamp).toDate() : null,
         });
       }
 
@@ -135,6 +137,8 @@ export default function SeguimientosPage() {
       await updateDoc(doc(db, "prospectos_frios", prospecto.id), {
         nivelSeguimiento: increment(1),
         fechaUltimoContacto: serverTimestamp(),
+        ultimoWhatsAppAt: serverTimestamp(),
+        whatsappCount: increment(1),
       });
     } catch (err) {
       console.error("Error al actualizar seguimiento:", err);
@@ -292,7 +296,12 @@ export default function SeguimientosPage() {
                       </td>
                     )}
                     <td className="px-6 py-4">
-                      <div className="flex justify-end">
+                      <div className="flex items-center justify-end gap-2">
+                        {p.whatsappCount > 0 && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700" title={p.ultimoWhatsAppAt ? `Último: ${p.ultimoWhatsAppAt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}>
+                            ✓ {p.whatsappCount}x
+                          </span>
+                        )}
                         {p.telefono ? (
                           <button
                             onClick={() => handleSeguimiento(p)}
@@ -355,18 +364,25 @@ export default function SeguimientosPage() {
                   </div>
                 </div>
                 {p.telefono && (
-                  <button
-                    onClick={() => handleSeguimiento(p)}
-                    disabled={sendingId === p.id}
-                    className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-green-600 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
-                  >
-                    {sendingId === p.id ? (
-                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    ) : (
-                      <MessageCircle size={14} />
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      onClick={() => handleSeguimiento(p)}
+                      disabled={sendingId === p.id}
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {sendingId === p.id ? (
+                        <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      ) : (
+                        <MessageCircle size={14} />
+                      )}
+                      Seguimiento WA
+                    </button>
+                    {p.whatsappCount > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">
+                        ✓ {p.whatsappCount}x
+                      </span>
                     )}
-                    Seguimiento WA
-                  </button>
+                  </div>
                 )}
               </div>
             ))}

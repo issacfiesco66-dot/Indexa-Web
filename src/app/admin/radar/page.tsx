@@ -37,6 +37,7 @@ interface SitioRadar {
   ultimaVistaAt: Date | null;
   whatsapp: string;
   statusPago: string;
+  radarContactadoAt: Date | null;
 }
 
 function timeSince(date: Date): string {
@@ -92,6 +93,7 @@ export default function RadarPage() {
           ultimaVistaAt,
           whatsapp: raw.whatsapp ?? "",
           statusPago: raw.statusPago ?? "demo",
+          radarContactadoAt: raw.radarContactadoAt ? (raw.radarContactadoAt as Timestamp).toDate() : null,
         });
       }
 
@@ -268,6 +270,11 @@ export default function RadarPage() {
                       >
                         <ExternalLink size={12} /> Demo
                       </a>
+                    )}
+                    {s.radarContactadoAt && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-semibold text-green-700" title={`Contactado: ${s.radarContactadoAt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}`}>
+                        ✓ WA enviado
+                      </span>
                     )}
                     {s.whatsapp && (
                       <button

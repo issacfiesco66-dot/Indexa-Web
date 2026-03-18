@@ -11,6 +11,7 @@ import {
   updateDoc,
   doc,
   serverTimestamp,
+  increment,
   type Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
@@ -261,6 +262,8 @@ export default function ProspectosPage() {
           vistasDemo: raw.vistasDemo ?? 0,
           nivelSeguimiento: raw.nivelSeguimiento ?? 0,
           demoSlug: raw.demoSlug ?? "",
+          whatsappCount: raw.whatsappCount ?? 0,
+          ultimoWhatsAppAt: raw.ultimoWhatsAppAt ? (raw.ultimoWhatsAppAt as Timestamp).toDate() : null,
         };
       });
       setProspectos(data);
@@ -345,12 +348,17 @@ export default function ProspectosPage() {
 
     window.open(url, "_blank", "noopener,noreferrer");
 
-    if (db && prospecto.status !== "contactado_wa" && prospecto.status !== "contactado") {
+    if (db) {
       try {
-        await updateDoc(doc(db, "prospectos_frios", prospecto.id), {
-          status: "contactado_wa" as ProspectoStatus,
+        const updates: Record<string, unknown> = {
           fechaUltimoContacto: serverTimestamp(),
-        });
+          ultimoWhatsAppAt: serverTimestamp(),
+          whatsappCount: increment(1),
+        };
+        if (prospecto.status !== "contactado_wa" && prospecto.status !== "contactado") {
+          updates.status = "contactado_wa" as ProspectoStatus;
+        }
+        await updateDoc(doc(db, "prospectos_frios", prospecto.id), updates);
       } catch (err) {
         console.error("Error al actualizar status:", err);
       }
@@ -976,13 +984,20 @@ export default function ProspectosPage() {
                           </button>
                         )}
                         {p.telefono && (
-                          <button
-                            onClick={() => handleWhatsAppContact(p)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-indexa-orange px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indexa-orange/90"
-                          >
-                            <MessageCircle size={13} />
-                            WhatsApp
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => handleWhatsAppContact(p)}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-indexa-orange px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indexa-orange/90"
+                            >
+                              <MessageCircle size={13} />
+                              WhatsApp
+                            </button>
+                            {p.whatsappCount > 0 && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700" title={p.ultimoWhatsAppAt ? `Último: ${p.ultimoWhatsAppAt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}>
+                                ✓ {p.whatsappCount}x
+                              </span>
+                            )}
+                          </div>
                         )}
                         <button
                           onClick={() => handleDescartar(p.id)}
@@ -1060,6 +1075,11 @@ export default function ProspectosPage() {
                       <MessageCircle size={13} />
                       WhatsApp
                     </button>
+                  )}
+                  {p.whatsappCount > 0 && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">
+                      ✓ {p.whatsappCount}x
+                    </span>
                   )}
                   <button
                     onClick={() => handleDescartar(p.id)}

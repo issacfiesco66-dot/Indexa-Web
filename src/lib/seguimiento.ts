@@ -72,6 +72,8 @@ export async function obtenerProspectosParaSeguimiento(): Promise<ProspectoFrio[
       vistasDemo: raw.vistasDemo ?? 0,
       nivelSeguimiento: raw.nivelSeguimiento ?? 0,
       demoSlug: raw.demoSlug ?? "",
+      whatsappCount: raw.whatsappCount ?? 0,
+      ultimoWhatsAppAt: raw.ultimoWhatsAppAt ? (raw.ultimoWhatsAppAt as Timestamp).toDate() : null,
     });
   }
 

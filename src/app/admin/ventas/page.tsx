@@ -6,6 +6,8 @@ import {
   onSnapshot,
   doc,
   updateDoc,
+  serverTimestamp,
+  increment,
   type Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
@@ -44,6 +46,8 @@ interface PipelineCard {
   demoSlug: string;
   rawStatus: string;
   createdAt: Date | null;
+  whatsappCount: number;
+  ultimoWhatsAppAt: Date | null;
 }
 
 // ── Column config ────────────────────────────────────────────────────────
@@ -178,6 +182,8 @@ export default function VentasPage() {
               demoSlug: data.demoSlug || data.slug || "",
               rawStatus: status,
               createdAt: tsToDate(data.importedAt),
+              whatsappCount: data.whatsappCount || 0,
+              ultimoWhatsAppAt: tsToDate(data.ultimoWhatsAppAt),
             };
           });
 
@@ -215,6 +221,8 @@ export default function VentasPage() {
               demoSlug: "",
               rawStatus: status,
               createdAt: tsToDate(data.createdAt),
+              whatsappCount: data.whatsappCount || 0,
+              ultimoWhatsAppAt: tsToDate(data.ultimoWhatsAppAt),
             };
           });
 
@@ -311,7 +319,7 @@ export default function VentasPage() {
   );
 
   // ── Seguimiento Rápido (urgency WhatsApp) ──────────────────────────
-  const handleSeguimientoRapido = useCallback((card: PipelineCard) => {
+  const handleSeguimientoRapido = useCallback(async (card: PipelineCard) => {
     const nombre = card.nombre.split(" ")[0] || card.nombre;
     const ciudad = card.ciudad || "tu ciudad";
     const negocio = card.categoria || card.nombre;
@@ -320,16 +328,42 @@ export default function VentasPage() {
     );
     const phone = card.telefono.replace(/[^\d+]/g, "");
     window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+
+    if (db) {
+      const realId = card.id.replace(/^[pl]_/, "");
+      const col = card.source === "lead" ? "leads" : "prospectos_frios";
+      try {
+        await updateDoc(doc(db, col, realId), {
+          ultimoWhatsAppAt: serverTimestamp(),
+          whatsappCount: increment(1),
+        });
+      } catch (err) {
+        console.error("Error tracking WA send:", err);
+      }
+    }
   }, []);
 
   // ── WhatsApp directo ───────────────────────────────────────────────
-  const handleWhatsApp = useCallback((card: PipelineCard) => {
+  const handleWhatsApp = useCallback(async (card: PipelineCard) => {
     const phone = card.telefono.replace(/[^\d+]/g, "");
     const nombre = card.nombre.split(" ")[0] || card.nombre;
     const msg = encodeURIComponent(
       `Hola ${nombre}, soy de INDEXA. Vi que te interesa impulsar tu negocio. Nuestro sistema incluye sitio web, posicionamiento en Google, WhatsApp directo para clientes, y campañas de Facebook y TikTok Ads desde un solo panel. ¿Tienes un momento para platicar?`
     );
     window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+
+    if (db) {
+      const realId = card.id.replace(/^[pl]_/, "");
+      const col = card.source === "lead" ? "leads" : "prospectos_frios";
+      try {
+        await updateDoc(doc(db, col, realId), {
+          ultimoWhatsAppAt: serverTimestamp(),
+          whatsappCount: increment(1),
+        });
+      } catch (err) {
+        console.error("Error tracking WA send:", err);
+      }
+    }
   }, []);
 
   // ── Filter cards ───────────────────────────────────────────────────
@@ -564,6 +598,15 @@ export default function VentasPage() {
                             {card.source === "lead" ? "Lead" : "Prospecto"}
                           </span>
                         </div>
+
+                        {/* WA tracking badge */}
+                        {card.whatsappCount > 0 && (
+                          <div className="mt-2">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700" title={card.ultimoWhatsAppAt ? `Último WA: ${card.ultimoWhatsAppAt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}>
+                              ✓ WA {card.whatsappCount}x
+                            </span>
+                          </div>
+                        )}
 
                         {/* Quick actions */}
                         <div className="mt-2.5 flex items-center gap-1">

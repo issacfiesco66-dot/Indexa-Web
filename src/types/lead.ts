@@ -89,4 +89,6 @@ export interface ProspectoFrio {
   vistasDemo: number;
   nivelSeguimiento: number;
   demoSlug: string;
+  whatsappCount: number;
+  ultimoWhatsAppAt: Date | null;
 }

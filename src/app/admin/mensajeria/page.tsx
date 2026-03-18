@@ -9,6 +9,7 @@ import {
   updateDoc,
   doc,
   serverTimestamp,
+  increment,
   type Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
@@ -121,6 +122,8 @@ export default function MensajeriaPage() {
           vistasDemo: raw.vistasDemo ?? 0,
           nivelSeguimiento: raw.nivelSeguimiento ?? 0,
           demoSlug: raw.demoSlug ?? "",
+          whatsappCount: raw.whatsappCount ?? 0,
+          ultimoWhatsAppAt: raw.ultimoWhatsAppAt ? (raw.ultimoWhatsAppAt as Timestamp).toDate() : null,
         };
       });
       data.sort((a, b) => {
@@ -190,6 +193,8 @@ export default function MensajeriaPage() {
         await updateDoc(ref, {
           status: "contactado_wa",
           fechaUltimoContacto: serverTimestamp(),
+          ultimoWhatsAppAt: serverTimestamp(),
+          whatsappCount: increment(1),
           ultimoMensajeTipo: template.id,
           ultimoMensajeLabel: template.label,
         });
@@ -344,9 +349,9 @@ export default function MensajeriaPage() {
                       </a>
                     )}
                     {isContacted && (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600">
-                        <CheckCircle2 size={14} />
-                        Enviado
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-semibold text-green-700" title={p.ultimoWhatsAppAt ? `Último: ${p.ultimoWhatsAppAt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}>
+                        <CheckCircle2 size={12} />
+                        {p.whatsappCount > 0 ? `Enviado ${p.whatsappCount}x` : "Enviado"}
                       </span>
                     )}
                   </div>
