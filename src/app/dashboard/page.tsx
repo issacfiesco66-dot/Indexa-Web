@@ -35,6 +35,7 @@ import {
   Rocket,
   LayoutTemplate,
   Megaphone,
+  Video,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -425,6 +426,13 @@ export default function ClientDashboardPage() {
                 <Megaphone size={16} />
                 <span className="hidden sm:inline">Marketing</span>
               </Link>
+              <Link
+                href="/dashboard/tiktok"
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-indexa-gray-dark"
+              >
+                <Video size={16} />
+                <span className="hidden sm:inline">TikTok</span>
+              </Link>
               <button
                 onClick={signOut}
                 className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-500"
@@ -492,8 +500,8 @@ export default function ClientDashboardPage() {
             </div>
           </section>
 
-          {/* Marketing CTA */}
-          <section className="mt-10">
+          {/* Marketing CTAs */}
+          <section className="mt-10 space-y-4">
             <Link
               href="/dashboard/marketing"
               className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
@@ -503,8 +511,23 @@ export default function ClientDashboardPage() {
                   <Megaphone size={24} className="text-indexa-orange" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-indexa-gray-dark">Panel de Marketing</h3>
+                  <h3 className="font-bold text-indexa-gray-dark">Facebook / Instagram Ads</h3>
                   <p className="text-sm text-gray-500">Conecta tus anuncios de Meta Ads y gestiónalos desde aquí.</p>
+                </div>
+              </div>
+              <ChevronLeft size={20} className="rotate-180 text-gray-400" />
+            </Link>
+            <Link
+              href="/dashboard/tiktok"
+              className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-900">
+                  <Video size={24} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-indexa-gray-dark">TikTok Ads</h3>
+                  <p className="text-sm text-gray-500">Conecta tu cuenta de TikTok Ads y gestiona campañas desde aquí.</p>
                 </div>
               </div>
               <ChevronLeft size={20} className="rotate-180 text-gray-400" />
@@ -538,6 +561,13 @@ export default function ClientDashboardPage() {
             >
               <Megaphone size={16} />
               <span className="hidden sm:inline">Marketing</span>
+            </Link>
+            <Link
+              href="/dashboard/tiktok"
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-indexa-gray-dark"
+            >
+              <Video size={16} />
+              <span className="hidden sm:inline">TikTok</span>
             </Link>
             {saved && (
               <span className="text-xs font-semibold text-green-600">✓ Guardado</span>

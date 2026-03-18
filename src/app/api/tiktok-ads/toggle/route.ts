@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { updateCampaignStatus, type TikTokCredentials } from "@/lib/tiktokAdsClient";
-import { verifyAdmin, extractToken } from "@/lib/verifyAuth";
+import { verifyIdToken, extractToken } from "@/lib/verifyAuth";
 import { createRateLimiter } from "@/lib/rateLimit";
 
 // Rate limit: 10 toggles per minute per IP
@@ -13,8 +13,8 @@ export async function POST(request: Request) {
   }
 
   const token = extractToken(request);
-  const admin = token ? await verifyAdmin(token) : null;
-  if (!admin) {
+  const user = token ? await verifyIdToken(token) : null;
+  if (!user) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
