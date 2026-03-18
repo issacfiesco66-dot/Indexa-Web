@@ -627,7 +627,7 @@ export default function MarketingPage() {
                       placeholder="Tu API key de NanoBanana..."
                       className={`mt-1 ${inputClass}`}
                     />
-                    <p className="mt-1 text-[10px] text-gray-400">Obténla gratis en <a href="https://nanobananaapi.ai" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline">nanobananaapi.ai</a></p>
+                    <p className="mt-1 text-[10px] text-gray-400">Obténla gratis en <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline">aistudio.google.com</a></p>
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-500">Facebook Page ID <span className="font-normal text-gray-400">(requerido para crear anuncios)</span></label>
