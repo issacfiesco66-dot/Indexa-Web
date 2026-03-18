@@ -43,6 +43,8 @@ import {
   Globe,
   Copy,
   ChevronRight,
+  Bot,
+  Send,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -138,7 +140,7 @@ interface WAPhoneNumber {
   status?: string;
 }
 
-type MetaTab = "resumen" | "campanas" | "adsets" | "anuncios" | "leads" | "paginas" | "whatsapp" | "catalogos";
+type MetaTab = "resumen" | "campanas" | "adsets" | "anuncios" | "leads" | "paginas" | "whatsapp" | "catalogos" | "ia";
 
 const META_TABS: { id: MetaTab; label: string; icon: React.ElementType }[] = [
   { id: "resumen", label: "Resumen", icon: BarChart3 },
@@ -149,6 +151,7 @@ const META_TABS: { id: MetaTab; label: string; icon: React.ElementType }[] = [
   { id: "paginas", label: "Páginas", icon: Globe },
   { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { id: "catalogos", label: "Catálogos", icon: ShoppingBag },
+  { id: "ia", label: "Asistente IA", icon: Bot },
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -290,6 +293,12 @@ export default function AdminFacebookAdsPage() {
   const [wabaId, setWabaId] = useState("");
 
   const [copied, setCopied] = useState(false);
+
+  // AI assistant
+  const [aiMessages, setAiMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [aiInput, setAiInput] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiHistory, setAiHistory] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
 
   const isConnected = !!savedToken && !!savedAccount;
 
@@ -776,6 +785,34 @@ export default function AdminFacebookAdsPage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  // ── AI assistant send message ────────────────────────────────
+  const sendAIMessage = useCallback(async () => {
+    if (!user || !savedToken || !savedAccount || !aiInput.trim() || aiLoading) return;
+    const userMsg = aiInput.trim();
+    setAiInput("");
+    setAiMessages((prev) => [...prev, { role: "user", content: userMsg }]);
+    setAiLoading(true);
+    try {
+      const authToken = await user.getIdToken();
+      const res = await fetch("/api/meta-ads/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ message: userMsg, history: aiHistory, metaToken: savedToken, adAccountId: savedAccount }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setAiMessages((prev) => [...prev, { role: "assistant", content: `❌ ${data.error}` }]);
+      } else {
+        setAiMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
+        setAiHistory(data.newHistory || []);
+      }
+    } catch {
+      setAiMessages((prev) => [...prev, { role: "assistant", content: "❌ Error de conexión. Intenta de nuevo." }]);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [user, savedToken, savedAccount, aiInput, aiLoading, aiHistory]);
 
   // ── Loading ───────────────────────────────────────────────────
   if (pageLoading || authLoading) {
@@ -1474,6 +1511,95 @@ export default function AdminFacebookAdsPage() {
                   ))}
                 </div>
               ) : null}
+            </div>
+          )}
+
+          {/* ════════════════ TAB: ASISTENTE IA ════════════════ */}
+          {activeTab === "ia" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-indexa-gray-dark flex items-center gap-2"><Bot size={20} className="text-indigo-600" /> Asistente IA de Campañas</h2>
+                  <p className="mt-0.5 text-xs text-gray-400">Describe lo que quieres en lenguaje natural y el asistente lo ejecuta en tu cuenta de Meta Ads.</p>
+                </div>
+                {aiMessages.length > 0 && (
+                  <button onClick={() => { setAiMessages([]); setAiHistory([]); }} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50">
+                    <X size={12} /> Limpiar chat
+                  </button>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-3 text-xs text-gray-500">
+                <p className="font-semibold text-gray-700 mb-1">Ejemplos de lo que puedes hacer:</p>
+                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                  {["¿Cómo van mis campañas esta semana?", "Pausa la campaña con peor CTR", "Crea un borrador de campaña de tráfico con $200 diarios", "¿Cuál campaña tiene el mayor gasto?"].map((ex) => (
+                    <button key={ex} onClick={() => setAiInput(ex)} className="rounded-lg border border-dashed border-gray-200 px-2 py-1.5 text-left text-[11px] text-gray-500 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+                      {ex}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex min-h-[320px] flex-col rounded-xl border border-gray-200 bg-gray-50">
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {aiMessages.length === 0 ? (
+                    <div className="flex h-full flex-col items-center justify-center py-10 text-center">
+                      <Bot size={36} className="text-gray-200" />
+                      <p className="mt-3 text-sm font-medium text-gray-400">Hola, soy tu asistente de Meta Ads.</p>
+                      <p className="mt-1 text-xs text-gray-300">Pregúntame sobre tus campañas o dime qué quieres hacer.</p>
+                    </div>
+                  ) : (
+                    aiMessages.map((msg, i) => (
+                      <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                        {msg.role === "assistant" && (
+                          <div className="mr-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-100">
+                            <Bot size={14} className="text-indigo-600" />
+                          </div>
+                        )}
+                        <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap ${msg.role === "user" ? "bg-indigo-600 text-white rounded-tr-none" : "bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-sm"}`}>
+                          {msg.content}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  {aiLoading && (
+                    <div className="flex justify-start">
+                      <div className="mr-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-100">
+                        <Bot size={14} className="text-indigo-600" />
+                      </div>
+                      <div className="rounded-2xl rounded-tl-none bg-white border border-gray-200 px-4 py-3 shadow-sm">
+                        <div className="flex gap-1 items-center">
+                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:0ms]" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:150ms]" />
+                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:300ms]" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-gray-200 p-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={aiInput}
+                      onChange={(e) => setAiInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAIMessage(); } }}
+                      placeholder="Escribe tu mensaje... (Enter para enviar)"
+                      disabled={aiLoading}
+                      className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none placeholder:text-gray-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50"
+                    />
+                    <button
+                      onClick={sendAIMessage}
+                      disabled={aiLoading || !aiInput.trim()}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors shrink-0"
+                    >
+                      {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-[10px] text-gray-300 text-center">Requiere <code>ANTHROPIC_API_KEY</code> configurada en las variables de entorno del servidor.</p>
+                </div>
+              </div>
             </div>
           )}
 
