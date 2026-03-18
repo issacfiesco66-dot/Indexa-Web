@@ -316,7 +316,7 @@ export default function VentasPage() {
     const ciudad = card.ciudad || "tu ciudad";
     const negocio = card.categoria || card.nombre;
     const msg = encodeURIComponent(
-      `Hola ${nombre}, solo me queda 1 cupo para la promoción de 3 meses gratis en ${ciudad}. ¿Te reservo el lugar para tu sitio de ${negocio}?`
+      `Hola ${nombre}, solo me queda 1 cupo en ${ciudad} para la promoción de 3 meses gratis del sistema completo: web profesional, Google, WhatsApp para recibir clientes y panel de marketing con Facebook y TikTok Ads para ${negocio}. ¿Te reservo el lugar?`
     );
     const phone = card.telefono.replace(/[^\d+]/g, "");
     window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
@@ -327,7 +327,7 @@ export default function VentasPage() {
     const phone = card.telefono.replace(/[^\d+]/g, "");
     const nombre = card.nombre.split(" ")[0] || card.nombre;
     const msg = encodeURIComponent(
-      `Hola ${nombre}, soy de INDEXA. Vi que te interesa tener presencia digital para tu negocio. ¿Tienes un momento para platicar?`
+      `Hola ${nombre}, soy de INDEXA. Vi que te interesa impulsar tu negocio. Nuestro sistema incluye sitio web, posicionamiento en Google, WhatsApp directo para clientes, y campañas de Facebook y TikTok Ads desde un solo panel. ¿Tienes un momento para platicar?`
     );
     window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
   }, []);

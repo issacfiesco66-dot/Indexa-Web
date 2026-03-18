@@ -119,7 +119,7 @@ export default function RadarPage() {
 
     const cleanPhone = sitio.whatsapp.replace(/[^\d+]/g, "");
     const fullPhone = cleanPhone.startsWith("+") ? cleanPhone : `+52${cleanPhone}`;
-    const message = `Hola, vi que estuvieron revisando la propuesta de INDEXA para ${sitio.nombre}. Me gustaría facilitarles la decisión: si activan su plan hoy, les damos el 50% de descuento los primeros 6 meses. ¿Les interesa?`;
+    const message = `Hola, vi que estuvieron revisando la propuesta de INDEXA para ${sitio.nombre}. El sistema incluye su sitio web, posicionamiento en Google, recepción de clientes por WhatsApp, y un panel para lanzar campañas en Facebook y TikTok Ads. Si activan hoy, les damos el 50% de descuento los primeros 6 meses en todo el paquete. ¿Les interesa?`;
     const waUrl = `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
 
     window.open(waUrl, "_blank");

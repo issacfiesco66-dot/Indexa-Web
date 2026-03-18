@@ -71,7 +71,7 @@ function generateSlug(name: string): string {
 }
 
 function generateProspectingMessage(businessName: string, demoUrl: string): string {
-  return `Buen día, equipo de ${businessName}. Soy el sistema automático de INDEXA. Hemos detectado que su negocio califica para una actualización digital. Les comparto una propuesta visual que generamos para ustedes: ${demoUrl}. ¿Les gustaría activarla?`;
+  return `Buen día, equipo de ${businessName}. Soy de INDEXA, la plataforma que ayuda a negocios a vender más con tecnología. Generamos una propuesta personalizada para ustedes que incluye: sitio web profesional, posicionamiento en Google, botón de WhatsApp para recibir clientes, y panel de marketing digital con Facebook e Instagram Ads. Revísenla aquí: ${demoUrl}. Los primeros meses van por nuestra cuenta. ¿Hablamos?`;
 }
 
 export default function ProspectosPage() {

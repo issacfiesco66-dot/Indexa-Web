@@ -32,11 +32,11 @@ function generateSlug(name: string): string {
 }
 
 function mensajeNoVieron(nombre: string, demoUrl: string): string {
-  return `Hola, equipo de ${nombre}. Hace unos días les envié una propuesta digital terminada para ustedes. Sé que están ocupados, así que les dejo el enlace directo: ${demoUrl}. Si les gusta, les regalaremos la plataforma por algunos meses para que prueben el impacto en sus ventas. ¿Tienen 2 minutos para revisarla?`;
+  return `Hola, equipo de ${nombre}. Hace unos días les envié una propuesta digital completa: sitio web profesional, posicionamiento en Google, WhatsApp directo para recibir clientes, y panel de marketing con Facebook y TikTok Ads. Sé que están ocupados, así que les dejo el enlace: ${demoUrl}. Los primeros meses van sin costo para que prueben el impacto en sus ventas. ¿Tienen 2 minutos para revisarla?`;
 }
 
 function mensajeVieron(nombre: string): string {
-  return `Hola ${nombre}. Vi que pudieron revisar la maqueta de su nuevo sitio web en INDEXA. ¿Qué les pareció el diseño? Para que no haya riesgo de su lado, podemos activar el sistema gratis por los primeros meses. ¿Les gustaría que lo habilite hoy mismo?`;
+  return `Hola ${nombre}. Vi que pudieron revisar su propuesta en INDEXA. Además del sitio web, el sistema incluye aparecer en Google, recibir clientes por WhatsApp y un panel para lanzar campañas en Facebook y TikTok Ads. Para que no haya riesgo, podemos activar todo gratis los primeros meses. ¿Les gustaría que lo habilite hoy mismo?`;
 }
 
 function diasDesde(fecha: Date): number {

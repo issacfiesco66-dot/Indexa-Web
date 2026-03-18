@@ -46,7 +46,7 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     color: "bg-blue-600 text-white",
     hoverColor: "hover:bg-blue-700",
     buildMessage: (nombre, _ciudad, _cat, url) =>
-      `Hola. Vi que ${nombre} no aparece en Google con web propia. Les preparé esta propuesta rápida para que no pierdan clientes: ${url}. ¿Les gustaría activarla?`,
+      `Hola. Vi que ${nombre} aún no tiene un sistema digital completo. Les armé una propuesta que incluye web profesional, posicionamiento en Google, botón de WhatsApp para recibir clientes y panel de marketing con Facebook y TikTok Ads: ${url}. ¿Les interesa activarla?`,
   },
   {
     id: "educativo",
@@ -55,7 +55,7 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     color: "bg-amber-500 text-white",
     hoverColor: "hover:bg-amber-600",
     buildMessage: (nombre, ciudad, categoria, url) =>
-      `Buen día. Notamos que en ${ciudad || "su zona"} la competencia de ${categoria || "su sector"} está creciendo. Creamos una herramienta para que ustedes resalten: ${url}. Es autogestionable y lista para recibir clientes. ¿Qué les parece?`,
+      `Buen día. En ${ciudad || "su zona"} la competencia de ${categoria || "su sector"} está invirtiendo en presencia digital. Les creamos un sistema completo: sitio web optimizado para Google, recepción de clientes por WhatsApp, y herramientas de publicidad en Facebook e Instagram desde un solo panel. Vean su propuesta: ${url}. ¿Qué les parece?`,
   },
   {
     id: "gancho",
@@ -64,7 +64,7 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     color: "bg-green-600 text-white",
     hoverColor: "hover:bg-green-700",
     buildMessage: (_nombre, ciudad, _cat, url) =>
-      `Hola, soy de INDEXA. Estamos impulsando negocios en ${ciudad || "su zona"} y generamos una demo para ustedes: ${url}. Si les gusta, les regalamos los primeros 3 meses de servicio para que vean los resultados sin costo. ¿Hablamos?`,
+      `Hola, soy de INDEXA. Estamos impulsando negocios en ${ciudad || "su zona"} con un sistema todo-en-uno: web profesional, Google, WhatsApp directo, y campañas de Facebook y TikTok Ads desde un panel fácil de usar. Les generamos una propuesta: ${url}. Los primeros 3 meses van por nuestra cuenta para que vean resultados sin riesgo. ¿Hablamos?`,
   },
 ];
 
