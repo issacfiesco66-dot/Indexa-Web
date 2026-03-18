@@ -95,6 +95,7 @@ export default function SeguimientosPage() {
           demoSlug: raw.demoSlug ?? "",
           whatsappCount: raw.whatsappCount ?? 0,
           ultimoWhatsAppAt: raw.ultimoWhatsAppAt ? (raw.ultimoWhatsAppAt as Timestamp).toDate() : null,
+          tieneWeb: raw.tieneWeb ?? false,
         });
       }
 

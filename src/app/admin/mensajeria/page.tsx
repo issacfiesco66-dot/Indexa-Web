@@ -124,6 +124,7 @@ export default function MensajeriaPage() {
           demoSlug: raw.demoSlug ?? "",
           whatsappCount: raw.whatsappCount ?? 0,
           ultimoWhatsAppAt: raw.ultimoWhatsAppAt ? (raw.ultimoWhatsAppAt as Timestamp).toDate() : null,
+          tieneWeb: raw.tieneWeb ?? false,
         };
       });
       data.sort((a, b) => {

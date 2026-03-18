@@ -33,6 +33,9 @@ import {
   MapPin,
   Eye,
   LayoutTemplate,
+  Megaphone,
+  Filter,
+  Globe,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -75,6 +78,12 @@ function generateProspectingMessage(businessName: string, demoUrl: string): stri
   return `Buen día, equipo de ${businessName}. Soy de INDEXA, la plataforma que ayuda a negocios a vender más con tecnología. Generamos una propuesta personalizada para ustedes que incluye: sitio web profesional, posicionamiento en Google, botón de WhatsApp para recibir clientes, y panel de marketing digital con Facebook e Instagram Ads. Revísenla aquí: ${demoUrl}. Los primeros meses van por nuestra cuenta. ¿Hablamos?`;
 }
 
+function generateAdsMessage(businessName: string): string {
+  return `Hola, equipo de ${businessName}. Soy de INDEXA. Vimos que ya tienen presencia digital y queremos ayudarles a llevarla al siguiente nivel. Tenemos una plataforma donde pueden crear y administrar sus anuncios de Facebook y TikTok de forma fácil, sin agencia, directo desde un panel. Ideal para atraer más clientes locales con campañas que ustedes mismos controlan. ¿Les interesa una demo sin costo?`;
+}
+
+type ProspectoFilter = "todos" | "sin_web" | "con_web";
+
 export default function ProspectosPage() {
   const [prospectos, setProspectos] = useState<ProspectoFrio[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +101,7 @@ export default function ProspectosPage() {
   const [demoFeedback, setDemoFeedback] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
   const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [prospectoFilter, setProspectoFilter] = useState<ProspectoFilter>("todos");
 
   // ── Scraper state ──────────────────────────────────────────────────
   const [scraperServicio, setScraperServicio] = useState("");
@@ -264,6 +274,7 @@ export default function ProspectosPage() {
           demoSlug: raw.demoSlug ?? "",
           whatsappCount: raw.whatsappCount ?? 0,
           ultimoWhatsAppAt: raw.ultimoWhatsAppAt ? (raw.ultimoWhatsAppAt as Timestamp).toDate() : null,
+          tieneWeb: raw.tieneWeb ?? false,
         };
       });
       setProspectos(data);
@@ -337,13 +348,39 @@ export default function ProspectosPage() {
     }
   }, []);
 
-  // ── WhatsApp contact ──────────────────────────────────────────────
+  // ── WhatsApp contact (website pitch) ─────────────────────────────
   const handleWhatsAppContact = useCallback(async (prospecto: ProspectoFrio) => {
     const digits = prospecto.telefono.replace(/[^\d+]/g, "");
     const num = digits.startsWith("+") ? digits : `+52${digits}`;
     const slug = prospecto.nombre.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     const demoUrl = `${window.location.origin}/demo/${encodeURIComponent(slug)}`;
     const message = generateProspectingMessage(prospecto.nombre, demoUrl);
+    const url = `https://wa.me/${num}?text=${encodeURIComponent(message)}`;
+
+    window.open(url, "_blank", "noopener,noreferrer");
+
+    if (db) {
+      try {
+        const updates: Record<string, unknown> = {
+          fechaUltimoContacto: serverTimestamp(),
+          ultimoWhatsAppAt: serverTimestamp(),
+          whatsappCount: increment(1),
+        };
+        if (prospecto.status !== "contactado_wa" && prospecto.status !== "contactado") {
+          updates.status = "contactado_wa" as ProspectoStatus;
+        }
+        await updateDoc(doc(db, "prospectos_frios", prospecto.id), updates);
+      } catch (err) {
+        console.error("Error al actualizar status:", err);
+      }
+    }
+  }, []);
+
+  // ── WhatsApp contact (ads pitch — for businesses WITH websites) ────
+  const handleWhatsAppAds = useCallback(async (prospecto: ProspectoFrio) => {
+    const digits = prospecto.telefono.replace(/[^\d+]/g, "");
+    const num = digits.startsWith("+") ? digits : `+52${digits}`;
+    const message = generateAdsMessage(prospecto.nombre);
     const url = `https://wa.me/${num}?text=${encodeURIComponent(message)}`;
 
     window.open(url, "_blank", "noopener,noreferrer");
@@ -568,7 +605,7 @@ export default function ProspectosPage() {
         <div>
           <h2 className="text-2xl font-bold text-indexa-gray-dark">Prospectos Fríos</h2>
           <p className="mt-1 text-sm text-gray-500">
-            {prospectos.length} prospecto{prospectos.length !== 1 && "s"} sin presencia digital.
+            {prospectos.length} prospecto{prospectos.length !== 1 && "s"} — {prospectos.filter(p => !p.tieneWeb).length} sin web, {prospectos.filter(p => p.tieneWeb).length} con web
           </p>
         </div>
 
@@ -879,6 +916,45 @@ export default function ProspectosPage() {
         </div>
       )}
 
+      {/* ── Filter bar ──────────────────────────────────────────── */}
+      {prospectos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Filter size={14} className="text-gray-400" />
+          <button
+            onClick={() => setProspectoFilter("todos")}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+              prospectoFilter === "todos"
+                ? "bg-indexa-gray-dark text-white"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+            }`}
+          >
+            Todos ({prospectos.length})
+          </button>
+          <button
+            onClick={() => setProspectoFilter("sin_web")}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+              prospectoFilter === "sin_web"
+                ? "bg-indexa-blue text-white"
+                : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+            }`}
+          >
+            <Globe size={12} />
+            Sin Web ({prospectos.filter(p => !p.tieneWeb).length})
+          </button>
+          <button
+            onClick={() => setProspectoFilter("con_web")}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+              prospectoFilter === "con_web"
+                ? "bg-purple-600 text-white"
+                : "bg-purple-50 text-purple-600 hover:bg-purple-100"
+            }`}
+          >
+            <Megaphone size={12} />
+            Con Web — Vender Ads ({prospectos.filter(p => p.tieneWeb).length})
+          </button>
+        </div>
+      )}
+
       {/* ── Empty state ─────────────────────────────────────────── */}
       {prospectos.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white py-20">
@@ -918,7 +994,7 @@ export default function ProspectosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {prospectos.map((p) => (
+                {prospectos.filter(p => prospectoFilter === "todos" ? true : prospectoFilter === "sin_web" ? !p.tieneWeb : p.tieneWeb).map((p) => (
                   <tr key={p.id} className={`transition-colors hover:bg-gray-50/50 ${selectedIds.has(p.id) ? "bg-indexa-blue/5" : ""}`}>
                     <td className="w-10 px-4 py-4">
                       {p.status === "nuevo" ? (
@@ -930,7 +1006,15 @@ export default function ProspectosPage() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <p className="font-medium text-indexa-gray-dark">{p.nombre}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-indexa-gray-dark">{p.nombre}</p>
+                        {p.tieneWeb && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700">
+                            <Globe size={10} />
+                            Web
+                          </span>
+                        )}
+                      </div>
                       {p.telefono && (
                         <p className="mt-0.5 text-xs text-gray-400">{p.telefono}</p>
                       )}
@@ -985,13 +1069,24 @@ export default function ProspectosPage() {
                         )}
                         {p.telefono && (
                           <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => handleWhatsAppContact(p)}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-indexa-orange px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indexa-orange/90"
-                            >
-                              <MessageCircle size={13} />
-                              WhatsApp
-                            </button>
+                            {p.tieneWeb ? (
+                              <button
+                                onClick={() => handleWhatsAppAds(p)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-purple-700"
+                                title="Ofrecer plataforma de Ads (Facebook/TikTok)"
+                              >
+                                <Megaphone size={13} />
+                                Vender Ads
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleWhatsAppContact(p)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-indexa-orange px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indexa-orange/90"
+                              >
+                                <MessageCircle size={13} />
+                                WhatsApp
+                              </button>
+                            )}
                             {p.whatsappCount > 0 && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700" title={p.ultimoWhatsAppAt ? `Último: ${p.ultimoWhatsAppAt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}>
                                 ✓ {p.whatsappCount}x
@@ -1017,7 +1112,7 @@ export default function ProspectosPage() {
 
           {/* ── Mobile cards ────────────────────────────────────── */}
           <div className="space-y-3 md:hidden">
-            {prospectos.map((p) => (
+            {prospectos.filter(p => prospectoFilter === "todos" ? true : prospectoFilter === "sin_web" ? !p.tieneWeb : p.tieneWeb).map((p) => (
               <div key={p.id} className={`rounded-2xl border bg-white p-4 shadow-sm ${selectedIds.has(p.id) ? "border-indexa-blue/40 bg-indexa-blue/5" : "border-gray-200"}`}>
                 <div className="flex items-start justify-between gap-3">
                   {p.status === "nuevo" && (
@@ -1026,7 +1121,15 @@ export default function ProspectosPage() {
                     </button>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-indexa-gray-dark truncate">{p.nombre}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-indexa-gray-dark truncate">{p.nombre}</p>
+                      {p.tieneWeb && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700">
+                          <Globe size={10} />
+                          Web
+                        </span>
+                      )}
+                    </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2">
                       {p.categoria && (
                         <span className="inline-flex rounded-full bg-indexa-blue/10 px-2.5 py-0.5 text-[10px] font-medium text-indexa-blue">
@@ -1068,13 +1171,23 @@ export default function ProspectosPage() {
                     </button>
                   )}
                   {p.telefono && (
-                    <button
-                      onClick={() => handleWhatsAppContact(p)}
-                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-indexa-orange px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indexa-orange/90"
-                    >
-                      <MessageCircle size={13} />
-                      WhatsApp
-                    </button>
+                    p.tieneWeb ? (
+                      <button
+                        onClick={() => handleWhatsAppAds(p)}
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-700"
+                      >
+                        <Megaphone size={13} />
+                        Vender Ads
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleWhatsAppContact(p)}
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-indexa-orange px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indexa-orange/90"
+                      >
+                        <MessageCircle size={13} />
+                        WhatsApp
+                      </button>
+                    )
                   )}
                   {p.whatsappCount > 0 && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">

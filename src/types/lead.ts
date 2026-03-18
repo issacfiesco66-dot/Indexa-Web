@@ -97,4 +97,5 @@ export interface ProspectoFrio {
   demoSlug: string;
   whatsappCount: number;
   ultimoWhatsAppAt: Date | null;
+  tieneWeb: boolean;
 }

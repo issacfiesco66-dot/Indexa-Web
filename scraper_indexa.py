@@ -196,6 +196,7 @@ def subir_prospecto(token: str, prospecto: Prospecto, categoria: str, ciudad: st
         "categoria": {"stringValue": categoria or prospecto.categoria},
         "ciudad": {"stringValue": ciudad or prospecto.ciudad},
         "status": {"stringValue": "nuevo"},
+        "tieneWeb": {"booleanValue": prospecto.tiene_web},
         "importedAt": {"timestampValue": now},
         "fechaUltimoContacto": {"nullValue": None},
         "vistasDemo": {"integerValue": "0"},
@@ -715,33 +716,35 @@ def run_single_query(
             todos_prospectos = extraer_prospectos_with_progress(page, max_results, total_visible)
             browser.close()
 
-        # Filter
+        # Classify
         sin_web = [p for p in todos_prospectos if not p.tiene_web]
+        con_web_tel = [p for p in todos_prospectos if p.tiene_web and p.telefono]
+        # Upload ALL with phone: sin_web (sell website) + con_web (sell ads)
+        uploadable = [p for p in todos_prospectos if p.telefono]
         result.total_extraidos = len(todos_prospectos)
-        result.con_web = len(todos_prospectos) - len(sin_web)
+        result.con_web = len(con_web_tel)
         result.sin_web = len(sin_web)
 
-        emit("phase", message=f"Extraidos: {result.total_extraidos} | Sin web: {result.sin_web} | Con web: {result.con_web}",
+        emit("phase", message=f"Extraidos: {result.total_extraidos} | Sin web: {result.sin_web} | Con web+tel: {result.con_web}",
              phase="filtered", progress=85, total=result.total_extraidos, sin_web=result.sin_web, con_web=result.con_web)
 
         # Save JSON
         if output_path:
             json_data = []
-            for p in sin_web:
+            for p in uploadable:
                 d = asdict(p)
-                d.pop("tiene_web", None)
                 d["categoria"] = categoria
                 d["ciudad"] = ciudad
                 json_data.append(d)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(json_data, f, ensure_ascii=False, indent=2)
 
-        # Upload to Firestore
-        if token and sin_web:
+        # Upload to Firestore — all businesses with phone numbers
+        if token and uploadable:
             emit("phase", message="Subiendo a Firestore...", phase="uploading", progress=88)
             nombres_subidos: set[str] = set()
 
-            for idx, p in enumerate(sin_web):
+            for idx, p in enumerate(uploadable):
                 tel_limpio = limpiar_telefono(p.telefono)
 
                 if tel_limpio and tel_limpio in existentes:
@@ -761,8 +764,9 @@ def run_single_query(
                         existentes.add(tel_limpio)
                     nombres_subidos.add(slug_key)
                     result.subidos += 1
-                    emit("uploaded", message=f"+ {p.nombre}", nombre=p.nombre, slug=p.slug, telefono=p.telefono,
-                         progress=88 + int((idx + 1) / len(sin_web) * 10))
+                    web_tag = "CON web" if p.tiene_web else "SIN web"
+                    emit("uploaded", message=f"+ {p.nombre} ({web_tag})", nombre=p.nombre, slug=p.slug, telefono=p.telefono,
+                         tiene_web=p.tiene_web, progress=88 + int((idx + 1) / len(uploadable) * 10))
                 else:
                     result.omitidos += 1
 
