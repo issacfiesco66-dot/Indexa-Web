@@ -161,6 +161,10 @@ const DEFAULT_SITIO: SitioData = {
   stripeSubscriptionId: "",
   ultimoPagoAt: null,
   templateId: "modern",
+  ciudad: "",
+  categoria: "",
+  latitud: "",
+  longitud: "",
   horarios: "",
   googleMapsUrl: "",
 };
@@ -187,6 +191,10 @@ function docToSitio(data: DocumentData): SitioData {
     stripeSubscriptionId: data.stripeSubscriptionId ?? "",
     ultimoPagoAt: data.ultimoPagoAt ?? null,
     templateId: data.templateId ?? "modern",
+    ciudad: data.ciudad ?? "",
+    categoria: data.categoria ?? "",
+    latitud: data.latitud ?? "",
+    longitud: data.longitud ?? "",
     horarios: data.horarios ?? "",
     googleMapsUrl: data.googleMapsUrl ?? "",
   };
@@ -868,6 +876,67 @@ export default function ClientDashboardPage() {
                     className={`mt-2 ${inputClass}`}
                   />
                 </div>
+
+                {/* SEO Local fields */}
+                <div className="border-t border-gray-100 pt-6">
+                  <p className="text-xs font-bold uppercase tracking-wider text-indexa-blue">SEO Local</p>
+                  <p className="mt-1 text-xs text-gray-400">Estos datos mejoran tu posicionamiento en Google y buscadores.</p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-semibold text-indexa-gray-dark">
+                      Categoría del negocio
+                    </label>
+                    <input
+                      type="text"
+                      value={sitio.categoria}
+                      onChange={(e) => updateField("categoria", e.target.value)}
+                      placeholder="Ej. Tlapalería, Restaurante, Dentista"
+                      className={`mt-2 ${inputClass}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-indexa-gray-dark">
+                      Ciudad
+                    </label>
+                    <input
+                      type="text"
+                      value={sitio.ciudad}
+                      onChange={(e) => updateField("ciudad", e.target.value)}
+                      placeholder="Ej. Chalco, CDMX, Guadalajara"
+                      className={`mt-2 ${inputClass}`}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-semibold text-indexa-gray-dark">
+                      Latitud
+                    </label>
+                    <input
+                      type="text"
+                      value={sitio.latitud}
+                      onChange={(e) => updateField("latitud", e.target.value)}
+                      placeholder="Ej. 19.2635"
+                      className={`mt-2 ${inputClass}`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-indexa-gray-dark">
+                      Longitud
+                    </label>
+                    <input
+                      type="text"
+                      value={sitio.longitud}
+                      onChange={(e) => updateField("longitud", e.target.value)}
+                      placeholder="Ej. -98.9008"
+                      className={`mt-2 ${inputClass}`}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400">
+                  💡 Para obtener tus coordenadas: abre Google Maps, haz clic derecho en tu ubicación y copia los números.
+                </p>
               </div>
             )}
 

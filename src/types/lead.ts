@@ -57,6 +57,10 @@ export interface SitioData {
   stripeSubscriptionId: string;
   ultimoPagoAt: string | null;
   templateId: TemplateId;
+  ciudad: string;
+  categoria: string;
+  latitud: string;
+  longitud: string;
   horarios: string;
   googleMapsUrl: string;
 }

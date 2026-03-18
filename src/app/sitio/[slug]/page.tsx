@@ -39,6 +39,10 @@ async function getSitioBySlug(slug: string): Promise<{ id: string; data: SitioDa
       stripeSubscriptionId: (raw.stripeSubscriptionId as string) ?? "",
       ultimoPagoAt: (raw.ultimoPagoAt as string) ?? null,
       templateId: (raw.templateId as SitioData["templateId"]) ?? "modern",
+      ciudad: (raw.ciudad as string) ?? "",
+      categoria: (raw.categoria as string) ?? "",
+      latitud: (raw.latitud as string) ?? "",
+      longitud: (raw.longitud as string) ?? "",
       horarios: (raw.horarios as string) ?? "",
       googleMapsUrl: (raw.googleMapsUrl as string) ?? "",
     },
@@ -53,18 +57,48 @@ export async function generateMetadata({ params }: SitioPageProps): Promise<Meta
     return { title: "Sitio no encontrado" };
   }
 
-  const { nombre, descripcion, colorPrincipal } = sitio.data;
+  const { nombre, descripcion, colorPrincipal, categoria, ciudad, servicios } = sitio.data;
+
+  // Build SEO-optimized title: "Tlapalería Cuauhtémoc | Vidriería en Chalco - Contacto Directo"
+  const titleParts = [nombre];
+  if (categoria && ciudad) {
+    titleParts.push(`${categoria} en ${ciudad}`);
+  } else if (categoria) {
+    titleParts.push(categoria);
+  } else if (ciudad) {
+    titleParts.push(`Negocio en ${ciudad}`);
+  }
+  titleParts.push("Contacto Directo");
+  const seoTitle = titleParts.join(" | ");
+
+  // Build SEO description with services, city, and CTA
+  const topServices = servicios.slice(0, 3).join(", ");
+  let seoDescription = descripcion || `${nombre} — conoce nuestros servicios y contáctanos.`;
+  if (topServices && ciudad) {
+    seoDescription = `${nombre} en ${ciudad}. ${categoria ? categoria + ": " : ""}${topServices}. ${descripcion || "Contáctanos por WhatsApp para más información."}`;
+  } else if (topServices) {
+    seoDescription = `${nombre}. ${topServices}. ${descripcion || "Contáctanos por WhatsApp para más información."}`;
+  } else if (ciudad) {
+    seoDescription = `${nombre} en ${ciudad}. ${descripcion || "Visita nuestro sitio web y contáctanos."}`;
+  }
+  // Trim to ~155 chars for SERP
+  if (seoDescription.length > 160) seoDescription = seoDescription.slice(0, 157) + "...";
 
   return {
-    title: `${nombre} — Sitio creado por INDEXA`,
-    description: descripcion || `${nombre} - Visita nuestro sitio web y conoce nuestros servicios.`,
+    title: seoTitle,
+    description: seoDescription,
     openGraph: {
-      title: nombre,
-      description: descripcion || `${nombre} - Conoce nuestros servicios.`,
+      title: seoTitle,
+      description: seoDescription,
       type: "website",
+      locale: "es_MX",
+      siteName: nombre,
     },
     other: {
       "theme-color": colorPrincipal,
+    },
+    alternates: {
+      canonical: `https://indexa-web-ten.vercel.app/sitio/${slug}`,
     },
   };
 }
@@ -75,6 +109,82 @@ const DEFAULT_SERVICES = [
   "Asesoría gratuita",
   "Calidad garantizada",
 ];
+
+// ── JSON-LD LocalBusiness builder ────────────────────────────────────
+function buildLocalBusinessJsonLd(data: SitioData, slug: string) {
+  const {
+    nombre, descripcion, whatsapp, emailContacto, direccion,
+    ciudad, categoria, latitud, longitud, horarios,
+    logoUrl, googleMapsUrl, servicios,
+  } = data;
+
+  const cleanPhone = whatsapp.replace(/[^\d+]/g, "");
+  const fullPhone = cleanPhone.startsWith("+") ? cleanPhone : `+52${cleanPhone}`;
+
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    name: nombre,
+    url: `https://indexa-web-ten.vercel.app/sitio/${slug}`,
+  };
+
+  if (descripcion) jsonLd.description = descripcion;
+  if (logoUrl) jsonLd.image = logoUrl;
+  if (whatsapp) jsonLd.telephone = fullPhone;
+  if (emailContacto) jsonLd.email = emailContacto;
+  if (googleMapsUrl) jsonLd.hasMap = googleMapsUrl;
+  if (categoria) jsonLd.additionalType = categoria;
+
+  // Address
+  if (direccion || ciudad) {
+    jsonLd.address = {
+      "@type": "PostalAddress",
+      ...(direccion && { streetAddress: direccion }),
+      ...(ciudad && { addressLocality: ciudad }),
+      addressCountry: "MX",
+    };
+  }
+
+  // Geo coordinates
+  if (latitud && longitud) {
+    jsonLd.geo = {
+      "@type": "GeoCoordinates",
+      latitude: parseFloat(latitud),
+      longitude: parseFloat(longitud),
+    };
+  }
+
+  // Area served
+  if (ciudad) {
+    jsonLd.areaServed = {
+      "@type": "City",
+      name: ciudad,
+    };
+  }
+
+  // Opening hours
+  if (horarios) {
+    jsonLd.openingHours = horarios;
+  }
+
+  // Services as hasOfferCatalog
+  if (servicios.length > 0) {
+    jsonLd.hasOfferCatalog = {
+      "@type": "OfferCatalog",
+      name: `Servicios de ${nombre}`,
+      itemListElement: servicios.map((s, i) => ({
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: s,
+          position: i + 1,
+        },
+      })),
+    };
+  }
+
+  return jsonLd;
+}
 
 export default async function SitioPage({ params }: SitioPageProps) {
   const { slug } = await params;
@@ -94,8 +204,17 @@ export default async function SitioPage({ params }: SitioPageProps) {
 
   const templateProps = { data, services, whatsAppUrl };
 
+  // JSON-LD structured data for SEO
+  const jsonLd = buildLocalBusinessJsonLd(data, slug);
+
   return (
     <div className="min-h-screen bg-white" style={{ "--brand": colorPrincipal } as React.CSSProperties}>
+      {/* JSON-LD LocalBusiness Schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       <SitioTracker sitioId={id} />
 
       {whatsapp && (
