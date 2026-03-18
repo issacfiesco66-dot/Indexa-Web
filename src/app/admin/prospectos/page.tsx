@@ -75,11 +75,33 @@ function generateSlug(name: string): string {
 }
 
 function generateProspectingMessage(businessName: string, demoUrl: string): string {
-  return `Buen día, equipo de ${businessName}. Soy de INDEXA, la plataforma que ayuda a negocios a vender más con tecnología. Generamos una propuesta personalizada para ustedes que incluye: sitio web profesional, posicionamiento en Google, botón de WhatsApp para recibir clientes, y panel de marketing digital con Facebook e Instagram Ads. Revísenla aquí: ${demoUrl}. Los primeros meses van por nuestra cuenta. ¿Hablamos?`;
+  return `Hola, ${businessName}. Soy de INDEXA. Busqué su negocio en Google y no aparecen — eso significa que cada día están perdiendo clientes que terminan eligiendo a su competencia. Ya les armé una propuesta personalizada: incluye sitio web profesional que aparece en Google, botón de WhatsApp para recibir clientes al instante, y un panel para lanzar anuncios en Facebook y TikTok segmentados por su zona (desde $50 al día). Negocios similares están consiguiendo 20-30 clientes nuevos al mes con esto. Revísenla aquí: ${demoUrl}. Los primeros meses van por nuestra cuenta para que vean resultados antes de pagar. ¿Tienen 2 minutos?`;
 }
 
-function generateAdsMessage(businessName: string): string {
-  return `Hola, equipo de ${businessName}. Soy de INDEXA. Vimos que ya tienen presencia digital y queremos ayudarles a llevarla al siguiente nivel. Tenemos una plataforma donde pueden crear y administrar sus anuncios de Facebook y TikTok de forma fácil, sin agencia, directo desde un panel. Ideal para atraer más clientes locales con campañas que ustedes mismos controlan. ¿Les interesa una demo sin costo?`;
+const ADS_MESSAGES = [
+  // Variant 1: Pain point + urgency — "your competitors are doing it"
+  (nombre: string, ciudad: string, categoria: string) => {
+    const zona = ciudad || "su zona";
+    const sector = categoria || "su giro";
+    return `Hola, ${nombre}. Soy de INDEXA. Investigamos negocios de ${sector} en ${zona} y vimos que ya tienen presencia en internet — eso los pone adelante de muchos. Pero hay algo que su competencia ya está haciendo y que les puede estar quitando clientes: anuncios en Facebook y TikTok. Hoy, 8 de cada 10 personas buscan negocios locales desde su celular. Con nuestra plataforma ustedes pueden lanzar campañas segmentadas por colonia y edad, controlar su presupuesto diario (desde $50 pesos al día), y ver exactamente cuántas personas los contactaron. Sin agencia, sin contratos, ustedes tienen el control. ¿Les puedo mostrar cómo funciona en 3 minutos?`;
+  },
+  // Variant 2: Results-focused — specific numbers
+  (nombre: string, ciudad: string, categoria: string) => {
+    const zona = ciudad || "su zona";
+    const sector = categoria || "negocios como el suyo";
+    return `Buen día, ${nombre}. Los contacto de INDEXA porque estamos trabajando con ${sector} en ${zona} que quieren más clientes sin depender de que la gente los encuentre por casualidad. Esto es lo que logran negocios como el suyo con nuestra plataforma de anuncios: llegan a +5,000 personas de su zona por semana, reciben mensajes directos de clientes interesados, y todo lo manejan desde su celular en un panel súper sencillo. Funciona con Facebook, Instagram y TikTok. Lo mejor: los primeros 7 días de campaña corren por nuestra cuenta para que vean resultados reales antes de invertir un peso. ¿Cuándo les queda bien que les enseñe?`;
+  },
+  // Variant 3: Empathy + authority — "we understand your business"
+  (nombre: string, ciudad: string, categoria: string) => {
+    const zona = ciudad || "su zona";
+    const sector = categoria || "su tipo de negocio";
+    return `Hola, equipo de ${nombre}. Les escribo de INDEXA. Trabajamos exclusivamente con negocios locales en ${zona} y sabemos que para ${sector} el mayor reto es atraer clientes nuevos de forma constante. Vi que ya tienen página — eso es genial. El siguiente paso que está funcionando mucho es poner anuncios dirigidos a personas que buscan exactamente lo que ustedes ofrecen, a unas cuadras de su negocio. Nuestra plataforma les permite hacerlo solos, sin necesidad de contratar agencia, y pueden empezar desde $50 pesos al día. Ya tenemos resultados muy buenos con negocios similares. ¿Les comparto una demo personalizada de cómo se vería una campaña para ${nombre}? Son 3 minutos y no tiene ningún costo ni compromiso.`;
+  },
+];
+
+function generateAdsMessage(nombre: string, ciudad: string, categoria: string): string {
+  const variant = ADS_MESSAGES[Math.floor(Math.random() * ADS_MESSAGES.length)];
+  return variant(nombre, ciudad, categoria);
 }
 
 type ProspectoFilter = "todos" | "sin_web" | "con_web";
@@ -380,7 +402,7 @@ export default function ProspectosPage() {
   const handleWhatsAppAds = useCallback(async (prospecto: ProspectoFrio) => {
     const digits = prospecto.telefono.replace(/[^\d+]/g, "");
     const num = digits.startsWith("+") ? digits : `+52${digits}`;
-    const message = generateAdsMessage(prospecto.nombre);
+    const message = generateAdsMessage(prospecto.nombre, prospecto.ciudad, prospecto.categoria);
     const url = `https://wa.me/${num}?text=${encodeURIComponent(message)}`;
 
     window.open(url, "_blank", "noopener,noreferrer");

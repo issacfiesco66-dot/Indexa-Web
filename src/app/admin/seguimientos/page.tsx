@@ -32,11 +32,11 @@ function generateSlug(name: string): string {
 }
 
 function mensajeNoVieron(nombre: string, demoUrl: string): string {
-  return `Hola, equipo de ${nombre}. Hace unos días les envié una propuesta digital completa: sitio web profesional, posicionamiento en Google, WhatsApp directo para recibir clientes, y panel de marketing con Facebook y TikTok Ads. Sé que están ocupados, así que les dejo el enlace: ${demoUrl}. Los primeros meses van sin costo para que prueben el impacto en sus ventas. ¿Tienen 2 minutos para revisarla?`;
+  return `Hola, ${nombre}. Les escribí hace unos días sobre una herramienta que está ayudando a negocios de su zona a conseguir 20-30 clientes nuevos al mes. Entiendo que están ocupados, por eso se los resumo: es un sistema donde su negocio aparece en Google, reciben clientes por WhatsApp, y pueden lanzar anuncios en Facebook y TikTok desde $50 pesos al día — todo desde su celular. Ya les tengo lista su propuesta personalizada: ${demoUrl}. Los primeros meses corren por nuestra cuenta. Solo necesitan 2 minutos para verla. ¿La revisan?`;
 }
 
 function mensajeVieron(nombre: string): string {
-  return `Hola ${nombre}. Vi que pudieron revisar su propuesta en INDEXA. Además del sitio web, el sistema incluye aparecer en Google, recibir clientes por WhatsApp y un panel para lanzar campañas en Facebook y TikTok Ads. Para que no haya riesgo, podemos activar todo gratis los primeros meses. ¿Les gustaría que lo habilite hoy mismo?`;
+  return `Hola, ${nombre}. Vi que revisaron su propuesta — ¿qué les pareció? Les cuento que negocios similares al suyo están usando el panel de anuncios para llegar a miles de personas por semana en su colonia, y el WhatsApp integrado les permite cerrar ventas al instante. Lo mejor: no necesitan saber nada técnico, todo se maneja desde el celular. Si lo activan esta semana, los primeros meses van completamente gratis — sin contratos ni letra chiquita. ¿Quieren que se los active hoy?`;
 }
 
 function diasDesde(fecha: Date): number {

@@ -47,7 +47,7 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     color: "bg-blue-600 text-white",
     hoverColor: "hover:bg-blue-700",
     buildMessage: (nombre, _ciudad, _cat, url) =>
-      `Hola. Vi que ${nombre} aún no tiene un sistema digital completo. Les armé una propuesta que incluye web profesional, posicionamiento en Google, botón de WhatsApp para recibir clientes y panel de marketing con Facebook y TikTok Ads: ${url}. ¿Les interesa activarla?`,
+      `Hola, ${nombre}. Soy de INDEXA. Busqué su negocio en Google y no aparecen — eso significa que cada día están perdiendo clientes que terminan yendo con la competencia. Les armé una propuesta completa: sitio web profesional que aparece en Google, botón de WhatsApp para recibir clientes al instante, y un panel donde pueden lanzar anuncios en Facebook y TikTok desde $50 pesos al día. Revísenla aquí: ${url}. Los primeros meses van sin costo. ¿Tienen 2 minutos para verla?`,
   },
   {
     id: "educativo",
@@ -56,7 +56,7 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     color: "bg-amber-500 text-white",
     hoverColor: "hover:bg-amber-600",
     buildMessage: (nombre, ciudad, categoria, url) =>
-      `Buen día. En ${ciudad || "su zona"} la competencia de ${categoria || "su sector"} está invirtiendo en presencia digital. Les creamos un sistema completo: sitio web optimizado para Google, recepción de clientes por WhatsApp, y herramientas de publicidad en Facebook e Instagram desde un solo panel. Vean su propuesta: ${url}. ¿Qué les parece?`,
+      `Buen día, ${nombre}. Dato importante: el 78% de las personas en ${ciudad || "su zona"} buscan ${categoria || "negocios locales"} desde su celular antes de ir. Si no aparecen en internet, esos clientes van directo a su competencia. Les creamos un sistema llave en mano: sitio web que aparece en Google, WhatsApp integrado para recibir pedidos, y un panel para correr anuncios en Facebook, Instagram y TikTok segmentados por colonia. Negocios similares están consiguiendo 20-30 clientes nuevos al mes. Vean su propuesta personalizada: ${url}. ¿Lo revisamos juntos?`,
   },
   {
     id: "gancho",
@@ -64,8 +64,8 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     icon: Gift,
     color: "bg-green-600 text-white",
     hoverColor: "hover:bg-green-700",
-    buildMessage: (_nombre, ciudad, _cat, url) =>
-      `Hola, soy de INDEXA. Estamos impulsando negocios en ${ciudad || "su zona"} con un sistema todo-en-uno: web profesional, Google, WhatsApp directo, y campañas de Facebook y TikTok Ads desde un panel fácil de usar. Les generamos una propuesta: ${url}. Los primeros 3 meses van por nuestra cuenta para que vean resultados sin riesgo. ¿Hablamos?`,
+    buildMessage: (nombre, ciudad, _cat, url) =>
+      `Hola, ${nombre}. Soy de INDEXA y tengo algo para ustedes: estamos activando gratis los primeros 3 meses de nuestro sistema completo a negocios en ${ciudad || "su zona"}. Incluye: sitio web profesional, aparecer en Google cuando busquen lo que ustedes venden, WhatsApp directo para cerrar ventas, y un panel para lanzar anuncios en Facebook y TikTok con presupuestos desde $50 al día. ¿Por qué gratis? Porque confiamos en que cuando vean los resultados, se van a querer quedar. Aquí está su propuesta: ${url}. Cero riesgo, cero contratos, cero letra chiquita. ¿Cuándo les queda bien una llamada de 5 minutos?`,
   },
 ];
 
