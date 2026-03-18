@@ -281,82 +281,106 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = await request.json();
-  const { message, history, metaToken, adAccountId } = body;
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Cuerpo de solicitud inválido." }, { status: 400 });
+  }
+
+  const { message, history, metaToken, adAccountId } = body as {
+    message: string;
+    history: ClaudeMessage[];
+    metaToken: string;
+    adAccountId: string;
+  };
 
   if (!message || !metaToken || !adAccountId) {
     return NextResponse.json({ error: "Faltan parámetros." }, { status: 400 });
   }
 
-  const claudeMessages: ClaudeMessage[] = [
-    ...(Array.isArray(history) ? history : []),
-    { role: "user", content: message },
-  ];
+  try {
+    const claudeMessages: ClaudeMessage[] = [
+      ...(Array.isArray(history) ? history : []),
+      { role: "user", content: message },
+    ];
 
-  // Agentic loop — up to 5 rounds of tool calls
-  for (let round = 0; round < 5; round++) {
-    const res = await fetch(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: CLAUDE_MODEL,
-        max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        tools: TOOLS,
-        messages: claudeMessages,
-      }),
-    });
-
-    const response = await res.json();
-
-    if (response.error) {
-      return NextResponse.json(
-        { error: response.error.message || "Error de Claude API." },
-        { status: 400 }
-      );
-    }
-
-    if (response.stop_reason === "end_turn") {
-      const text =
-        (response.content as ClaudeContentBlock[])?.find((c) => c.type === "text")?.text ?? "";
-      return NextResponse.json({
-        reply: text,
-        newHistory: [
-          ...(Array.isArray(history) ? history : []),
-          { role: "user", content: message },
-          { role: "assistant", content: text },
-        ],
+    // Agentic loop — up to 5 rounds of tool calls
+    for (let round = 0; round < 5; round++) {
+      const res = await fetch(ANTHROPIC_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: CLAUDE_MODEL,
+          max_tokens: 1024,
+          system: SYSTEM_PROMPT,
+          tools: TOOLS,
+          messages: claudeMessages,
+        }),
       });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        let errMsg = `Error de Claude API (${res.status})`;
+        try { errMsg = JSON.parse(errText)?.error?.message || errMsg; } catch { /* ignore */ }
+        return NextResponse.json({ error: errMsg }, { status: 400 });
+      }
+
+      const response = await res.json();
+
+      if (response.error) {
+        return NextResponse.json(
+          { error: response.error.message || "Error de Claude API." },
+          { status: 400 }
+        );
+      }
+
+      if (response.stop_reason === "end_turn") {
+        const text =
+          (response.content as ClaudeContentBlock[])?.find((c) => c.type === "text")?.text ?? "";
+        return NextResponse.json({
+          reply: text,
+          newHistory: [
+            ...(Array.isArray(history) ? history : []),
+            { role: "user", content: message },
+            { role: "assistant", content: text },
+          ],
+        });
+      }
+
+      if (response.stop_reason === "tool_use") {
+        const toolBlocks = (response.content as ClaudeContentBlock[]).filter(
+          (c) => c.type === "tool_use"
+        ) as { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }[];
+
+        claudeMessages.push({ role: "assistant", content: response.content });
+
+        const toolResults = await Promise.all(
+          toolBlocks.map(async (block) => ({
+            type: "tool_result",
+            tool_use_id: block.id,
+            content: await executeTool(block.name, block.input, metaToken as string, adAccountId as string),
+          }))
+        );
+
+        claudeMessages.push({ role: "user", content: toolResults });
+        continue;
+      }
+
+      break;
     }
 
-    if (response.stop_reason === "tool_use") {
-      const toolBlocks = (response.content as ClaudeContentBlock[]).filter(
-        (c) => c.type === "tool_use"
-      ) as { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }[];
-
-      claudeMessages.push({ role: "assistant", content: response.content });
-
-      const toolResults = await Promise.all(
-        toolBlocks.map(async (block) => ({
-          type: "tool_result",
-          tool_use_id: block.id,
-          content: await executeTool(block.name, block.input, metaToken, adAccountId),
-        }))
-      );
-
-      claudeMessages.push({ role: "user", content: toolResults });
-      continue;
-    }
-
-    break;
+    return NextResponse.json({
+      reply: "No pude completar la solicitud. Intenta de nuevo.",
+      newHistory: Array.isArray(history) ? history : [],
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error interno del asistente.";
+    console.error("[meta-ads/ai] error:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
-
-  return NextResponse.json({
-    reply: "No pude completar la solicitud. Intenta de nuevo.",
-    newHistory: Array.isArray(history) ? history : [],
-  });
 }
