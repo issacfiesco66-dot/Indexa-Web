@@ -192,12 +192,14 @@ export async function GET(request: NextRequest) {
 }
 
 // ── Helper: post to Meta Graph ─────────────────────────────────
-async function metaPost(url: string, params: Record<string, string>) {
+async function metaPost(url: string, params: Record<string, string>, step?: string) {
   const body = new URLSearchParams(params);
   const res = await fetch(url, { method: "POST", body });
   const data = await res.json();
   if (data.error) {
-    throw new Error(data.error.message || "Error de Meta API.");
+    const msg = data.error.message || "Error de Meta API.";
+    console.error(`[meta-ads POST] step=${step || "unknown"} url=${url.split("?")[0]} error:`, msg);
+    throw new Error(`[${step || "meta"}] ${msg}`);
   }
   return data;
 }
@@ -327,9 +329,11 @@ export async function POST(request: NextRequest) {
       const budgetCents = String(Math.round(parseFloat(dailyBudget) * 100));
 
       // 1. Upload image
+      console.log(`[meta-ads] createCampaign step 1: uploading image (${imageBase64.length} chars)`);
       const imageData = await metaPost(
         `${META_GRAPH_URL}/${actId}/adimages`,
-        { bytes: imageBase64, access_token: metaToken }
+        { bytes: imageBase64, access_token: metaToken },
+        "upload_image"
       );
       const imageHashes = imageData.images;
       const imageHash = imageHashes ? Object.values(imageHashes)[0] as { hash: string } : null;
@@ -342,6 +346,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 2. Create campaign
+      console.log(`[meta-ads] createCampaign step 2: creating campaign "${campaignName}"`);
       const campaignData = await metaPost(
         `${META_GRAPH_URL}/${actId}/campaigns`,
         {
@@ -350,7 +355,8 @@ export async function POST(request: NextRequest) {
           status: "PAUSED",
           special_ad_categories: "[]",
           access_token: metaToken,
-        }
+        },
+        "create_campaign"
       );
       const newCampaignId = campaignData.id;
 
@@ -365,10 +371,11 @@ export async function POST(request: NextRequest) {
       };
 
       // 4. Create ad set
+      console.log(`[meta-ads] createCampaign step 4: creating ad set, budget=${budgetCents} cents`);
       const adSetData = await metaPost(
         `${META_GRAPH_URL}/${actId}/adsets`,
         {
-          campaign_id: newCampaignId,
+          campaign_id: newCampaignId as string,
           name: `${campaignName} - Ad Set`,
           daily_budget: budgetCents,
           billing_event: "IMPRESSIONS",
@@ -377,7 +384,8 @@ export async function POST(request: NextRequest) {
           status: "PAUSED",
           bid_strategy: "LOWEST_COST_WITHOUT_CAP",
           access_token: metaToken,
-        }
+        },
+        "create_adset"
       );
       const adSetId = adSetData.id;
 
@@ -396,26 +404,30 @@ export async function POST(request: NextRequest) {
         },
       };
 
+      console.log(`[meta-ads] createCampaign step 5: creating ad creative`);
       const creativeData = await metaPost(
         `${META_GRAPH_URL}/${actId}/adcreatives`,
         {
           name: `${campaignName} - Creative`,
           object_story_spec: JSON.stringify(objectStorySpec),
           access_token: metaToken,
-        }
+        },
+        "create_creative"
       );
       const creativeId = creativeData.id;
 
       // 6. Create ad
+      console.log(`[meta-ads] createCampaign step 6: creating ad`);
       const adData = await metaPost(
         `${META_GRAPH_URL}/${actId}/ads`,
         {
           name: `${campaignName} - Ad`,
-          adset_id: adSetId,
+          adset_id: adSetId as string,
           creative: JSON.stringify({ creative_id: creativeId }),
           status: "PAUSED",
           access_token: metaToken,
-        }
+        },
+        "create_ad"
       );
 
       return NextResponse.json({
