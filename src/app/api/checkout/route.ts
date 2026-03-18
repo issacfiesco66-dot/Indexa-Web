@@ -29,13 +29,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Validate env vars upfront
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.error("CHECKOUT: STRIPE_SECRET_KEY is not set");
+    return NextResponse.json(
+      { success: false, message: "Error de configuración del servidor (SK). Contacta soporte." },
+      { status: 500 }
+    );
+  }
+
   try {
     const body: CheckoutBody = await request.json();
     const { priceId, planId, sitioId, authToken } = body;
 
     if (!priceId || !sitioId || !authToken || !planId) {
       return NextResponse.json(
-        { success: false, message: "Faltan parámetros: priceId, planId, sitioId, authToken." },
+        { success: false, message: `Faltan parámetros.${!priceId ? " priceId" : ""}${!planId ? " planId" : ""}${!sitioId ? " sitioId" : ""}${!authToken ? " authToken" : ""}` },
         { status: 400 }
       );
     }
@@ -44,12 +53,13 @@ export async function POST(request: NextRequest) {
     const tokenUser = await verifyIdToken(authToken);
     if (!tokenUser) {
       return NextResponse.json(
-        { success: false, message: "No autorizado." },
+        { success: false, message: "No autorizado. Vuelve a iniciar sesión." },
         { status: 401 }
       );
     }
 
     // Verify sitio ownership — only the owner can purchase for their site
+    let existingCustomerId: string | undefined;
     try {
       const db = getAdminDb();
       const sitioSnap = await db.collection("sitios").doc(sitioId).get();
@@ -59,25 +69,24 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
-      const sitioOwner = sitioSnap.data()?.ownerId;
+      const sitioData = sitioSnap.data();
+      const sitioOwner = sitioData?.ownerId;
       if (sitioOwner && sitioOwner !== tokenUser.uid) {
         return NextResponse.json(
           { success: false, message: "No tienes permiso para este sitio." },
           { status: 403 }
         );
       }
-    } catch {
+      existingCustomerId = sitioData?.stripeCustomerId as string | undefined;
+    } catch (dbErr) {
+      console.error("CHECKOUT: Firestore error:", dbErr);
       return NextResponse.json(
-        { success: false, message: "Error al verificar propiedad del sitio." },
+        { success: false, message: "Error al verificar tu sitio. Verifica que tengas conexión e intenta de nuevo." },
         { status: 500 }
       );
     }
 
-    const origin = request.headers.get("origin") || "http://localhost:3000";
-
-    // Look up or reference existing Stripe customer
-    const sitioData = (await getAdminDb().collection("sitios").doc(sitioId).get()).data();
-    const existingCustomerId = sitioData?.stripeCustomerId as string | undefined;
+    const origin = request.headers.get("origin") || "https://indexa-web-ten.vercel.app";
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "subscription",
@@ -113,8 +122,14 @@ export async function POST(request: NextRequest) {
       url: session.url,
     });
   } catch (err) {
-    console.error("Checkout error:", err);
-    const message = err instanceof Error ? err.message : "Error al crear sesión de pago.";
+    console.error("CHECKOUT: Stripe session error:", err);
+    const rawMsg = err instanceof Error ? err.message : "Error desconocido";
+    // Surface Stripe-specific errors to help debug
+    const message = rawMsg.includes("No such price")
+      ? "El precio seleccionado no existe en Stripe. Contacta soporte."
+      : rawMsg.includes("api_key")
+        ? "Error de autenticación con Stripe. Contacta soporte."
+        : `Error al crear sesión de pago: ${rawMsg}`;
     return NextResponse.json(
       { success: false, message },
       { status: 500 }
