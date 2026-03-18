@@ -111,23 +111,26 @@ function AdminShell({ children }: { children: React.ReactNode }) {
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-white border-r border-gray-200 transition-transform duration-200 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#0a0e27] transition-transform duration-200 lg:static lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between border-b border-gray-100 px-6">
-          <Link href="/admin/dashboard" className="text-xl font-extrabold tracking-tight text-indexa-blue">
-            INDEXA
+        <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">
+          <Link href="/admin/dashboard" className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indexa-orange to-orange-400">
+              <span className="text-sm font-black text-white">IX</span>
+            </div>
+            <span className="text-lg font-extrabold tracking-tight text-white">INDEXA</span>
           </Link>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-gray-600">
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-white/50 hover:text-white">
             <X size={20} />
           </button>
         </div>
@@ -142,16 +145,16 @@ function AdminShell({ children }: { children: React.ReactNode }) {
                   <Link
                     href={item.href}
                     onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
                       isActive
-                        ? "bg-indexa-blue/10 text-indexa-blue"
-                        : "text-indexa-gray-dark hover:bg-gray-50 hover:text-indexa-blue"
+                        ? "bg-white/10 text-white shadow-sm"
+                        : "text-white/60 hover:bg-white/5 hover:text-white"
                     }`}
                   >
                     <item.icon size={18} />
                     {item.label}
                     {item.href === "/admin/radar" && hotCount > 0 && (
-                      <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                      <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gradient-to-r from-indexa-orange to-orange-500 px-1.5 text-[10px] font-bold text-white">
                         {hotCount}
                       </span>
                     )}
@@ -163,10 +166,10 @@ function AdminShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-gray-100 p-3">
+        <div className="border-t border-white/10 p-3">
           <button
             onClick={signOut}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-400"
           >
             <LogOut size={18} />
             Cerrar Sesión
@@ -180,13 +183,16 @@ function AdminShell({ children }: { children: React.ReactNode }) {
         <header className="flex h-16 items-center gap-4 border-b border-gray-200 bg-white px-4 lg:px-8">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 lg:hidden"
+            className="rounded-lg p-2 text-indexa-gray-dark hover:bg-indexa-gray-light lg:hidden"
           >
             <Menu size={20} />
           </button>
-          <h1 className="text-lg font-semibold text-indexa-gray-dark">
+          <h1 className="text-lg font-bold text-indexa-gray-dark">
             {NAV_ITEMS.find((i) => pathname === i.href || pathname?.startsWith(i.href + "/"))?.label ?? "Admin"}
           </h1>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="hidden text-xs font-medium text-gray-400 sm:block">{user?.email}</span>
+          </div>
         </header>
 
         {/* Page content */}

@@ -76,28 +76,35 @@ function LoginForm() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-indexa-gray-light px-4">
-      <div className="w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center bg-[#050816] px-4 relative overflow-hidden">
+      {/* Background orbs */}
+      <div className="absolute top-1/4 left-1/4 h-[400px] w-[400px] rounded-full bg-indexa-blue/20 blur-[120px] animate-pulse-glow" />
+      <div className="absolute bottom-1/4 right-1/4 h-[300px] w-[300px] rounded-full bg-indexa-orange/10 blur-[100px] animate-pulse-glow" style={{ animationDelay: '2s' }} />
+
+      <div className="relative w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold tracking-tight text-indexa-blue">INDEXA</h1>
-          <p className="mt-2 text-sm text-indexa-gray-dark">Panel de Administración</p>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indexa-orange to-orange-400">
+            <span className="text-lg font-black text-white">IX</span>
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-white">INDEXA</h1>
+          <p className="mt-2 text-sm text-white/50">Panel de Administración</p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm"
+          className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-xl backdrop-blur-sm"
         >
-          <h2 className="text-lg font-bold text-indexa-gray-dark">Iniciar Sesión</h2>
+          <h2 className="text-lg font-bold text-white">Iniciar Sesión</h2>
 
           {error && (
-            <div className="mt-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+            <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400">
               {error}
             </div>
           )}
 
           <div className="mt-6 space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-semibold text-indexa-gray-dark">
+              <label htmlFor="email" className="block text-sm font-semibold text-white/70">
                 Correo electrónico
               </label>
               <input
@@ -106,11 +113,11 @@ function LoginForm() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-indexa-gray-light px-4 py-3 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
+                className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none transition-colors focus:border-indexa-orange focus:ring-2 focus:ring-indexa-orange/20"
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-indexa-gray-dark">
+              <label htmlFor="password" className="block text-sm font-semibold text-white/70">
                 Contraseña
               </label>
               <input
@@ -119,7 +126,7 @@ function LoginForm() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-indexa-gray-light px-4 py-3 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
+                className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none transition-colors focus:border-indexa-orange focus:ring-2 focus:ring-indexa-orange/20"
               />
             </div>
           </div>
@@ -127,15 +134,15 @@ function LoginForm() {
           <button
             type="submit"
             disabled={submitting}
-            className="mt-6 w-full rounded-xl bg-indexa-blue px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-indexa-blue/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-6 w-full rounded-xl bg-gradient-to-r from-indexa-orange to-orange-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indexa-orange/25 transition-all hover:shadow-xl hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? "Ingresando..." : "Ingresar"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-gray-400">
+        <p className="mt-6 text-center text-xs text-white/30">
           ¿Eres cliente?{" "}
-          <Link href="/login" className="font-medium text-gray-500 hover:text-indexa-blue">
+          <Link href="/login" className="font-medium text-white/50 hover:text-indexa-orange">
             Accede a tu panel aquí
           </Link>
         </p>

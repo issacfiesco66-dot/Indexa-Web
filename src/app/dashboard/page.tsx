@@ -414,28 +414,33 @@ export default function ClientDashboardPage() {
   // ── No sitio state — new client welcome ───────────────────────
   if (pageState === "no-sitio") {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
-          <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
-            <span className="text-lg font-extrabold tracking-tight text-indexa-blue">INDEXA</span>
-            <div className="flex items-center gap-3">
+      <div className="min-h-screen bg-indexa-gray-light">
+        <header className="sticky top-0 z-30 bg-[#0a0e27] shadow-lg shadow-black/10">
+          <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5 sm:px-6">
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indexa-orange to-orange-400">
+                <span className="text-sm font-black text-white">IX</span>
+              </div>
+              <span className="text-lg font-extrabold tracking-tight text-white">INDEXA</span>
+            </Link>
+            <div className="flex items-center gap-2">
               <Link
                 href="/dashboard/marketing"
-                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-indexa-orange"
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
               >
                 <Megaphone size={16} />
                 <span className="hidden sm:inline">Marketing</span>
               </Link>
               <Link
                 href="/dashboard/tiktok"
-                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-indexa-gray-dark"
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
               >
                 <Video size={16} />
                 <span className="hidden sm:inline">TikTok</span>
               </Link>
               <button
                 onClick={signOut}
-                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-500"
+                className="rounded-lg p-2 text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-400"
                 title="Cerrar sesión"
               >
                 <LogOut size={18} />
@@ -543,46 +548,51 @@ export default function ClientDashboardPage() {
     "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none transition-colors focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20";
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-indexa-gray-light">
       {/* ── Header ──────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4 sm:px-6">
+      <header className="sticky top-0 z-30 bg-[#0a0e27] shadow-lg shadow-black/10">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-3">
-            <span className="text-lg font-extrabold tracking-tight text-indexa-blue">INDEXA</span>
-            <span className="hidden text-sm text-gray-400 sm:block">|</span>
-            <span className="hidden text-sm font-medium text-indexa-gray-dark sm:block">
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indexa-orange to-orange-400">
+                <span className="text-sm font-black text-white">IX</span>
+              </div>
+              <span className="text-lg font-extrabold tracking-tight text-white">INDEXA</span>
+            </Link>
+            <span className="hidden text-sm text-white/30 sm:block">|</span>
+            <span className="hidden text-sm font-medium text-white/70 sm:block">
               {sitio.nombre || "Mi Negocio"}
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Link
               href="/dashboard/marketing"
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-indexa-orange"
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
             >
               <Megaphone size={16} />
               <span className="hidden sm:inline">Marketing</span>
             </Link>
             <Link
               href="/dashboard/tiktok"
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-indexa-gray-dark"
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
             >
               <Video size={16} />
               <span className="hidden sm:inline">TikTok</span>
             </Link>
             {saved && (
-              <span className="text-xs font-semibold text-green-600">✓ Guardado</span>
+              <span className="text-xs font-semibold text-green-400">✓ Guardado</span>
             )}
             <button
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-xl bg-indexa-blue px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-indexa-blue/90 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indexa-orange to-orange-500 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-indexa-orange/25 transition-all hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-60"
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
               {saving ? "Guardando..." : "Guardar"}
             </button>
             <button
               onClick={signOut}
-              className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-500"
+              className="rounded-lg p-2 text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-400"
               title="Cerrar sesión"
             >
               <LogOut size={18} />

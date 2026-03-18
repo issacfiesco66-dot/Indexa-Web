@@ -86,11 +86,18 @@ export default function ClientLoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center bg-[#050816] px-4 relative overflow-hidden">
+      {/* Background orbs */}
+      <div className="absolute top-1/4 left-1/4 h-[400px] w-[400px] rounded-full bg-indexa-blue/20 blur-[120px] animate-pulse-glow" />
+      <div className="absolute bottom-1/4 right-1/4 h-[300px] w-[300px] rounded-full bg-indexa-orange/10 blur-[100px] animate-pulse-glow" style={{ animationDelay: '2s' }} />
+
+      <div className="relative w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold tracking-tight text-indexa-blue">INDEXA</h1>
-          <p className="mt-2 text-sm text-gray-500">Accede a tu panel de negocio</p>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indexa-orange to-orange-400">
+            <span className="text-lg font-black text-white">IX</span>
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-white">INDEXA</h1>
+          <p className="mt-2 text-sm text-white/50">Accede a tu panel de negocio</p>
         </div>
 
         {/* ── Password Reset Form ─────────────────────────────────── */}
@@ -211,9 +218,9 @@ export default function ClientLoginPage() {
           </form>
         )}
 
-        <p className="mt-6 text-center text-xs text-gray-400">
+        <p className="mt-6 text-center text-xs text-white/30">
           ¿Eres administrador?{" "}
-          <Link href="/admin/login" className="font-medium text-gray-500 hover:text-indexa-blue">
+          <Link href="/admin/login" className="font-medium text-white/50 hover:text-indexa-orange">
             Accede aquí
           </Link>
         </p>

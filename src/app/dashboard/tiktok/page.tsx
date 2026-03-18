@@ -212,7 +212,7 @@ export default function ClientTikTokAdsPage() {
   // ── Not connected: show setup form ─────────────────────────────
   if (!connected) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-indexa-gray-light">
         <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
           {/* Back nav */}
           <Link
@@ -315,7 +315,7 @@ export default function ClientTikTokAdsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-indexa-gray-light">
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
         {/* Back nav */}
         <Link
