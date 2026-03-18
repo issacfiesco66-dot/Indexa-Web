@@ -46,6 +46,8 @@ async function getSitioBySlug(slug: string): Promise<{ id: string; data: SitioDa
       horarios: (raw.horarios as string) ?? "",
       googleMapsUrl: (raw.googleMapsUrl as string) ?? "",
       ofertasActivas: (raw.ofertasActivas as SitioData["ofertasActivas"]) ?? [],
+      bioLinks: (raw.bioLinks as SitioData["bioLinks"]) ?? [],
+      bioStats: (raw.bioStats as SitioData["bioStats"]) ?? { visitas: { fb: 0, ig: 0, tt: 0, wa: 0, direct: 0 }, clicks: {} },
     },
   };
 }

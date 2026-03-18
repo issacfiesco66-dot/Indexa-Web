@@ -36,6 +36,24 @@ export type PlanType = "starter" | "profesional" | "enterprise";
 export type StatusPago = "inactivo" | "activo" | "cancelado" | "vencido" | "demo" | "publicado";
 export type TemplateId = "modern" | "elegant" | "minimalist";
 
+export type BioLinkTipo = "whatsapp" | "oferta" | "cupon" | "reserva" | "menu" | "link";
+export type BioSource = "fb" | "ig" | "tt" | "wa" | "direct";
+
+export interface BioLink {
+  id: string;
+  tipo: BioLinkTipo;
+  titulo: string;
+  descripcion: string;
+  url: string;
+  emoji: string;
+  activo: boolean;
+}
+
+export interface BioStats {
+  visitas: Record<BioSource, number>;
+  clicks: Record<string, Record<BioSource, number>>;
+}
+
 export interface Oferta {
   id: string;
   titulo: string;
@@ -73,6 +91,8 @@ export interface SitioData {
   horarios: string;
   googleMapsUrl: string;
   ofertasActivas: Oferta[];
+  bioLinks: BioLink[];
+  bioStats: BioStats;
 }
 
 export interface UserProfile {

@@ -76,6 +76,11 @@ service cloud.firestore {
         || (
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(["statusPago", "plan", "stripeCustomerId", "stripeSubscriptionId", "fechaVencimiento", "ultimoPagoAt"])
+        )
+        // Bio visit tracking (public API route, no auth needed)
+        || (
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["bioStats"])
         );
     }
 

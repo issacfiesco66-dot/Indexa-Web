@@ -16,7 +16,7 @@ import {
 } from "firebase/storage";
 import { db, storage } from "@/lib/firebaseConfig";
 import { useAuth } from "@/lib/AuthContext";
-import type { SitioData, UserProfile, TemplateId, Oferta } from "@/types/lead";
+import type { SitioData, UserProfile, TemplateId, Oferta, BioLink, BioStats } from "@/types/lead";
 import {
   Eye,
   MousePointerClick,
@@ -39,6 +39,7 @@ import {
   Video,
   Tag,
   Gift,
+  Link2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -174,6 +175,8 @@ const DEFAULT_SITIO: SitioData = {
   horarios: "",
   googleMapsUrl: "",
   ofertasActivas: [],
+  bioLinks: [],
+  bioStats: { visitas: { fb: 0, ig: 0, tt: 0, wa: 0, direct: 0 }, clicks: {} },
 };
 
 function docToSitio(data: DocumentData): SitioData {
@@ -205,6 +208,8 @@ function docToSitio(data: DocumentData): SitioData {
     horarios: data.horarios ?? "",
     googleMapsUrl: data.googleMapsUrl ?? "",
     ofertasActivas: (data.ofertasActivas as Oferta[]) ?? [],
+    bioLinks: (data.bioLinks as BioLink[]) ?? [],
+    bioStats: (data.bioStats as BioStats) ?? { visitas: { fb: 0, ig: 0, tt: 0, wa: 0, direct: 0 }, clicks: {} },
   };
 }
 
@@ -538,6 +543,13 @@ export default function ClientDashboardPage() {
             </Link>
             <div className="flex items-center gap-2">
               <Link
+                href="/dashboard/bio"
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <Link2 size={16} />
+                <span className="hidden sm:inline">Bio</span>
+              </Link>
+              <Link
                 href="/dashboard/ofertas"
                 className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
               >
@@ -698,6 +710,13 @@ export default function ClientDashboardPage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/bio"
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <Link2 size={16} />
+              <span className="hidden sm:inline">Bio</span>
+            </Link>
             <Link
               href="/dashboard/ofertas"
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white"
