@@ -7,7 +7,7 @@ export const maxDuration = 60;
 const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
 const META_GRAPH_URL = "https://graph.facebook.com/v21.0";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const CLAUDE_MODEL = "claude-3-5-sonnet-20241022";
+const CLAUDE_MODEL = "claude-3-haiku-20240307";
 
 const SYSTEM_PROMPT = `Eres un asistente de IA especializado en gestionar campañas de Meta Ads (Facebook e Instagram) para negocios.
 Ayudas a los usuarios a: entender el rendimiento de sus campañas, crear borradores de campañas, pausar/reanudar campañas y dar recomendaciones para mejorar resultados.
@@ -397,8 +397,12 @@ export async function POST(request: NextRequest) {
       console.log(`[meta-ads/ai] Claude status: ${claudeRes.status}`);
 
       if (!claudeRes.ok) {
-        let errMsg = `Error de Claude API (HTTP ${claudeRes.status})`;
-        try { errMsg = JSON.parse(claudeText)?.error?.message || errMsg; } catch { /* noop */ }
+        let errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${claudeText.slice(0, 300)}`;
+        try {
+          const parsed = JSON.parse(claudeText);
+          errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${parsed?.error?.message || claudeText.slice(0, 200)}`;
+        } catch { /* noop */ }
+        console.error("[meta-ads/ai] Claude error:", errMsg);
         return NextResponse.json({ error: errMsg }, { status: 400 });
       }
 
