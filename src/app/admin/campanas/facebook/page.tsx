@@ -35,6 +35,14 @@ import {
   Plus,
   Upload,
   X,
+  Layers,
+  FileText,
+  MessageCircle,
+  ShoppingBag,
+  Phone,
+  Globe,
+  Copy,
+  ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -60,6 +68,88 @@ interface CampaignInsights {
   cpm?: string;
   reach?: string;
 }
+
+interface AdSet {
+  id: string;
+  name: string;
+  status: string;
+  daily_budget?: string;
+  lifetime_budget?: string;
+  optimization_goal?: string;
+  bid_strategy?: string;
+  campaign_id?: string;
+}
+
+interface MetaAd {
+  id: string;
+  name: string;
+  status: string;
+  adset_id?: string;
+  campaign_id?: string;
+  creative?: { name?: string; thumbnail_url?: string };
+  created_time?: string;
+}
+
+interface MetaPage {
+  id: string;
+  name: string;
+  category?: string;
+  fan_count?: number;
+  followers_count?: number;
+  picture?: { data?: { url?: string } };
+  link?: string;
+  verification_status?: string;
+}
+
+interface LeadForm {
+  id: string;
+  name: string;
+  status?: string;
+  leads_count?: number;
+  created_time?: string;
+}
+
+interface LeadEntry {
+  id: string;
+  created_time: string;
+  field_data: Array<{ name: string; values: string[] }>;
+}
+
+interface Catalog {
+  id: string;
+  name: string;
+  product_count?: number;
+  vertical?: string;
+}
+
+interface WATemplate {
+  id: string;
+  name: string;
+  status: string;
+  language: string;
+  category: string;
+}
+
+interface WAPhoneNumber {
+  id: string;
+  display_phone_number: string;
+  verified_name: string;
+  quality_rating?: string;
+  status?: string;
+}
+
+type MetaTab = "resumen" | "campanas" | "adsets" | "anuncios" | "leads" | "paginas" | "whatsapp" | "catalogos";
+
+const META_TABS: { id: MetaTab; label: string; icon: React.ElementType }[] = [
+  { id: "resumen", label: "Resumen", icon: BarChart3 },
+  { id: "campanas", label: "Campañas", icon: Megaphone },
+  { id: "adsets", label: "Ad Sets", icon: Layers },
+  { id: "anuncios", label: "Anuncios", icon: FileText },
+  { id: "leads", label: "Leads", icon: Users },
+  { id: "paginas", label: "Páginas", icon: Globe },
+  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { id: "catalogos", label: "Catálogos", icon: ShoppingBag },
+];
 
 // ── Helpers ──────────────────────────────────────────────────────────
 function formatNumber(val: string | undefined): string {
@@ -165,6 +255,40 @@ export default function AdminFacebookAdsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [datePreset, setDatePreset] = useState("last_7d");
+
+  // Tab
+  const [activeTab, setActiveTab] = useState<MetaTab>("resumen");
+
+  // Ad Sets
+  const [adSets, setAdSets] = useState<AdSet[]>([]);
+  const [loadingAdSets, setLoadingAdSets] = useState(false);
+
+  // Ads
+  const [metaAds, setMetaAds] = useState<MetaAd[]>([]);
+  const [loadingAds, setLoadingAds] = useState(false);
+
+  // Pages
+  const [pages, setPages] = useState<MetaPage[]>([]);
+  const [loadingPages, setLoadingPages] = useState(false);
+
+  // Leads
+  const [leadForms, setLeadForms] = useState<LeadForm[]>([]);
+  const [loadingLeadForms, setLoadingLeadForms] = useState(false);
+  const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
+  const [leads, setLeads] = useState<LeadEntry[]>([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+
+  // Catalogs
+  const [catalogs, setCatalogs] = useState<Catalog[]>([]);
+  const [loadingCatalogs, setLoadingCatalogs] = useState(false);
+
+  // WhatsApp
+  const [waPhones, setWaPhones] = useState<WAPhoneNumber[]>([]);
+  const [waTemplates, setWaTemplates] = useState<WATemplate[]>([]);
+  const [loadingWA, setLoadingWA] = useState(false);
+  const [wabaId, setWabaId] = useState("");
+
+  const [copied, setCopied] = useState(false);
 
   const isConnected = !!savedToken && !!savedAccount;
 
@@ -485,11 +609,171 @@ export default function AdminFacebookAdsPage() {
       setCampaigns([]);
       setInsights({});
       setAccountInsights(null);
+      setAdSets([]);
+      setMetaAds([]);
+      setPages([]);
+      setLeadForms([]);
+      setLeads([]);
+      setCatalogs([]);
+      setWaPhones([]);
+      setWaTemplates([]);
       setShowGuide(true);
     } catch {
       setError("Error al desconectar.");
     }
   }, [user]);
+
+  // ── Fetch ad sets ───────────────────────────────────────────
+  const fetchAdSets = useCallback(async () => {
+    if (!user || !savedToken || !savedAccount) return;
+    setLoadingAdSets(true);
+    try {
+      const authToken = await user.getIdToken();
+      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "all_adsets" });
+      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const data = await res.json();
+      if (!data.error) setAdSets(data.data || []);
+    } catch { /* non-critical */ } finally { setLoadingAdSets(false); }
+  }, [user, savedToken, savedAccount]);
+
+  // ── Fetch ads ───────────────────────────────────────────────
+  const fetchAds = useCallback(async () => {
+    if (!user || !savedToken || !savedAccount) return;
+    setLoadingAds(true);
+    try {
+      const authToken = await user.getIdToken();
+      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "ads" });
+      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const data = await res.json();
+      if (!data.error) setMetaAds(data.data || []);
+    } catch { /* non-critical */ } finally { setLoadingAds(false); }
+  }, [user, savedToken, savedAccount]);
+
+  // ── Fetch pages ─────────────────────────────────────────────
+  const fetchPages = useCallback(async () => {
+    if (!user || !savedToken || !savedAccount) return;
+    setLoadingPages(true);
+    try {
+      const authToken = await user.getIdToken();
+      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "pages" });
+      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const data = await res.json();
+      if (!data.error) setPages(data.data || []);
+    } catch { /* non-critical */ } finally { setLoadingPages(false); }
+  }, [user, savedToken, savedAccount]);
+
+  // ── Fetch lead forms ────────────────────────────────────────
+  const fetchLeadForms = useCallback(async () => {
+    if (!user || !savedToken || !savedAccount || !savedPageId) return;
+    setLoadingLeadForms(true);
+    try {
+      const authToken = await user.getIdToken();
+      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "lead_forms", pageId: savedPageId });
+      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const data = await res.json();
+      if (!data.error) setLeadForms(data.data || []);
+    } catch { /* non-critical */ } finally { setLoadingLeadForms(false); }
+  }, [user, savedToken, savedAccount, savedPageId]);
+
+  // ── Fetch leads for a form ──────────────────────────────────
+  const fetchLeads = useCallback(async (formId: string) => {
+    if (!user || !savedToken || !savedAccount) return;
+    setLoadingLeads(true);
+    setSelectedFormId(formId);
+    try {
+      const authToken = await user.getIdToken();
+      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "leads", formId });
+      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const data = await res.json();
+      if (!data.error) setLeads(data.data || []);
+    } catch { /* non-critical */ } finally { setLoadingLeads(false); }
+  }, [user, savedToken, savedAccount]);
+
+  // ── Fetch catalogs ──────────────────────────────────────────
+  const fetchCatalogs = useCallback(async () => {
+    if (!user || !savedToken || !savedAccount) return;
+    setLoadingCatalogs(true);
+    try {
+      const authToken = await user.getIdToken();
+      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "catalogs" });
+      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const data = await res.json();
+      if (!data.error) setCatalogs(data.data || []);
+    } catch { /* non-critical */ } finally { setLoadingCatalogs(false); }
+  }, [user, savedToken, savedAccount]);
+
+  // ── Fetch WhatsApp ──────────────────────────────────────────
+  const fetchWhatsApp = useCallback(async () => {
+    if (!user || !savedToken || !savedAccount || !wabaId.trim()) return;
+    setLoadingWA(true);
+    try {
+      const authToken = await user.getIdToken();
+      const base = { metaToken: savedToken, adAccountId: savedAccount, wabaId: wabaId.trim() };
+      const [phonesRes, templatesRes] = await Promise.all([
+        fetch(`/api/meta-ads?${new URLSearchParams({ ...base, action: "whatsapp_phone_numbers" })}`, { headers: { Authorization: `Bearer ${authToken}` } }),
+        fetch(`/api/meta-ads?${new URLSearchParams({ ...base, action: "whatsapp_templates" })}`, { headers: { Authorization: `Bearer ${authToken}` } }),
+      ]);
+      const phonesData = await phonesRes.json();
+      const templatesData = await templatesRes.json();
+      if (!phonesData.error) setWaPhones(phonesData.data || []);
+      if (!templatesData.error) setWaTemplates(templatesData.data || []);
+    } catch { /* non-critical */ } finally { setLoadingWA(false); }
+  }, [user, savedToken, savedAccount, wabaId]);
+
+  // ── Toggle ad set status ────────────────────────────────────
+  const handleAdSetToggle = useCallback(async (adsetId: string, currentStatus: string) => {
+    if (!user || !savedToken) return;
+    setActionLoading(adsetId);
+    try {
+      const authToken = await user.getIdToken();
+      const newStatus = currentStatus === "ACTIVE" ? "PAUSED" : "ACTIVE";
+      const res = await fetch("/api/meta-ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ metaToken: savedToken, action: "adset_toggle", adsetId, newStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAdSets(prev => prev.map(a => a.id === adsetId ? { ...a, status: newStatus } : a));
+      } else { setError(data.error || "Error"); }
+    } catch { setError("Error de conexión."); } finally { setActionLoading(null); }
+  }, [user, savedToken]);
+
+  // ── Toggle ad status ────────────────────────────────────────
+  const handleAdToggle = useCallback(async (adId: string, currentStatus: string) => {
+    if (!user || !savedToken) return;
+    setActionLoading(adId);
+    try {
+      const authToken = await user.getIdToken();
+      const newStatus = currentStatus === "ACTIVE" ? "PAUSED" : "ACTIVE";
+      const res = await fetch("/api/meta-ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ metaToken: savedToken, action: "ad_toggle", adId, newStatus }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMetaAds(prev => prev.map(a => a.id === adId ? { ...a, status: newStatus } : a));
+      } else { setError(data.error || "Error"); }
+    } catch { setError("Error de conexión."); } finally { setActionLoading(null); }
+  }, [user, savedToken]);
+
+  // ── Auto-load tab data ──────────────────────────────────────
+  useEffect(() => {
+    if (!isConnected || pageLoading) return;
+    if (activeTab === "adsets" && adSets.length === 0 && !loadingAdSets) fetchAdSets();
+    if (activeTab === "anuncios" && metaAds.length === 0 && !loadingAds) fetchAds();
+    if (activeTab === "paginas" && pages.length === 0 && !loadingPages) fetchPages();
+    if (activeTab === "leads" && leadForms.length === 0 && !loadingLeadForms && savedPageId) fetchLeadForms();
+    if (activeTab === "catalogos" && catalogs.length === 0 && !loadingCatalogs) fetchCatalogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, isConnected, pageLoading]);
+
+  const copyText = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   // ── Loading ───────────────────────────────────────────────────
   if (pageLoading || authLoading) {
@@ -648,260 +932,551 @@ export default function AdminFacebookAdsPage() {
         </div>
       )}
 
-      {/* ── Connected: Dashboard ───────────────────────────────── */}
+      {/* ── Connected: Tabbed Dashboard ─────────────────────────── */}
       {isConnected && (
         <>
-          {/* Account-level metrics */}
-          {accountInsights && (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-                  <Eye size={18} className="text-indexa-blue" />
-                </div>
-                <div>
-                  <p className="text-lg font-extrabold text-indexa-gray-dark">{formatNumber(accountInsights.impressions)}</p>
-                  <p className="text-xs text-gray-500">Impresiones</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50">
-                  <MousePointerClick size={18} className="text-green-600" />
-                </div>
-                <div>
-                  <p className="text-lg font-extrabold text-indexa-gray-dark">{formatNumber(accountInsights.clicks)}</p>
-                  <p className="text-xs text-gray-500">Clics</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50">
-                  <DollarSign size={18} className="text-indexa-orange" />
-                </div>
-                <div>
-                  <p className="text-lg font-extrabold text-indexa-gray-dark">{formatMoney(accountInsights.spend)}</p>
-                  <p className="text-xs text-gray-500">Gasto total</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50">
-                  <Users size={18} className="text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-lg font-extrabold text-indexa-gray-dark">{formatNumber(accountInsights.reach)}</p>
-                  <p className="text-xs text-gray-500">Alcance</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-lg font-bold text-indexa-gray-dark">
-              <BarChart3 size={20} className="text-indexa-blue" />
-              Campañas ({campaigns.length})
-            </h2>
-            <div className="flex items-center gap-2">
-              <select
-                value={datePreset}
-                onChange={(e) => setDatePreset(e.target.value)}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-indexa-gray-dark"
-              >
-                <option value="today">Hoy</option>
-                <option value="yesterday">Ayer</option>
-                <option value="last_7d">Últimos 7 días</option>
-                <option value="last_14d">Últimos 14 días</option>
-                <option value="last_30d">Últimos 30 días</option>
-                <option value="this_month">Este mes</option>
-                <option value="last_month">Mes pasado</option>
-              </select>
-              <button
-                onClick={() => { fetchCampaigns(); fetchAccountInsights(); }}
-                disabled={loadingCampaigns}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
-              >
-                <RefreshCw size={12} className={loadingCampaigns ? "animate-spin" : ""} />
-                Actualizar
-              </button>
-              {savedPageId && (
+          {/* Tab bar */}
+          <div className="flex gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
+            {META_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
                 <button
-                  onClick={() => { setShowCreateModal(true); setCreateError(""); }}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indexa-orange to-orange-500 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
+                    isActive
+                      ? "bg-indexa-blue text-white shadow-sm"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-indexa-gray-dark"
+                  }`}
                 >
-                  <Plus size={14} />
-                  Crear Campaña
+                  <Icon size={14} />
+                  {tab.label}
                 </button>
-              )}
-            </div>
+              );
+            })}
           </div>
 
           {error && (
             <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               <AlertCircle size={16} />
               {error}
-              <button onClick={() => setError("")} className="ml-auto text-xs font-medium hover:underline">
-                Cerrar
-              </button>
+              <button onClick={() => setError("")} className="ml-auto text-xs font-medium hover:underline">Cerrar</button>
             </div>
           )}
 
-          {/* Campaign list */}
-          {loadingCampaigns ? (
-            <div className="flex h-40 items-center justify-center rounded-2xl border border-gray-200 bg-white">
-              <Loader2 className="h-6 w-6 animate-spin text-indexa-blue" />
-            </div>
-          ) : campaigns.length === 0 ? (
-            <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white text-center">
-              <Megaphone size={32} className="text-gray-300" />
-              <p className="mt-3 text-sm text-gray-500">No se encontraron campañas.</p>
-              {savedPageId ? (
-                <button
-                  onClick={() => { setShowCreateModal(true); setCreateError(""); }}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-indexa-orange px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-indexa-orange/90"
-                >
-                  <Plus size={14} /> Crear tu primera campaña
-                </button>
-              ) : (
-                <p className="mt-1 text-xs text-gray-400">Configura tu Facebook Page ID en las credenciales para crear campañas.</p>
+          {/* ════════════════ TAB: RESUMEN ════════════════ */}
+          {activeTab === "resumen" && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-indexa-gray-dark">Resumen de Cuenta</h2>
+                <div className="flex items-center gap-2">
+                  <select value={datePreset} onChange={(e) => setDatePreset(e.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-indexa-gray-dark">
+                    <option value="today">Hoy</option>
+                    <option value="yesterday">Ayer</option>
+                    <option value="last_7d">Últimos 7 días</option>
+                    <option value="last_14d">Últimos 14 días</option>
+                    <option value="last_30d">Últimos 30 días</option>
+                    <option value="this_month">Este mes</option>
+                    <option value="last_month">Mes pasado</option>
+                  </select>
+                  <button onClick={() => { fetchCampaigns(); fetchAccountInsights(); }} disabled={loadingCampaigns} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+                    <RefreshCw size={12} className={loadingCampaigns ? "animate-spin" : ""} /> Actualizar
+                  </button>
+                </div>
+              </div>
+
+              {accountInsights && (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {[
+                    { label: "Impresiones", value: formatNumber(accountInsights.impressions), icon: Eye, color: "bg-blue-50", iconColor: "text-indexa-blue" },
+                    { label: "Clics", value: formatNumber(accountInsights.clicks), icon: MousePointerClick, color: "bg-green-50", iconColor: "text-green-600" },
+                    { label: "Gasto total", value: formatMoney(accountInsights.spend), icon: DollarSign, color: "bg-orange-50", iconColor: "text-indexa-orange" },
+                    { label: "Alcance", value: formatNumber(accountInsights.reach), icon: Users, color: "bg-purple-50", iconColor: "text-purple-600" },
+                  ].map((m) => {
+                    const MIcon = m.icon;
+                    return (
+                      <div key={m.label} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${m.color}`}><MIcon size={18} className={m.iconColor} /></div>
+                        <div>
+                          <p className="text-lg font-extrabold text-indexa-gray-dark">{m.value}</p>
+                          <p className="text-xs text-gray-500">{m.label}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Campañas</p>
+                  <p className="mt-1 text-2xl font-extrabold text-indexa-gray-dark">{campaigns.length}</p>
+                  <p className="text-[11px] text-gray-400">{campaigns.filter(c => c.status === "ACTIVE").length} activas</p>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Ad Sets</p>
+                  <p className="mt-1 text-2xl font-extrabold text-indexa-gray-dark">{adSets.length}</p>
+                  <p className="text-[11px] text-gray-400">{adSets.filter(a => a.status === "ACTIVE").length} activos</p>
+                </div>
+                <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Anuncios</p>
+                  <p className="mt-1 text-2xl font-extrabold text-indexa-gray-dark">{metaAds.length}</p>
+                  <p className="text-[11px] text-gray-400">{metaAds.filter(a => a.status === "ACTIVE").length} activos</p>
+                </div>
+              </div>
+
+              {savedNanoBananaKey && (
+                <Link href="/dashboard/marketing/crear-anuncio" className="flex items-center justify-between rounded-2xl border border-gray-200 bg-gradient-to-r from-purple-50 to-orange-50 p-5 shadow-sm transition-shadow hover:shadow-md">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indexa-orange"><Wand2 size={20} className="text-white" /></div>
+                    <div>
+                      <h3 className="text-sm font-bold text-indexa-gray-dark">Crear Anuncio con IA</h3>
+                      <p className="text-xs text-gray-500">Genera imágenes profesionales y previsualiza tus anuncios.</p>
+                    </div>
+                  </div>
+                  <ImagePlus size={18} className="text-gray-400" />
+                </Link>
               )}
             </div>
-          ) : (
-            <div className="space-y-3">
-              {campaigns.map((c) => {
-                const st = statusLabel(c.status);
-                const ins = insights[c.id];
-                const budget = c.daily_budget
-                  ? `$${(parseInt(c.daily_budget) / 100).toFixed(2)}/día`
-                  : c.lifetime_budget
-                  ? `$${(parseInt(c.lifetime_budget) / 100).toFixed(2)} total`
-                  : "—";
+          )}
 
-                return (
-                  <div key={c.id} className="rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
-                    <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold text-indexa-gray-dark truncate">{c.name}</h3>
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${st.color} ${st.bg}`}>
-                            {st.text}
-                          </span>
+          {/* ════════════════ TAB: CAMPAÑAS ════════════════ */}
+          {activeTab === "campanas" && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-indexa-gray-dark">Campañas ({campaigns.length})</h2>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { fetchCampaigns(); fetchAccountInsights(); }} disabled={loadingCampaigns} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+                    <RefreshCw size={12} className={loadingCampaigns ? "animate-spin" : ""} /> Actualizar
+                  </button>
+                  {savedPageId && (
+                    <button onClick={() => { setShowCreateModal(true); setCreateError(""); }} className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indexa-orange to-orange-500 px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:shadow-md">
+                      <Plus size={14} /> Crear Campaña
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {loadingCampaigns ? (
+                <div className="flex h-40 items-center justify-center rounded-2xl border border-gray-200 bg-white"><Loader2 className="h-6 w-6 animate-spin text-indexa-blue" /></div>
+              ) : campaigns.length === 0 ? (
+                <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white text-center">
+                  <Megaphone size={32} className="text-gray-300" />
+                  <p className="mt-3 text-sm text-gray-500">No se encontraron campañas.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {campaigns.map((c) => {
+                    const st = statusLabel(c.status);
+                    const ins = insights[c.id];
+                    const budget = c.daily_budget ? `$${(parseInt(c.daily_budget) / 100).toFixed(2)}/día` : c.lifetime_budget ? `$${(parseInt(c.lifetime_budget) / 100).toFixed(2)} total` : "—";
+                    return (
+                      <div key={c.id} className="rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+                        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-bold text-indexa-gray-dark truncate">{c.name}</h3>
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${st.color} ${st.bg}`}>{st.text}</span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-gray-400">
+                              <span>Objetivo: {c.objective?.replace(/_/g, " ") || "—"}</span>
+                              <span>Presupuesto: {budget}</span>
+                              {c.created_time && <span>Creada: {new Date(c.created_time).toLocaleDateString("es-MX")}</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!ins && <button onClick={() => fetchCampaignInsights(c.id)} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-medium text-gray-500 hover:bg-gray-50"><TrendingUp size={12} /> Métricas</button>}
+                            {c.status === "ACTIVE" && (
+                              <button onClick={() => handleCampaignAction(c.id, "pause")} disabled={actionLoading === c.id} className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-700 hover:bg-amber-100 disabled:opacity-50">
+                                {actionLoading === c.id ? <Loader2 size={12} className="animate-spin" /> : <Pause size={12} />} Pausar
+                              </button>
+                            )}
+                            {c.status === "PAUSED" && (
+                              <button onClick={() => handleCampaignAction(c.id, "resume")} disabled={actionLoading === c.id} className="inline-flex items-center gap-1 rounded-lg bg-green-50 px-3 py-1.5 text-[11px] font-bold text-green-700 hover:bg-green-100 disabled:opacity-50">
+                                {actionLoading === c.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />} Reanudar
+                              </button>
+                            )}
+                            {deleteConfirm === c.id ? (
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => handleDeleteCampaign(c.id)} disabled={actionLoading === c.id} className="inline-flex items-center gap-1 rounded-lg bg-red-500 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-600 disabled:opacity-50">
+                                  {actionLoading === c.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} Confirmar
+                                </button>
+                                <button onClick={() => setDeleteConfirm(null)} className="rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 hover:bg-gray-100">Cancelar</button>
+                              </div>
+                            ) : (
+                              <button onClick={() => setDeleteConfirm(c.id)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 hover:bg-red-50 hover:text-red-500" title="Eliminar"><Trash2 size={12} /></button>
+                            )}
+                          </div>
                         </div>
-                        <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-gray-400">
-                          <span>Objetivo: {c.objective?.replace(/_/g, " ") || "—"}</span>
-                          <span>Presupuesto: {budget}</span>
-                          {c.created_time && <span>Creada: {new Date(c.created_time).toLocaleDateString("es-MX")}</span>}
+                        {ins && (
+                          <div className="grid grid-cols-2 gap-px border-t border-gray-100 bg-gray-100 sm:grid-cols-5">
+                            {[
+                              { label: "Impresiones", value: formatNumber(ins.impressions) },
+                              { label: "Clics", value: formatNumber(ins.clicks) },
+                              { label: "CTR", value: ins.ctr ? `${parseFloat(ins.ctr).toFixed(2)}%` : "—" },
+                              { label: "CPC", value: formatMoney(ins.cpc) },
+                              { label: "Gasto", value: formatMoney(ins.spend) },
+                            ].map((m) => (
+                              <div key={m.label} className="bg-white px-4 py-3 text-center">
+                                <p className="text-xs font-bold text-indexa-gray-dark">{m.value}</p>
+                                <p className="text-[10px] text-gray-400">{m.label}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ════════════════ TAB: AD SETS ════════════════ */}
+          {activeTab === "adsets" && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-indexa-gray-dark">Ad Sets ({adSets.length})</h2>
+                <button onClick={fetchAdSets} disabled={loadingAdSets} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+                  <RefreshCw size={12} className={loadingAdSets ? "animate-spin" : ""} /> Actualizar
+                </button>
+              </div>
+
+              {loadingAdSets ? (
+                <div className="flex h-40 items-center justify-center rounded-2xl border border-gray-200 bg-white"><Loader2 className="h-6 w-6 animate-spin text-indexa-blue" /></div>
+              ) : adSets.length === 0 ? (
+                <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white text-center">
+                  <Layers size={32} className="text-gray-300" />
+                  <p className="mt-3 text-sm text-gray-500">No se encontraron ad sets.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {adSets.map((as) => {
+                    const st = statusLabel(as.status);
+                    const budget = as.daily_budget ? `$${(parseInt(as.daily_budget) / 100).toFixed(2)}/día` : as.lifetime_budget ? `$${(parseInt(as.lifetime_budget) / 100).toFixed(2)} total` : "—";
+                    return (
+                      <div key={as.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-bold text-indexa-gray-dark truncate">{as.name}</h3>
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${st.color} ${st.bg}`}>{st.text}</span>
+                          </div>
+                          <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-gray-400">
+                            <span>Presupuesto: {budget}</span>
+                            {as.optimization_goal && <span>Optimización: {as.optimization_goal.replace(/_/g, " ")}</span>}
+                            {as.bid_strategy && <span>Puja: {as.bid_strategy.replace(/_/g, " ")}</span>}
+                            <span>ID: {as.id}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(as.status === "ACTIVE" || as.status === "PAUSED") && (
+                            <button onClick={() => handleAdSetToggle(as.id, as.status)} disabled={actionLoading === as.id} className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-[11px] font-bold disabled:opacity-50 ${as.status === "ACTIVE" ? "bg-amber-50 text-amber-700 hover:bg-amber-100" : "bg-green-50 text-green-700 hover:bg-green-100"}`}>
+                              {actionLoading === as.id ? <Loader2 size={12} className="animate-spin" /> : as.status === "ACTIVE" ? <Pause size={12} /> : <Play size={12} />}
+                              {as.status === "ACTIVE" ? "Pausar" : "Activar"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ════════════════ TAB: ANUNCIOS ════════════════ */}
+          {activeTab === "anuncios" && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-indexa-gray-dark">Anuncios ({metaAds.length})</h2>
+                <button onClick={fetchAds} disabled={loadingAds} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+                  <RefreshCw size={12} className={loadingAds ? "animate-spin" : ""} /> Actualizar
+                </button>
+              </div>
+
+              {loadingAds ? (
+                <div className="flex h-40 items-center justify-center rounded-2xl border border-gray-200 bg-white"><Loader2 className="h-6 w-6 animate-spin text-indexa-blue" /></div>
+              ) : metaAds.length === 0 ? (
+                <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white text-center">
+                  <FileText size={32} className="text-gray-300" />
+                  <p className="mt-3 text-sm text-gray-500">No se encontraron anuncios.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {metaAds.map((ad) => {
+                    const st = statusLabel(ad.status);
+                    return (
+                      <div key={ad.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          {ad.creative?.thumbnail_url && (
+                            <img src={ad.creative.thumbnail_url} alt="" className="h-12 w-12 flex-shrink-0 rounded-lg border border-gray-200 object-cover" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-bold text-indexa-gray-dark truncate">{ad.name}</h3>
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${st.color} ${st.bg}`}>{st.text}</span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-gray-400">
+                              {ad.creative?.name && <span>Creative: {ad.creative.name}</span>}
+                              {ad.created_time && <span>Creado: {new Date(ad.created_time).toLocaleDateString("es-MX")}</span>}
+                              <span>ID: {ad.id}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(ad.status === "ACTIVE" || ad.status === "PAUSED") && (
+                            <button onClick={() => handleAdToggle(ad.id, ad.status)} disabled={actionLoading === ad.id} className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-[11px] font-bold disabled:opacity-50 ${ad.status === "ACTIVE" ? "bg-amber-50 text-amber-700 hover:bg-amber-100" : "bg-green-50 text-green-700 hover:bg-green-100"}`}>
+                              {actionLoading === ad.id ? <Loader2 size={12} className="animate-spin" /> : ad.status === "ACTIVE" ? <Pause size={12} /> : <Play size={12} />}
+                              {ad.status === "ACTIVE" ? "Pausar" : "Activar"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ════════════════ TAB: LEADS ════════════════ */}
+          {activeTab === "leads" && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-indexa-gray-dark">Lead Forms</h2>
+                {savedPageId ? (
+                  <button onClick={fetchLeadForms} disabled={loadingLeadForms} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+                    <RefreshCw size={12} className={loadingLeadForms ? "animate-spin" : ""} /> Actualizar
+                  </button>
+                ) : (
+                  <p className="text-xs text-gray-400">Configura tu Page ID para ver formularios de leads.</p>
+                )}
+              </div>
+
+              {loadingLeadForms ? (
+                <div className="flex h-40 items-center justify-center rounded-2xl border border-gray-200 bg-white"><Loader2 className="h-6 w-6 animate-spin text-indexa-blue" /></div>
+              ) : leadForms.length === 0 ? (
+                <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white text-center">
+                  <Users size={32} className="text-gray-300" />
+                  <p className="mt-3 text-sm text-gray-500">No se encontraron formularios de leads.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {leadForms.map((form) => (
+                    <div key={form.id} className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-bold text-indexa-gray-dark truncate">{form.name}</h3>
+                          <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-gray-400">
+                            {form.leads_count != null && <span className="font-semibold text-indexa-blue">{form.leads_count} leads</span>}
+                            {form.status && <span>Estado: {form.status}</span>}
+                            {form.created_time && <span>Creado: {new Date(form.created_time).toLocaleDateString("es-MX")}</span>}
+                          </div>
+                        </div>
+                        <button onClick={() => fetchLeads(form.id)} disabled={loadingLeads && selectedFormId === form.id} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                          {loadingLeads && selectedFormId === form.id ? <Loader2 size={12} className="animate-spin" /> : <ChevronRight size={12} />} Ver leads
+                        </button>
+                      </div>
+
+                      {selectedFormId === form.id && leads.length > 0 && (
+                        <div className="border-t border-gray-100">
+                          <div className="max-h-64 overflow-y-auto">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-gray-50 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                <tr>
+                                  <th className="px-4 py-2">Fecha</th>
+                                  <th className="px-4 py-2">Datos</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                {leads.map((lead) => (
+                                  <tr key={lead.id} className="hover:bg-gray-50">
+                                    <td className="whitespace-nowrap px-4 py-2 text-gray-500">{new Date(lead.created_time).toLocaleDateString("es-MX")}</td>
+                                    <td className="px-4 py-2">
+                                      {lead.field_data.map((f) => (
+                                        <div key={f.name}><span className="font-semibold text-indexa-gray-dark">{f.name}:</span> {f.values.join(", ")}</div>
+                                      ))}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ════════════════ TAB: PÁGINAS ════════════════ */}
+          {activeTab === "paginas" && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-indexa-gray-dark">Páginas de Facebook ({pages.length})</h2>
+                <button onClick={fetchPages} disabled={loadingPages} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+                  <RefreshCw size={12} className={loadingPages ? "animate-spin" : ""} /> Actualizar
+                </button>
+              </div>
+
+              {loadingPages ? (
+                <div className="flex h-40 items-center justify-center rounded-2xl border border-gray-200 bg-white"><Loader2 className="h-6 w-6 animate-spin text-indexa-blue" /></div>
+              ) : pages.length === 0 ? (
+                <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white text-center">
+                  <Globe size={32} className="text-gray-300" />
+                  <p className="mt-3 text-sm text-gray-500">No se encontraron páginas.</p>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {pages.map((page) => (
+                    <div key={page.id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-start gap-3">
+                        {page.picture?.data?.url && <img src={page.picture.data.url} alt="" className="h-12 w-12 flex-shrink-0 rounded-xl border border-gray-200 object-cover" />}
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-bold text-indexa-gray-dark truncate">{page.name}</h3>
+                          {page.category && <p className="text-[11px] text-gray-400">{page.category}</p>}
+                          <div className="mt-2 flex gap-4 text-xs">
+                            {page.fan_count != null && <span><span className="font-bold text-indexa-gray-dark">{page.fan_count.toLocaleString("es-MX")}</span> fans</span>}
+                            {page.followers_count != null && <span><span className="font-bold text-indexa-gray-dark">{page.followers_count.toLocaleString("es-MX")}</span> seguidores</span>}
+                          </div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <button onClick={() => copyText(page.id)} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-[10px] font-medium text-gray-500 hover:bg-gray-50">
+                              <Copy size={10} /> {copied ? "Copiado" : `ID: ${page.id}`}
+                            </button>
+                            {page.link && (
+                              <a href={page.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-indexa-blue hover:underline">
+                                <ExternalLink size={10} /> Ver página
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ════════════════ TAB: WHATSAPP ════════════════ */}
+          {activeTab === "whatsapp" && (
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-indexa-gray-dark">WhatsApp Business</h2>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="flex items-end gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-gray-500">WhatsApp Business Account ID (WABA ID)</label>
+                    <input type="text" value={wabaId} onChange={(e) => setWabaId(e.target.value)} placeholder="Ej: 123456789012345" className={`mt-1 ${inputClass}`} />
+                    <p className="mt-1 text-[10px] text-gray-400">Encuéntralo en Meta Business Suite → WhatsApp Accounts</p>
+                  </div>
+                  <button onClick={fetchWhatsApp} disabled={loadingWA || !wabaId.trim()} className="inline-flex items-center gap-1.5 rounded-xl bg-green-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-green-700 disabled:opacity-50">
+                    {loadingWA ? <Loader2 size={14} className="animate-spin" /> : <MessageCircle size={14} />} Conectar
+                  </button>
+                </div>
+              </div>
+
+              {waPhones.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-bold text-indexa-gray-dark">Números de Teléfono</h3>
+                  {waPhones.map((ph) => (
+                    <div key={ph.id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50"><Phone size={18} className="text-green-600" /></div>
+                        <div>
+                          <p className="text-sm font-bold text-indexa-gray-dark">{ph.display_phone_number}</p>
+                          <p className="text-[11px] text-gray-400">{ph.verified_name}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {!ins && (
-                          <button
-                            onClick={() => fetchCampaignInsights(c.id)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:bg-gray-50"
-                          >
-                            <TrendingUp size={12} /> Ver métricas
-                          </button>
-                        )}
-                        {c.status === "ACTIVE" && (
-                          <button
-                            onClick={() => handleCampaignAction(c.id, "pause")}
-                            disabled={actionLoading === c.id}
-                            className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
-                          >
-                            {actionLoading === c.id ? <Loader2 size={12} className="animate-spin" /> : <Pause size={12} />}
-                            Pausar
-                          </button>
-                        )}
-                        {c.status === "PAUSED" && (
-                          <button
-                            onClick={() => handleCampaignAction(c.id, "resume")}
-                            disabled={actionLoading === c.id}
-                            className="inline-flex items-center gap-1 rounded-lg bg-green-50 px-3 py-1.5 text-[11px] font-bold text-green-700 transition-colors hover:bg-green-100 disabled:opacity-50"
-                          >
-                            {actionLoading === c.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-                            Reanudar
-                          </button>
-                        )}
-                        {deleteConfirm === c.id ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleDeleteCampaign(c.id)}
-                              disabled={actionLoading === c.id}
-                              className="inline-flex items-center gap-1 rounded-lg bg-red-500 px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
-                            >
-                              {actionLoading === c.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                              Confirmar
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirm(null)}
-                              className="rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 hover:bg-gray-100"
-                            >
-                              Cancelar
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setDeleteConfirm(c.id)}
-                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                            title="Eliminar campaña"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        )}
+                        {ph.quality_rating && <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${ph.quality_rating === "GREEN" ? "bg-green-100 text-green-700" : ph.quality_rating === "YELLOW" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>{ph.quality_rating}</span>}
+                        {ph.status && <span className="text-[11px] text-gray-400">{ph.status}</span>}
                       </div>
                     </div>
+                  ))}
+                </div>
+              )}
 
-                    {/* Campaign insights row */}
-                    {ins && (
-                      <div className="grid grid-cols-2 gap-px border-t border-gray-100 bg-gray-100 sm:grid-cols-5">
-                        {[
-                          { label: "Impresiones", value: formatNumber(ins.impressions) },
-                          { label: "Clics", value: formatNumber(ins.clicks) },
-                          { label: "CTR", value: ins.ctr ? `${parseFloat(ins.ctr).toFixed(2)}%` : "—" },
-                          { label: "CPC", value: formatMoney(ins.cpc) },
-                          { label: "Gasto", value: formatMoney(ins.spend) },
-                        ].map((m) => (
-                          <div key={m.label} className="bg-white px-4 py-3 text-center">
-                            <p className="text-xs font-bold text-indexa-gray-dark">{m.value}</p>
-                            <p className="text-[10px] text-gray-400">{m.label}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+              {waTemplates.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-bold text-indexa-gray-dark">Plantillas de Mensaje ({waTemplates.length})</h3>
+                  <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-gray-50 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        <tr>
+                          <th className="px-4 py-2">Nombre</th>
+                          <th className="px-4 py-2">Idioma</th>
+                          <th className="px-4 py-2">Categoría</th>
+                          <th className="px-4 py-2">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {waTemplates.map((tpl) => {
+                          const tplSt = tpl.status === "APPROVED" ? "bg-green-100 text-green-700" : tpl.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600";
+                          return (
+                            <tr key={tpl.id} className="hover:bg-gray-50">
+                              <td className="px-4 py-2 font-semibold text-indexa-gray-dark">{tpl.name}</td>
+                              <td className="px-4 py-2 text-gray-500">{tpl.language}</td>
+                              <td className="px-4 py-2 text-gray-500">{tpl.category}</td>
+                              <td className="px-4 py-2"><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tplSt}`}>{tpl.status}</span></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                );
-              })}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Ad Creator CTA */}
-          {savedNanoBananaKey && (
-            <div>
-              <Link
-                href="/dashboard/marketing/crear-anuncio"
-                className="flex items-center justify-between rounded-2xl border border-gray-200 bg-gradient-to-r from-purple-50 to-orange-50 p-5 shadow-sm transition-shadow hover:shadow-md"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indexa-orange">
-                    <Wand2 size={20} className="text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-indexa-gray-dark">Crear Anuncio con IA</h3>
-                    <p className="text-xs text-gray-500">Genera imágenes profesionales y previsualiza tus anuncios de Facebook e Instagram.</p>
-                  </div>
+          {/* ════════════════ TAB: CATÁLOGOS ════════════════ */}
+          {activeTab === "catalogos" && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-indexa-gray-dark">Catálogos de Productos ({catalogs.length})</h2>
+                <button onClick={fetchCatalogs} disabled={loadingCatalogs} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
+                  <RefreshCw size={12} className={loadingCatalogs ? "animate-spin" : ""} /> Actualizar
+                </button>
+              </div>
+
+              {loadingCatalogs ? (
+                <div className="flex h-40 items-center justify-center rounded-2xl border border-gray-200 bg-white"><Loader2 className="h-6 w-6 animate-spin text-indexa-blue" /></div>
+              ) : catalogs.length === 0 ? (
+                <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white text-center">
+                  <ShoppingBag size={32} className="text-gray-300" />
+                  <p className="mt-3 text-sm text-gray-500">No se encontraron catálogos.</p>
+                  <a href="https://business.facebook.com/commerce" target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-indexa-blue hover:underline"><ExternalLink size={10} /> Crear catálogo en Commerce Manager</a>
                 </div>
-                <ImagePlus size={18} className="text-gray-400" />
-              </Link>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {catalogs.map((cat) => (
+                    <div key={cat.id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50"><ShoppingBag size={18} className="text-purple-600" /></div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-sm font-bold text-indexa-gray-dark truncate">{cat.name}</h3>
+                          <div className="mt-1 flex gap-3 text-[11px] text-gray-400">
+                            {cat.product_count != null && <span><span className="font-semibold text-indexa-gray-dark">{cat.product_count}</span> productos</span>}
+                            {cat.vertical && <span>{cat.vertical}</span>}
+                            <span>ID: {cat.id}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* Help link */}
-          <div className="text-center">
-            <a
-              href="https://www.facebook.com/business/tools/ads-manager"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-400 transition-colors hover:text-indexa-blue"
-            >
-              <ExternalLink size={12} />
-              Abrir Meta Ads Manager completo
+          <div className="text-center pt-2">
+            <a href="https://www.facebook.com/business/tools/ads-manager" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-400 transition-colors hover:text-indexa-blue">
+              <ExternalLink size={12} /> Abrir Meta Ads Manager completo
             </a>
           </div>
         </>

@@ -72,6 +72,88 @@ export async function GET(request: NextRequest) {
         break;
       }
 
+      case "all_adsets": {
+        fields = "name,status,daily_budget,lifetime_budget,targeting,optimization_goal,bid_strategy,campaign_id";
+        url = `${META_GRAPH_URL}/act_${adAccountId.replace("act_", "")}/adsets?fields=${fields}&limit=100&access_token=${metaToken}`;
+        break;
+      }
+
+      case "ads": {
+        fields = "name,status,adset_id,campaign_id,creative{name,object_story_spec,thumbnail_url},created_time";
+        url = `${META_GRAPH_URL}/act_${adAccountId.replace("act_", "")}/ads?fields=${fields}&limit=100&access_token=${metaToken}`;
+        break;
+      }
+
+      case "pages": {
+        fields = "name,id,category,fan_count,followers_count,picture{url},cover{source},link,verification_status";
+        url = `${META_GRAPH_URL}/me/accounts?fields=${fields}&limit=50&access_token=${metaToken}`;
+        break;
+      }
+
+      case "page_insights": {
+        const pageId = request.nextUrl.searchParams.get("pageId");
+        if (!pageId) return NextResponse.json({ error: "Falta pageId." }, { status: 400 });
+        const period = request.nextUrl.searchParams.get("period") || "day";
+        fields = "page_impressions,page_engaged_users,page_post_engagements,page_fans,page_views_total";
+        url = `${META_GRAPH_URL}/${pageId}/insights?metric=${fields}&period=${period}&access_token=${metaToken}`;
+        break;
+      }
+
+      case "leads": {
+        const formId = request.nextUrl.searchParams.get("formId");
+        if (!formId) return NextResponse.json({ error: "Falta formId." }, { status: 400 });
+        fields = "created_time,field_data";
+        url = `${META_GRAPH_URL}/${formId}/leads?fields=${fields}&limit=100&access_token=${metaToken}`;
+        break;
+      }
+
+      case "lead_forms": {
+        const lpageId = request.nextUrl.searchParams.get("pageId");
+        if (!lpageId) return NextResponse.json({ error: "Falta pageId." }, { status: 400 });
+        fields = "id,name,status,leads_count,created_time";
+        url = `${META_GRAPH_URL}/${lpageId}/leadgen_forms?fields=${fields}&limit=50&access_token=${metaToken}`;
+        break;
+      }
+
+      case "catalogs": {
+        const businessId = request.nextUrl.searchParams.get("businessId") || adAccountId.replace("act_", "");
+        fields = "id,name,product_count,vertical";
+        url = `${META_GRAPH_URL}/act_${businessId}/product_catalogs?fields=${fields}&limit=50&access_token=${metaToken}`;
+        break;
+      }
+
+      case "catalog_products": {
+        const catalogId = request.nextUrl.searchParams.get("catalogId");
+        if (!catalogId) return NextResponse.json({ error: "Falta catalogId." }, { status: 400 });
+        fields = "id,name,price,currency,image_url,url,availability";
+        url = `${META_GRAPH_URL}/${catalogId}/products?fields=${fields}&limit=100&access_token=${metaToken}`;
+        break;
+      }
+
+      case "whatsapp_business": {
+        const wabaId = request.nextUrl.searchParams.get("wabaId");
+        if (!wabaId) return NextResponse.json({ error: "Falta wabaId (WhatsApp Business Account ID)." }, { status: 400 });
+        fields = "id,name,currency,timezone_id,message_template_namespace";
+        url = `${META_GRAPH_URL}/${wabaId}?fields=${fields}&access_token=${metaToken}`;
+        break;
+      }
+
+      case "whatsapp_phone_numbers": {
+        const wpbaId = request.nextUrl.searchParams.get("wabaId");
+        if (!wpbaId) return NextResponse.json({ error: "Falta wabaId." }, { status: 400 });
+        fields = "id,display_phone_number,verified_name,quality_rating,status,name_status";
+        url = `${META_GRAPH_URL}/${wpbaId}/phone_numbers?fields=${fields}&access_token=${metaToken}`;
+        break;
+      }
+
+      case "whatsapp_templates": {
+        const wtbaId = request.nextUrl.searchParams.get("wabaId");
+        if (!wtbaId) return NextResponse.json({ error: "Falta wabaId." }, { status: 400 });
+        fields = "id,name,status,language,category,components";
+        url = `${META_GRAPH_URL}/${wtbaId}/message_templates?fields=${fields}&limit=100&access_token=${metaToken}`;
+        break;
+      }
+
       default:
         return NextResponse.json({ error: "Acción no válida." }, { status: 400 });
     }
@@ -168,6 +250,49 @@ export async function POST(request: NextRequest) {
         { status: "DELETED", access_token: metaToken }
       );
       return NextResponse.json({ success: true, data });
+    }
+
+    // ── Toggle ad set status ─────────────────────────────────────
+    if (action === "adset_toggle") {
+      const { adsetId, newStatus } = body;
+      if (!adsetId || !newStatus) return NextResponse.json({ error: "Falta adsetId o newStatus." }, { status: 400 });
+      const data = await metaPost(
+        `${META_GRAPH_URL}/${adsetId}`,
+        { status: newStatus, access_token: metaToken }
+      );
+      return NextResponse.json({ success: true, data });
+    }
+
+    // ── Toggle ad status ─────────────────────────────────────────
+    if (action === "ad_toggle") {
+      const { adId, newStatus } = body;
+      if (!adId || !newStatus) return NextResponse.json({ error: "Falta adId o newStatus." }, { status: 400 });
+      const data = await metaPost(
+        `${META_GRAPH_URL}/${adId}`,
+        { status: newStatus, access_token: metaToken }
+      );
+      return NextResponse.json({ success: true, data });
+    }
+
+    // ── Send WhatsApp template message ───────────────────────────
+    if (action === "whatsapp_send") {
+      const { phoneNumberId, to, templateName, languageCode } = body;
+      if (!phoneNumberId || !to || !templateName) {
+        return NextResponse.json({ error: "Faltan parámetros de WhatsApp." }, { status: 400 });
+      }
+      const waRes = await fetch(`${META_GRAPH_URL}/${phoneNumberId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${metaToken}` },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to,
+          type: "template",
+          template: { name: templateName, language: { code: languageCode || "es_MX" } },
+        }),
+      });
+      const waData = await waRes.json();
+      if (waData.error) throw new Error(waData.error.message || "Error de WhatsApp API.");
+      return NextResponse.json({ success: true, data: waData });
     }
 
     // ── Create full campaign ────────────────────────────────────
