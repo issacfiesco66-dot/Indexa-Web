@@ -84,6 +84,11 @@ service cloud.firestore {
         );
     }
 
+    // ── configuracion (admin settings) ──────────────────────────────────────
+    match /configuracion/{docId} {
+      allow read, write: if isAdmin();
+    }
+
     // ── webhook_events (audit trail — webhook writes, admin reads) ─────────
     match /webhook_events/{eventId} {
       allow read: if isAdmin();
