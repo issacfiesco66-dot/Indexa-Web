@@ -1066,7 +1066,7 @@ export default function AdminFacebookAdsPage() {
               </div>
 
               {savedNanoBananaKey && (
-                <Link href="/dashboard/marketing/crear-anuncio" className="flex items-center justify-between rounded-2xl border border-gray-200 bg-gradient-to-r from-purple-50 to-orange-50 p-5 shadow-sm transition-shadow hover:shadow-md">
+                <Link href="/admin/campanas/facebook/crear-anuncio" className="flex items-center justify-between rounded-2xl border border-gray-200 bg-gradient-to-r from-purple-50 to-orange-50 p-5 shadow-sm transition-shadow hover:shadow-md">
                   <div className="flex items-center gap-4">
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indexa-orange"><Wand2 size={20} className="text-white" /></div>
                     <div>
