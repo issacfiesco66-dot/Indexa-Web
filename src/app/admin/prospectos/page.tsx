@@ -79,23 +79,59 @@ function generateProspectingMessage(businessName: string, demoUrl: string): stri
 }
 
 const ADS_MESSAGES = [
-  // Variant 1: Pain point + urgency — "your competitors are doing it"
+  // Variant 1: Competitor threat + structured benefits
   (nombre: string, ciudad: string, categoria: string) => {
     const zona = ciudad || "su zona";
     const sector = categoria || "su giro";
-    return `Hola, ${nombre}. Soy de INDEXA. Investigamos negocios de ${sector} en ${zona} y vimos que ya tienen presencia en internet — eso los pone adelante de muchos. Pero hay algo que su competencia ya está haciendo y que les puede estar quitando clientes: anuncios en Facebook y TikTok. Hoy, 8 de cada 10 personas buscan negocios locales desde su celular. Con nuestra plataforma ustedes pueden lanzar campañas segmentadas por colonia y edad, controlar su presupuesto diario (desde $50 pesos al día), y ver exactamente cuántas personas los contactaron. Sin agencia, sin contratos, ustedes tienen el control. ¿Les puedo mostrar cómo funciona en 3 minutos?`;
+    return `Hola, soy de INDEXA. Vi que ${nombre} en ${zona} ya tiene presencia digital y eso es genial, pero noté algo: su competencia directa de ${sector} está apareciendo en el muro de Facebook e Instagram de gente que vive a menos de 2km de ustedes.
+
+Les preparé una propuesta rápida para que sean ustedes quienes aparezcan ahí:
+
+*Publicidad Local:* Anuncios que solo ven personas en su zona (en el horario que ustedes abren).
+
+*Control Total:* Ustedes deciden cuánto invertir (desde $50 al día) y lo activan o apagan con un botón.
+
+*Resultados Reales:* El botón del anuncio lleva directo a su WhatsApp para pedidos o consultas.
+
+Sin agencias y sin contratos. ¿Me permiten enviarles el link de la demo de cómo se vería ${nombre} con esta tecnología activada?`;
   },
-  // Variant 2: Results-focused — specific numbers
+  // Variant 2: Results-first + social proof
   (nombre: string, ciudad: string, categoria: string) => {
     const zona = ciudad || "su zona";
-    const sector = categoria || "negocios como el suyo";
-    return `Buen día, ${nombre}. Los contacto de INDEXA porque estamos trabajando con ${sector} en ${zona} que quieren más clientes sin depender de que la gente los encuentre por casualidad. Esto es lo que logran negocios como el suyo con nuestra plataforma de anuncios: llegan a +5,000 personas de su zona por semana, reciben mensajes directos de clientes interesados, y todo lo manejan desde su celular en un panel súper sencillo. Funciona con Facebook, Instagram y TikTok. Lo mejor: los primeros 7 días de campaña corren por nuestra cuenta para que vean resultados reales antes de invertir un peso. ¿Cuándo les queda bien que les enseñe?`;
+    const sector = categoria || "negocios locales";
+    return `Hola, soy de INDEXA. Estamos trabajando con ${sector} en ${zona} y quería compartirles algo que está funcionando muy bien.
+
+Vi que ${nombre} ya tiene presencia en internet — eso los pone adelante del 80% de negocios de la zona. El siguiente paso que está dando resultados es aparecer en el celular de clientes potenciales que están cerca de ustedes.
+
+Así funciona:
+
+*Segmentación por zona:* Sus anuncios solo los ven personas a pocas cuadras de su negocio.
+
+*Desde $50 al día:* Ustedes ponen el presupuesto que quieran y lo ajustan cuando quieran.
+
+*WhatsApp directo:* Cada persona que toca su anuncio les cae directo al WhatsApp. Sin formularios, sin esperas.
+
+*Sin agencia:* Todo lo controlan ustedes desde su celular en un panel muy sencillo.
+
+¿Les puedo enviar una demo personalizada de cómo se vería una campaña para ${nombre}? Son 3 minutos y no tiene ningún costo.`;
   },
-  // Variant 3: Empathy + authority — "we understand your business"
+  // Variant 3: Urgency + risk removal
   (nombre: string, ciudad: string, categoria: string) => {
     const zona = ciudad || "su zona";
-    const sector = categoria || "su tipo de negocio";
-    return `Hola, equipo de ${nombre}. Les escribo de INDEXA. Trabajamos exclusivamente con negocios locales en ${zona} y sabemos que para ${sector} el mayor reto es atraer clientes nuevos de forma constante. Vi que ya tienen página — eso es genial. El siguiente paso que está funcionando mucho es poner anuncios dirigidos a personas que buscan exactamente lo que ustedes ofrecen, a unas cuadras de su negocio. Nuestra plataforma les permite hacerlo solos, sin necesidad de contratar agencia, y pueden empezar desde $50 pesos al día. Ya tenemos resultados muy buenos con negocios similares. ¿Les comparto una demo personalizada de cómo se vería una campaña para ${nombre}? Son 3 minutos y no tiene ningún costo ni compromiso.`;
+    const sector = categoria || "su sector";
+    return `Hola, soy de INDEXA. Investigando ${sector} en ${zona} encontré a ${nombre} y vi que ya tienen página web — eso habla muy bien de ustedes.
+
+Les escribo porque detectamos que otros negocios de ${sector} en su zona ya están corriendo anuncios pagados en Facebook y TikTok, y eso les puede estar quitando clientes que deberían llegar a ustedes.
+
+La buena noticia es que con nuestra plataforma pueden hacer lo mismo, pero sin depender de una agencia:
+
+*Anuncios hiperlocales:* Solo los ve gente que está cerca de su negocio, en los horarios que ustedes elijan.
+
+*Presupuesto flexible:* Empiezan desde $50 al día y lo pueden pausar cuando quieran.
+
+*Contacto inmediato:* El cliente toca el anuncio y les llega un mensaje directo a WhatsApp.
+
+Sin contratos, sin letra chiquita, y los primeros 7 días de campaña corren por nuestra cuenta. ¿Me permiten enviarles el link de cómo se vería esto para ${nombre}?`;
   },
 ];
 
