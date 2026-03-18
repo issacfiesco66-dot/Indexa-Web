@@ -195,10 +195,15 @@ export async function GET(request: NextRequest) {
 async function metaPost(url: string, params: Record<string, string>, step?: string) {
   const body = new URLSearchParams(params);
   const res = await fetch(url, { method: "POST", body });
-  const data = await res.json();
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error(`[${step || "meta"}] Respuesta no-JSON de Meta: ${text.slice(0, 200)}`); }
   if (data.error) {
-    const msg = data.error.message || "Error de Meta API.";
-    console.error(`[meta-ads POST] step=${step || "unknown"} url=${url.split("?")[0]} error:`, msg);
+    const msg = data.error.error_user_msg || data.error.message || "Error de Meta API.";
+    const code = data.error.code || "";
+    const subcode = data.error.error_subcode || "";
+    console.error(`[meta-ads POST] step=${step} code=${code} subcode=${subcode} msg:`, msg);
+    console.error(`[meta-ads POST] full error:`, JSON.stringify(data.error).slice(0, 500));
     throw new Error(`[${step || "meta"}] ${msg}`);
   }
   return data;
@@ -353,7 +358,6 @@ export async function POST(request: NextRequest) {
           name: campaignName,
           objective: "OUTCOME_TRAFFIC",
           status: "PAUSED",
-          special_ad_categories: "[]",
           access_token: metaToken,
         },
         "create_campaign"
