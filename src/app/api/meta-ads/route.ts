@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyIdToken } from "@/lib/verifyAuth";
 import { createRateLimiter } from "@/lib/rateLimit";
 
+export const maxDuration = 60;
+
 // Rate limit: 20 requests per minute per IP
 const limiter = createRateLimiter({ windowMs: 60_000, max: 20 });
 
@@ -116,9 +118,10 @@ export async function GET(request: NextRequest) {
       }
 
       case "catalogs": {
-        const businessId = request.nextUrl.searchParams.get("businessId") || adAccountId.replace("act_", "");
+        const businessId = request.nextUrl.searchParams.get("businessId");
+        if (!businessId) return NextResponse.json({ error: "Falta businessId (ID del Business Manager). No es el mismo que el Ad Account ID." }, { status: 400 });
         fields = "id,name,product_count,vertical";
-        url = `${META_GRAPH_URL}/act_${businessId}/product_catalogs?fields=${fields}&limit=50&access_token=${metaToken}`;
+        url = `${META_GRAPH_URL}/${businessId}/owned_product_catalogs?fields=${fields}&limit=50&access_token=${metaToken}`;
         break;
       }
 

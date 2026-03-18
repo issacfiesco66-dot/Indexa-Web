@@ -281,6 +281,7 @@ export default function AdminFacebookAdsPage() {
   // Catalogs
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
   const [loadingCatalogs, setLoadingCatalogs] = useState(false);
+  const [businessId, setBusinessId] = useState("");
 
   // WhatsApp
   const [waPhones, setWaPhones] = useState<WAPhoneNumber[]>([]);
@@ -691,16 +692,17 @@ export default function AdminFacebookAdsPage() {
 
   // ── Fetch catalogs ──────────────────────────────────────────
   const fetchCatalogs = useCallback(async () => {
-    if (!user || !savedToken || !savedAccount) return;
+    if (!user || !savedToken || !savedAccount || !businessId.trim()) return;
     setLoadingCatalogs(true);
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "catalogs" });
+      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "catalogs", businessId: businessId.trim() });
       const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
       const data = await res.json();
       if (!data.error) setCatalogs(data.data || []);
+      else setError(data.error);
     } catch { /* non-critical */ } finally { setLoadingCatalogs(false); }
-  }, [user, savedToken, savedAccount]);
+  }, [user, savedToken, savedAccount, businessId]);
 
   // ── Fetch WhatsApp ──────────────────────────────────────────
   const fetchWhatsApp = useCallback(async () => {
@@ -765,7 +767,7 @@ export default function AdminFacebookAdsPage() {
     if (activeTab === "anuncios" && metaAds.length === 0 && !loadingAds) fetchAds();
     if (activeTab === "paginas" && pages.length === 0 && !loadingPages) fetchPages();
     if (activeTab === "leads" && leadForms.length === 0 && !loadingLeadForms && savedPageId) fetchLeadForms();
-    if (activeTab === "catalogos" && catalogs.length === 0 && !loadingCatalogs) fetchCatalogs();
+    // catalogs requires manual businessId input — no auto-load
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isConnected, pageLoading]);
 
@@ -1436,22 +1438,24 @@ export default function AdminFacebookAdsPage() {
           {/* ════════════════ TAB: CATÁLOGOS ════════════════ */}
           {activeTab === "catalogos" && (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-bold text-indexa-gray-dark">Catálogos de Productos ({catalogs.length})</h2>
-                <button onClick={fetchCatalogs} disabled={loadingCatalogs} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50">
-                  <RefreshCw size={12} className={loadingCatalogs ? "animate-spin" : ""} /> Actualizar
-                </button>
+              <h2 className="text-lg font-bold text-indexa-gray-dark">Catálogos de Productos</h2>
+
+              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="flex items-end gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs font-semibold text-gray-500">Business Manager ID</label>
+                    <input type="text" value={businessId} onChange={(e) => setBusinessId(e.target.value)} placeholder="Ej: 123456789012345" className={`mt-1 ${inputClass}`} />
+                    <p className="mt-1 text-[10px] text-gray-400">Distínto al Ad Account ID. Encuéntralo en <a href="https://business.facebook.com/settings" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline">Meta Business Suite → Configuración → Info del negocio → ID</a></p>
+                  </div>
+                  <button onClick={fetchCatalogs} disabled={loadingCatalogs || !businessId.trim()} className="inline-flex items-center gap-1.5 rounded-xl bg-purple-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-50">
+                    {loadingCatalogs ? <Loader2 size={14} className="animate-spin" /> : <ShoppingBag size={14} />} Cargar
+                  </button>
+                </div>
               </div>
 
               {loadingCatalogs ? (
                 <div className="flex h-40 items-center justify-center rounded-2xl border border-gray-200 bg-white"><Loader2 className="h-6 w-6 animate-spin text-indexa-blue" /></div>
-              ) : catalogs.length === 0 ? (
-                <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white text-center">
-                  <ShoppingBag size={32} className="text-gray-300" />
-                  <p className="mt-3 text-sm text-gray-500">No se encontraron catálogos.</p>
-                  <a href="https://business.facebook.com/commerce" target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs text-indexa-blue hover:underline"><ExternalLink size={10} /> Crear catálogo en Commerce Manager</a>
-                </div>
-              ) : (
+              ) : catalogs.length > 0 ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {catalogs.map((cat) => (
                     <div key={cat.id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -1469,7 +1473,7 @@ export default function AdminFacebookAdsPage() {
                     </div>
                   ))}
                 </div>
-              )}
+              ) : null}
             </div>
           )}
 
