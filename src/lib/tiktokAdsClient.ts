@@ -1,6 +1,7 @@
 /**
  * TikTok Marketing API client — server-side only.
- * Handles campaign CRUD operations via TikTok Business API v1.3.
+ * Handles campaign, ad group, ad, reporting, audience, and pixel operations
+ * via TikTok Business API v1.3.
  */
 
 const TIKTOK_API_BASE = "https://business-api.tiktok.com/open_api/v1.3";
@@ -21,6 +22,79 @@ export interface TikTokCampaign {
   budgetMode: string;
   createTime: string;
   modifyTime: string;
+}
+
+export interface TikTokAdGroup {
+  adgroupId: string;
+  adgroupName: string;
+  campaignId: string;
+  status: string;
+  budget: number;
+  bidPrice: number;
+  optimizationGoal: string;
+  placementType: string;
+  createTime: string;
+}
+
+export interface TikTokAd {
+  adId: string;
+  adName: string;
+  adgroupId: string;
+  campaignId: string;
+  status: string;
+  adText: string;
+  callToAction: string;
+  imageMode: string;
+  createTime: string;
+}
+
+export interface TikTokAccountInfo {
+  advertiserId: string;
+  advertiserName: string;
+  currency: string;
+  timezone: string;
+  status: string;
+  description: string;
+  createTime: string;
+}
+
+export interface TikTokBalance {
+  balance: number;
+  cashBalance: number;
+  grantBalance: number;
+  transferBalance: number;
+  currency: string;
+}
+
+export interface TikTokReportRow {
+  date: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  cpm: number;
+  conversions: number;
+  costPerConversion: number;
+  reach: number;
+  videoViews: number;
+}
+
+export interface TikTokAudience {
+  audienceId: string;
+  name: string;
+  audienceType: string;
+  coverNum: number;
+  status: string;
+  createTime: string;
+}
+
+export interface TikTokPixel {
+  pixelId: string;
+  pixelName: string;
+  pixelCode: string;
+  status: string;
+  createTime: string;
 }
 
 export interface TikTokApiResponse<T> {
@@ -47,6 +121,77 @@ interface CampaignListData {
     page_size: number;
     total_page: number;
   };
+}
+
+interface AdGroupListData {
+  list: Array<{
+    adgroup_id: string;
+    adgroup_name: string;
+    campaign_id: string;
+    operation_status: string;
+    budget: number;
+    bid_price: number;
+    optimization_goal: string;
+    placement_type: string;
+    create_time: string;
+  }>;
+  page_info: { total_number: number; page: number; page_size: number; total_page: number };
+}
+
+interface AdListData {
+  list: Array<{
+    ad_id: string;
+    ad_name: string;
+    adgroup_id: string;
+    campaign_id: string;
+    operation_status: string;
+    ad_text: string;
+    call_to_action: string;
+    image_mode: string;
+    create_time: string;
+  }>;
+  page_info: { total_number: number; page: number; page_size: number; total_page: number };
+}
+
+interface ReportListData {
+  list: Array<{
+    dimensions: { stat_time_day: string };
+    metrics: {
+      spend: string;
+      impressions: string;
+      clicks: string;
+      ctr: string;
+      cpc: string;
+      cpm: string;
+      conversion: string;
+      cost_per_conversion: string;
+      reach: string;
+      video_play_actions?: string;
+    };
+  }>;
+  page_info: { total_number: number; page: number; page_size: number; total_page: number };
+}
+
+interface AudienceListData {
+  list: Array<{
+    audience_id: string;
+    name: string;
+    audience_type: string;
+    cover_num: number;
+    audience_status: string;
+    create_time: string;
+  }>;
+  page_info: { total_number: number; page: number; page_size: number; total_page: number };
+}
+
+interface PixelListData {
+  pixels: Array<{
+    pixel_id: string;
+    pixel_name: string;
+    pixel_code: string;
+    status: string;
+    create_time: string;
+  }>;
 }
 
 // ── API Helpers ──────────────────────────────────────────────────────────
@@ -177,9 +322,17 @@ export async function updateCampaignBudget(
  */
 export async function getAdvertiserInfo(
   creds: TikTokCredentials
-): Promise<{ name: string; id: string }> {
+): Promise<TikTokAccountInfo> {
   const response = await tiktokFetch<{
-    list: Array<{ advertiser_id: number; advertiser_name: string }>;
+    list: Array<{
+      advertiser_id: number;
+      advertiser_name: string;
+      currency: string;
+      timezone: string;
+      status: string;
+      description: string;
+      create_time: string;
+    }>;
   }>("/advertiser/info/", creds.accessToken, {
     method: "GET",
     params: { advertiser_ids: `["${creds.advertiserId}"]` },
@@ -187,7 +340,308 @@ export async function getAdvertiserInfo(
 
   const adv = response.data.list?.[0];
   return {
-    name: adv?.advertiser_name ?? "Unknown",
-    id: String(adv?.advertiser_id ?? creds.advertiserId),
+    advertiserId: String(adv?.advertiser_id ?? creds.advertiserId),
+    advertiserName: adv?.advertiser_name ?? "Unknown",
+    currency: adv?.currency ?? "USD",
+    timezone: adv?.timezone ?? "UTC",
+    status: adv?.status ?? "STATUS_UNKNOWN",
+    description: adv?.description ?? "",
+    createTime: adv?.create_time ?? "",
+  };
+}
+
+/**
+ * Get advertiser account balance.
+ */
+export async function getBalance(
+  creds: TikTokCredentials
+): Promise<TikTokBalance> {
+  const response = await tiktokFetch<{
+    list: Array<{
+      balance: number;
+      cash_balance: number;
+      grant_balance: number;
+      transfer_balance: number;
+      currency: string;
+    }>;
+  }>("/advertiser/balance/get/", creds.accessToken, {
+    method: "GET",
+    params: { advertiser_id: creds.advertiserId },
+  });
+
+  const b = response.data.list?.[0];
+  return {
+    balance: b?.balance ?? 0,
+    cashBalance: b?.cash_balance ?? 0,
+    grantBalance: b?.grant_balance ?? 0,
+    transferBalance: b?.transfer_balance ?? 0,
+    currency: b?.currency ?? "USD",
+  };
+}
+
+/**
+ * Fetch ad groups for a given advertiser (optionally filter by campaign).
+ */
+export async function getAdGroups(
+  creds: TikTokCredentials,
+  campaignId?: string,
+  page = 1,
+  pageSize = 50
+): Promise<{ adGroups: TikTokAdGroup[]; total: number }> {
+  const params: Record<string, string | number> = {
+    advertiser_id: creds.advertiserId,
+    page,
+    page_size: pageSize,
+  };
+  if (campaignId) {
+    params.campaign_ids = `["${campaignId}"]`;
+  }
+
+  const response = await tiktokFetch<AdGroupListData>(
+    "/adgroup/get/",
+    creds.accessToken,
+    { method: "GET", params }
+  );
+
+  const adGroups: TikTokAdGroup[] = (response.data.list || []).map((g) => ({
+    adgroupId: g.adgroup_id,
+    adgroupName: g.adgroup_name,
+    campaignId: g.campaign_id,
+    status: g.operation_status,
+    budget: g.budget,
+    bidPrice: g.bid_price,
+    optimizationGoal: g.optimization_goal,
+    placementType: g.placement_type,
+    createTime: g.create_time,
+  }));
+
+  return { adGroups, total: response.data.page_info.total_number };
+}
+
+/**
+ * Update ad group status (enable/disable).
+ */
+export async function updateAdGroupStatus(
+  creds: TikTokCredentials,
+  adgroupId: string,
+  status: "ENABLE" | "DISABLE" | "DELETE"
+): Promise<void> {
+  await tiktokFetch<unknown>("/adgroup/status/update/", creds.accessToken, {
+    method: "POST",
+    body: {
+      advertiser_id: creds.advertiserId,
+      adgroup_ids: [adgroupId],
+      operation_status: status,
+    },
+  });
+}
+
+/**
+ * Fetch ads for a given advertiser (optionally filter by ad group).
+ */
+export async function getAds(
+  creds: TikTokCredentials,
+  adgroupId?: string,
+  page = 1,
+  pageSize = 50
+): Promise<{ ads: TikTokAd[]; total: number }> {
+  const params: Record<string, string | number> = {
+    advertiser_id: creds.advertiserId,
+    page,
+    page_size: pageSize,
+  };
+  if (adgroupId) {
+    params.adgroup_ids = `["${adgroupId}"]`;
+  }
+
+  const response = await tiktokFetch<AdListData>(
+    "/ad/get/",
+    creds.accessToken,
+    { method: "GET", params }
+  );
+
+  const ads: TikTokAd[] = (response.data.list || []).map((a) => ({
+    adId: a.ad_id,
+    adName: a.ad_name,
+    adgroupId: a.adgroup_id,
+    campaignId: a.campaign_id,
+    status: a.operation_status,
+    adText: a.ad_text,
+    callToAction: a.call_to_action,
+    imageMode: a.image_mode,
+    createTime: a.create_time,
+  }));
+
+  return { ads, total: response.data.page_info.total_number };
+}
+
+/**
+ * Update ad status (enable/disable).
+ */
+export async function updateAdStatus(
+  creds: TikTokCredentials,
+  adId: string,
+  status: "ENABLE" | "DISABLE" | "DELETE"
+): Promise<void> {
+  await tiktokFetch<unknown>("/ad/status/update/", creds.accessToken, {
+    method: "POST",
+    body: {
+      advertiser_id: creds.advertiserId,
+      ad_ids: [adId],
+      operation_status: status,
+    },
+  });
+}
+
+/**
+ * Get campaign-level performance reporting.
+ */
+export async function getReporting(
+  creds: TikTokCredentials,
+  startDate: string,
+  endDate: string,
+  reportType: "BASIC" | "AUDIENCE" | "PLAYBACK" = "BASIC"
+): Promise<TikTokReportRow[]> {
+  const response = await tiktokFetch<ReportListData>(
+    "/report/integrated/get/",
+    creds.accessToken,
+    {
+      method: "GET",
+      params: {
+        advertiser_id: creds.advertiserId,
+        report_type: reportType,
+        data_level: "AUCTION_ADVERTISER",
+        dimensions: '["stat_time_day"]',
+        metrics: '["spend","impressions","clicks","ctr","cpc","cpm","conversion","cost_per_conversion","reach","video_play_actions"]',
+        start_date: startDate,
+        end_date: endDate,
+        page_size: 365,
+      },
+    }
+  );
+
+  return (response.data.list || []).map((r) => ({
+    date: r.dimensions.stat_time_day,
+    spend: parseFloat(r.metrics.spend) || 0,
+    impressions: parseInt(r.metrics.impressions) || 0,
+    clicks: parseInt(r.metrics.clicks) || 0,
+    ctr: parseFloat(r.metrics.ctr) || 0,
+    cpc: parseFloat(r.metrics.cpc) || 0,
+    cpm: parseFloat(r.metrics.cpm) || 0,
+    conversions: parseInt(r.metrics.conversion) || 0,
+    costPerConversion: parseFloat(r.metrics.cost_per_conversion) || 0,
+    reach: parseInt(r.metrics.reach) || 0,
+    videoViews: parseInt(r.metrics.video_play_actions || "0") || 0,
+  }));
+}
+
+/**
+ * Get custom audiences.
+ */
+export async function getAudiences(
+  creds: TikTokCredentials,
+  page = 1,
+  pageSize = 50
+): Promise<{ audiences: TikTokAudience[]; total: number }> {
+  const response = await tiktokFetch<AudienceListData>(
+    "/dmp/custom_audience/list/",
+    creds.accessToken,
+    {
+      method: "GET",
+      params: {
+        advertiser_id: creds.advertiserId,
+        page,
+        page_size: pageSize,
+      },
+    }
+  );
+
+  const audiences: TikTokAudience[] = (response.data.list || []).map((a) => ({
+    audienceId: a.audience_id,
+    name: a.name,
+    audienceType: a.audience_type,
+    coverNum: a.cover_num,
+    status: a.audience_status,
+    createTime: a.create_time,
+  }));
+
+  return { audiences, total: response.data.page_info.total_number };
+}
+
+/**
+ * Get pixel list.
+ */
+export async function getPixels(
+  creds: TikTokCredentials
+): Promise<TikTokPixel[]> {
+  const response = await tiktokFetch<PixelListData>(
+    "/pixel/list/",
+    creds.accessToken,
+    {
+      method: "GET",
+      params: { advertiser_id: creds.advertiserId },
+    }
+  );
+
+  return (response.data.pixels || []).map((p) => ({
+    pixelId: p.pixel_id,
+    pixelName: p.pixel_name,
+    pixelCode: p.pixel_code,
+    status: p.status,
+    createTime: p.create_time,
+  }));
+}
+
+/**
+ * Get account transactions.
+ */
+export async function getTransactions(
+  creds: TikTokCredentials,
+  startDate: string,
+  endDate: string,
+  page = 1,
+  pageSize = 20
+): Promise<{
+  transactions: Array<{
+    transactionType: string;
+    amount: number;
+    cash: number;
+    grant: number;
+    transferIn: number;
+    createTime: string;
+  }>;
+  total: number;
+}> {
+  const response = await tiktokFetch<{
+    list: Array<{
+      transaction_type: string;
+      amount: number;
+      cash: number;
+      grant: number;
+      transfer_in: number;
+      create_time: string;
+    }>;
+    page_info: { total_number: number };
+  }>("/advertiser/transaction/get/", creds.accessToken, {
+    method: "GET",
+    params: {
+      advertiser_id: creds.advertiserId,
+      start_date: startDate,
+      end_date: endDate,
+      page,
+      page_size: pageSize,
+    },
+  });
+
+  return {
+    transactions: (response.data.list || []).map((t) => ({
+      transactionType: t.transaction_type,
+      amount: t.amount,
+      cash: t.cash,
+      grant: t.grant,
+      transferIn: t.transfer_in,
+      createTime: t.create_time,
+    })),
+    total: response.data.page_info?.total_number ?? 0,
   };
 }
