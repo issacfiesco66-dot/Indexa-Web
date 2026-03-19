@@ -17,7 +17,7 @@ function getVisitCount(sitioId: string): number {
   return current;
 }
 
-export function useTrackView(sitioId: string) {
+export function useTrackView(sitioId: string, slug?: string) {
   useEffect(() => {
     if (!db || !sitioId) return;
 
@@ -36,7 +36,15 @@ export function useTrackView(sitioId: string) {
     }
 
     updateDoc(doc(db, "sitios", sitioId), updates).catch(() => {});
-  }, [sitioId]);
+
+    // Also track demo view for the linked prospecto (fire-and-forget)
+    const trackSlug = slug || sitioId;
+    fetch("/api/prospectos/track-demo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug: trackSlug }),
+    }).catch(() => {});
+  }, [sitioId, slug]);
 }
 
 export function useTrackWhatsAppClick(sitioId: string) {
@@ -48,7 +56,7 @@ export function useTrackWhatsAppClick(sitioId: string) {
   }, [sitioId]);
 }
 
-export default function SitioTracker({ sitioId }: { sitioId: string }) {
-  useTrackView(sitioId);
+export default function SitioTracker({ sitioId, slug }: { sitioId: string; slug?: string }) {
+  useTrackView(sitioId, slug);
   return null;
 }

@@ -18,6 +18,7 @@ interface CheckoutBody {
   planId: string;
   sitioId: string;
   authToken: string;
+  trialDays?: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: CheckoutBody = await request.json();
-    const { priceId, planId, sitioId, authToken } = body;
+    const { priceId, planId, sitioId, authToken, trialDays } = body;
 
     if (!priceId || !sitioId || !authToken || !planId) {
       return NextResponse.json(
@@ -92,6 +93,9 @@ export async function POST(request: NextRequest) {
           ownerId: tokenUser.uid,
           planId,
         },
+        ...(trialDays && trialDays > 0 && !existingCustomerId
+          ? { trial_period_days: Math.min(trialDays, 90) }
+          : {}),
       },
       success_url: `${origin}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/dashboard?checkout=cancel`,

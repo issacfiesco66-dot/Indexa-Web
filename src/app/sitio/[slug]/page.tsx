@@ -230,7 +230,7 @@ export default async function SitioPage({ params }: SitioPageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <SitioTracker sitioId={id} />
+      <SitioTracker sitioId={id} slug={data.slug} />
 
       {whatsapp && (
         <WhatsAppButton
