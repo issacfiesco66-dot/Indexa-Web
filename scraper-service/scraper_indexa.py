@@ -692,20 +692,27 @@ def run_single_query(
                     "--disable-blink-features=AutomationControlled",
                     "--disable-dev-shm-usage",
                     "--disable-gpu",
+                    "--disable-software-rasterizer",
                     "--disable-extensions",
                     "--disable-background-networking",
                     "--disable-default-apps",
                     "--disable-sync",
                     "--disable-translate",
                     "--no-first-run",
-                    "--js-flags=--max-old-space-size=384",
+                    "--single-process",
+                    "--renderer-process-limit=1",
+                    "--disable-features=site-per-process,TranslateUI",
+                    "--disable-component-extensions-with-background-pages",
+                    "--disable-client-side-phishing-detection",
+                    "--disable-ipc-flooding-protection",
+                    "--js-flags=--max-old-space-size=128",
                 ],
             )
             context = browser.new_context(
                 locale="es-MX",
                 geolocation={"latitude": 19.4326, "longitude": -99.1332},
                 permissions=["geolocation"],
-                viewport={"width": 1024, "height": 600},
+                viewport={"width": 800, "height": 450},
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -714,9 +721,10 @@ def run_single_query(
             )
             page = context.new_page()
 
-            # Block images & media to save memory (keep CSS/fonts for Maps)
+            # Block ALL non-essential resources to minimize memory
+            _ALLOWED_TYPES = {"document", "script", "xhr", "fetch"}
             def _block_heavy(route):
-                if route.request.resource_type in ("image", "media"):
+                if route.request.resource_type not in _ALLOWED_TYPES:
                     route.abort()
                 else:
                     route.continue_()

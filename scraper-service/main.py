@@ -8,6 +8,7 @@ import json
 import os
 import uuid
 import time
+import shutil
 from pathlib import Path
 
 import logging
@@ -24,7 +25,8 @@ logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s")
 
 app = FastAPI(title="INDEXA Scraper Service")
 
-BUILD_VERSION = "2026-03-18-v5"
+BUILD_VERSION = "2026-03-19-v6"
+_BOOT_TIME = time.time()
 
 FIREBASE_PROJECT_ID = os.getenv("NEXT_PUBLIC_FIREBASE_PROJECT_ID", "")
 CRON_SECRET = os.getenv("CRON_SECRET", "")
@@ -77,7 +79,44 @@ def _cleanup_old_jobs():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "project": FIREBASE_PROJECT_ID, "version": BUILD_VERSION}
+    uptime = int(time.time() - _BOOT_TIME)
+    return {"status": "ok", "project": FIREBASE_PROJECT_ID, "version": BUILD_VERSION, "uptime_s": uptime}
+
+
+@app.get("/debug-memory")
+async def debug_memory():
+    """Show memory info for diagnosing OOM issues."""
+    import resource
+    try:
+        with open("/proc/meminfo") as f:
+            meminfo = {}
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 2:
+                    meminfo[parts[0].rstrip(":")] = int(parts[1])
+        total_mb = meminfo.get("MemTotal", 0) // 1024
+        avail_mb = meminfo.get("MemAvailable", 0) // 1024
+        free_mb = meminfo.get("MemFree", 0) // 1024
+    except Exception:
+        total_mb = avail_mb = free_mb = -1
+    
+    # Current process RSS
+    try:
+        ru = resource.getrusage(resource.RUSAGE_SELF)
+        rss_mb = ru.ru_maxrss // 1024  # Linux: KB -> MB
+    except Exception:
+        rss_mb = -1
+    
+    disk = shutil.disk_usage("/")
+    return {
+        "ram_total_mb": total_mb,
+        "ram_available_mb": avail_mb,
+        "ram_free_mb": free_mb,
+        "process_rss_mb": rss_mb,
+        "disk_total_gb": round(disk.total / (1024**3), 1),
+        "disk_free_gb": round(disk.free / (1024**3), 1),
+        "active_jobs": len([j for j in _jobs.values() if j["status"] == "running"]),
+    }
 
 
 # ── Async scrape job endpoints ───────────────────────────────────────
@@ -228,7 +267,10 @@ async def scrape_status(job_id: str):
     """Poll job progress. Returns current status, progress %, message, and result when done."""
     job = _jobs.get(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="Job no encontrado.")
+        raise HTTPException(
+            status_code=404,
+            detail="Job no encontrado. El servidor pudo haberse reiniciado por falta de memoria (OOM). Intenta de nuevo.",
+        )
 
     return {
         "job_id": job_id,
