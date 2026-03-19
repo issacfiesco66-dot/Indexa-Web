@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Image from "next/image";
 import type { SitioData, BioLink, Oferta } from "@/types/lead";
 
 interface BioClientProps {
@@ -191,10 +192,13 @@ export default function BioClient({ sitioId, data, source }: BioClientProps) {
       {/* Profile header */}
       <div className="flex flex-col items-center">
         {data.logoUrl ? (
-          <img
+          <Image
             src={data.logoUrl}
             alt={data.nombre}
+            width={96}
+            height={96}
             className="h-24 w-24 rounded-full border-4 object-cover shadow-2xl"
+            priority
             style={{ borderColor: color }}
           />
         ) : (
@@ -237,9 +241,11 @@ export default function BioClient({ sitioId, data, source }: BioClientProps) {
         >
           <div className="flex items-center gap-3 rounded-2xl bg-gray-950/50 px-5 py-4 backdrop-blur-sm">
             {activeOfertas[0].imagenUrl && (
-              <img
+              <Image
                 src={activeOfertas[0].imagenUrl}
                 alt=""
+                width={56}
+                height={56}
                 className="h-14 w-14 rounded-xl object-cover"
               />
             )}
