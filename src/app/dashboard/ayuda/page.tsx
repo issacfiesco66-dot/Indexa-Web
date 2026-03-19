@@ -46,7 +46,7 @@ const HELP_FAQS: FAQItemData[] = [
   },
 ];
 
-const SUPPORT_WHATSAPP = "5512345678";
+const SUPPORT_WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5215512345678";
 const SUPPORT_MESSAGE = encodeURIComponent(
   "Hola, soy cliente de INDEXA y necesito ayuda con mi sitio web."
 );
@@ -112,7 +112,7 @@ export default function AyudaPage() {
             Nuestro equipo está listo para ayudarte. Escríbenos y te respondemos en minutos.
           </p>
           <a
-            href={`https://wa.me/+52${SUPPORT_WHATSAPP}?text=${SUPPORT_MESSAGE}`}
+            href={`https://wa.me/${SUPPORT_WHATSAPP}?text=${SUPPORT_MESSAGE}`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-6 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-[#1fb855] hover:shadow-xl hover:-translate-y-0.5"

@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import type { LeadFormData, LeadFormErrors, ContactApiResponse } from "@/types/lead";
+import { useRecaptcha } from "@/lib/useRecaptcha";
 
 export default function ContactForm() {
   const [formData, setFormData] = useState<LeadFormData>({
@@ -15,6 +16,7 @@ export default function ContactForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<"idle" | "success" | "error">("idle");
   const [serverMessage, setServerMessage] = useState("");
+  const { executeRecaptcha } = useRecaptcha();
 
   const validate = (): boolean => {
     const newErrors: LeadFormErrors = {};
@@ -56,6 +58,8 @@ export default function ContactForm() {
     setServerMessage("");
 
     try {
+      const recaptchaToken = await executeRecaptcha("contact_form");
+
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -65,6 +69,7 @@ export default function ContactForm() {
           phone: formData.phone.trim(),
           email: formData.email.trim(),
           mensaje: formData.mensaje.trim(),
+          recaptchaToken,
         }),
       });
 

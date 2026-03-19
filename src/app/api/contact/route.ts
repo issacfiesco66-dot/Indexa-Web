@@ -87,6 +87,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // ── reCAPTCHA v3 verification ────────────────────────────────
+    const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
+    const recaptchaToken = (body as unknown as Record<string, unknown>).recaptchaToken;
+    if (recaptchaSecret && typeof recaptchaToken === "string" && recaptchaToken) {
+      try {
+        const captchaRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `secret=${recaptchaSecret}&response=${recaptchaToken}`,
+        });
+        const captchaData = await captchaRes.json();
+        if (!captchaData.success || (captchaData.score !== undefined && captchaData.score < 0.3)) {
+          return NextResponse.json<ContactApiResponse>(
+            { success: false, message: "Verificación de seguridad fallida. Intenta de nuevo." },
+            { status: 403 }
+          );
+        }
+      } catch (e) {
+        console.error("reCAPTCHA verification error:", e);
+      }
+    }
+
     const { contactName, businessName, phone, email, mensaje } = body;
 
     // Sanitize for HTML emails
@@ -112,33 +134,65 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 2. Correo de confirmación al cliente ──────────────────────
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.indexa.com.mx";
+    const waNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5215512345678";
+    const signupUrl = `${siteUrl}/registro`;
+    const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(`Hola, soy ${contactName.trim()} de ${businessName.trim()}. Acabo de solicitar información en INDEXA y quiero activar mi sitio web.`)}`;
+
     const clientEmailPromise = getResend().emails.send({
       from: FROM_EMAIL,
       to: email.trim(),
-      subject: "¡Gracias por contactar a INDEXA!",
+      subject: "¡Gracias por contactar a INDEXA! Tu sitio web está listo para activarse",
       html: `
         <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333333;">
           <div style="background-color: #002366; padding: 32px; text-align: center;">
             <h1 style="color: #FFFFFF; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">INDEXA</h1>
+            <p style="color: rgba(255,255,255,0.7); margin: 8px 0 0; font-size: 14px;">Sistema Digital Todo-en-Uno para PYMES</p>
           </div>
-          <div style="padding: 32px; background-color: #F8F9FA;">
+          <div style="padding: 32px; background-color: #FFFFFF;">
             <h2 style="color: #002366; margin-top: 0;">¡Hola, ${safeName}!</h2>
             <p style="font-size: 16px; line-height: 1.6;">
               Gracias por contactar a <strong>INDEXA</strong>. Hemos recibido tu solicitud para
               <strong>${safeBusiness}</strong>.
             </p>
             <p style="font-size: 16px; line-height: 1.6;">
-              Un consultor se pondrá en contacto contigo <strong>en menos de 24 horas</strong> para ayudarte a llevar tu negocio al mundo digital.
+              Mientras un consultor se pone en contacto contigo, <strong>puedes crear tu cuenta gratis ahora mismo</strong> y empezar a ver cómo funcionará tu sitio web:
             </p>
-            <div style="margin-top: 24px; padding: 20px; background-color: #FFFFFF; border-radius: 12px; border: 1px solid #e5e7eb;">
-              <p style="margin: 0 0 8px 0; font-size: 14px;"><strong>Nombre:</strong> ${safeName}</p>
-              <p style="margin: 0 0 8px 0; font-size: 14px;"><strong>Negocio:</strong> ${safeBusiness}</p>
-              <p style="margin: 0 0 8px 0; font-size: 14px;"><strong>Teléfono:</strong> ${safePhone}</p>
-              <p style="margin: 0; font-size: 14px;"><strong>Email:</strong> ${safeEmail}</p>
+
+            <!-- Primary CTA: Signup -->
+            <div style="text-align: center; margin: 28px 0;">
+              <a href="${signupUrl}" target="_blank" rel="noopener noreferrer"
+                style="display: inline-block; background-color: #FF6600; color: #FFFFFF; padding: 18px 48px; border-radius: 12px; text-decoration: none; font-weight: 800; font-size: 18px; letter-spacing: 0.3px;">
+                Crear Mi Cuenta Gratis →
+              </a>
+              <p style="margin: 10px 0 0; font-size: 13px; color: #666;">Sin tarjeta de crédito · Listo en 2 minutos</p>
             </div>
-            <p style="font-size: 14px; color: #666; margin-top: 24px;">
-              Si no solicitaste esta cotización, puedes ignorar este correo.
+
+            <!-- Urgency -->
+            <div style="margin: 24px 0; padding: 16px 20px; background-color: #FFF7ED; border-radius: 12px; border: 1px solid #FDBA74; text-align: center;">
+              <p style="margin: 0; font-size: 15px; color: #9A3412; font-weight: 600;">
+                🔥 Los primeros 3 meses van por nuestra cuenta si activas este mes.
+              </p>
+            </div>
+
+            <div style="margin-top: 24px; padding: 20px; background-color: #F8F9FA; border-radius: 12px; border: 1px solid #e5e7eb;">
+              <p style="margin: 0 0 8px 0; font-size: 14px;"><strong>Tu solicitud:</strong></p>
+              <p style="margin: 0 0 4px 0; font-size: 14px;">📋 Negocio: ${safeBusiness}</p>
+              <p style="margin: 0 0 4px 0; font-size: 14px;">📞 Teléfono: ${safePhone}</p>
+              <p style="margin: 0; font-size: 14px;">📧 Email: ${safeEmail}</p>
+            </div>
+
+            <p style="font-size: 15px; line-height: 1.7; color: #555; text-align: center; margin-top: 24px;">
+              ¿Prefieres que te expliquemos por WhatsApp?
             </p>
+
+            <!-- WhatsApp CTA -->
+            <div style="text-align: center; margin: 16px 0;">
+              <a href="${waUrl}" target="_blank" rel="noopener noreferrer"
+                style="display: inline-block; background-color: #25D366; color: #FFFFFF; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 15px;">
+                💬 Escribir por WhatsApp
+              </a>
+            </div>
           </div>
           <div style="background-color: #002366; padding: 20px; text-align: center;">
             <p style="color: rgba(255,255,255,0.6); font-size: 12px; margin: 0;">

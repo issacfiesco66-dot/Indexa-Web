@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   description: "Estamos realizando mejoras en INDEXA. Volveremos en unos minutos.",
 };
 
-const WHATSAPP_NUMBER = "528000000000"; // Replace with your real WhatsApp number
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5215512345678";
 const WHATSAPP_MESSAGE = encodeURIComponent(
   "Hola, necesito soporte urgente. El sitio de INDEXA está en mantenimiento."
 );
