@@ -27,13 +27,17 @@ function LoginForm() {
         try {
           if (attempt > 0) await new Promise((r) => setTimeout(r, 800));
           const snap = await getDoc(doc(db, "usuarios", user.uid));
-          const role = snap.exists() ? snap.data().role : "cliente";
-          if (role === "admin") {
+          const rawRole = snap.exists() ? snap.data().role : "client";
+          if (rawRole === "admin" || rawRole === "superadmin") {
             router.replace("/admin/dashboard");
             setChecking(false);
             return;
+          } else if (rawRole === "agency") {
+            router.replace("/agency/dashboard");
+            setChecking(false);
+            return;
           } else {
-            // Non-admin user on admin login — sign them out
+            // Non-admin/non-agency user on admin login — sign them out
             await signOut();
             setChecking(false);
             return;

@@ -5,10 +5,9 @@ import { useRouter } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
-import { BrandingProvider } from "@/lib/BrandingContext";
 import { normalizeRole } from "@/types/tenant";
 
-function DashboardGuard({ children }: { children: React.ReactNode }) {
+function AgencyGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [allowed, setAllowed] = useState(false);
@@ -16,13 +15,12 @@ function DashboardGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      router.replace("/login");
+      router.replace("/admin/login");
       return;
     }
     if (!db) { setAllowed(true); return; }
 
     (async () => {
-      // Retry up to 3 times — Firestore can reject reads right after login
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           if (attempt > 0) await new Promise((r) => setTimeout(r, 800));
@@ -30,20 +28,23 @@ function DashboardGuard({ children }: { children: React.ReactNode }) {
           if (snap.exists()) {
             const role = normalizeRole(snap.data().role);
             if (role === "superadmin") {
-              router.replace("/admin/dashboard");
+              // Superadmin can access agency panel too
+              setAllowed(true);
               return;
             }
             if (role === "agency") {
-              router.replace("/agency/dashboard");
+              setAllowed(true);
               return;
             }
           }
-          break; // Read succeeded, user is client — allow through
+          // Not agency — redirect
+          router.replace("/admin/login");
+          return;
         } catch {
           // Retry
         }
       }
-      setAllowed(true);
+      router.replace("/admin/login");
     })();
   }, [user, loading, router]);
 
@@ -58,12 +59,10 @@ function DashboardGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function AgencyLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <DashboardGuard>
-        <BrandingProvider>{children}</BrandingProvider>
-      </DashboardGuard>
+      <AgencyGuard>{children}</AgencyGuard>
     </AuthProvider>
   );
 }
