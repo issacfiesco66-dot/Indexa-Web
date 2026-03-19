@@ -14,6 +14,7 @@ const MAINTENANCE_BYPASS_PREFIXES = [
   "/admin",        // Admin panel (login + dashboard)
   "/agency",       // Agency panel
   "/api/admin",    // Admin API routes
+  "/api/agency",   // Agency API routes
   "/api/webhooks", // Stripe webhooks must always work
   "/mantenimiento", // The maintenance page itself
   "/_next",        // Next.js internals (static assets, HMR)
@@ -82,6 +83,16 @@ export function middleware(request: NextRequest) {
       if (isRSC) return NextResponse.next();
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
+  }
+
+  // ── 4. Dashboard Gate — client + agency (support) + superadmin ─────
+  if (pathname.startsWith("/dashboard")) {
+    if (!authCookie) {
+      if (isRSC) return NextResponse.next();
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    // All authenticated roles can access /dashboard/*
+    // BrandingProvider handles white-label injection client-side
   }
 
   return NextResponse.next();

@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { collection, query, where, getDocs, addDoc, Timestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 import { useAuth } from "@/lib/AuthContext";
+import type { AgenciaDoc } from "@/types/tenant";
 
 interface AgencySite {
   id: string;
@@ -16,25 +17,39 @@ interface AgencySite {
 }
 
 export default function AgencyDashboardPage() {
-  const { user, loading, role, agencyBranding, signOut } = useAuth();
+  const { user, loading, agencyId, agencyBranding, agencyName, signOut } = useAuth();
   const router = useRouter();
   const [sites, setSites] = useState<AgencySite[]>([]);
+  const [agencia, setAgencia] = useState<AgenciaDoc | null>(null);
   const [loadingSites, setLoadingSites] = useState(true);
 
   // New client form
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newSlug, setNewSlug] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Fetch agency doc (plan config, limits)
+  useEffect(() => {
+    if (!db || !agencyId) return;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "agencias", agencyId));
+        if (snap.exists()) setAgencia(snap.data() as AgenciaDoc);
+      } catch (err) {
+        console.error("Error fetching agencia doc:", err);
+      }
+    })();
+  }, [agencyId]);
+
   const fetchSites = useCallback(async () => {
-    if (!db || !user) return;
+    if (!db || !agencyId) return;
     setLoadingSites(true);
     try {
-      const q = query(collection(db, "sitios"), where("agencyId", "==", user.uid));
+      const q = query(collection(db, "sitios"), where("agencyId", "==", agencyId));
       const snap = await getDocs(q);
       const results: AgencySite[] = snap.docs.map((d) => {
         const data = d.data();
@@ -53,77 +68,66 @@ export default function AgencyDashboardPage() {
     } finally {
       setLoadingSites(false);
     }
-  }, [db, user]);
+  }, [agencyId]);
 
   useEffect(() => {
-    if (!loading && user) fetchSites();
-  }, [loading, user, fetchSites]);
+    if (!loading && agencyId) fetchSites();
+  }, [loading, agencyId, fetchSites]);
 
   const generateSlug = (name: string) =>
-    name
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
+    name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-  const handleCreateClient = async () => {
+  const handleCreateDemo = async () => {
     setError("");
     setSuccess("");
+    if (!newName.trim()) { setError("El nombre del negocio es requerido."); return; }
+    if (!newEmail.trim()) { setError("El email del cliente es requerido."); return; }
+    if (!newPassword || newPassword.length < 6) { setError("La contraseña debe tener al menos 6 caracteres."); return; }
 
-    if (!newName.trim()) {
-      setError("El nombre del negocio es requerido.");
+    // Check plan limit
+    if (agencia && sites.length >= agencia.planConfig.maxSitios) {
+      setError(`Has alcanzado el límite de ${agencia.planConfig.maxSitios} sitios de tu plan. Contacta soporte para ampliar.`);
       return;
     }
 
-    const slug = newSlug.trim() || generateSlug(newName);
-    if (!slug) {
-      setError("El slug generado está vacío. Usa un nombre válido.");
-      return;
-    }
-
-    if (!db || !user) return;
-
+    if (!user) return;
     setCreating(true);
-    try {
-      const siteData: Record<string, unknown> = {
-        nombre: newName.trim(),
-        slug,
-        agencyId: user.uid,
-        statusPago: "demo",
-        plantilla: "modern",
-        descripcion: "",
-        eslogan: "",
-        whatsapp: "",
-        email: newEmail.trim() || "",
-        ownerEmail: newEmail.trim() || "",
-        colorPrimario: agencyBranding?.colorPrincipal || "#002366",
-        colorSecundario: "#FF6600",
-        createdAt: Timestamp.now(),
-      };
 
-      const docRef = await addDoc(collection(db, "sitios"), siteData);
-      setSuccess(`Cliente creado: ${newName.trim()} (ID: ${docRef.id})`);
-      setNewName("");
-      setNewSlug("");
-      setNewEmail("");
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/agency/create-client", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          businessName: newName.trim(),
+          slug: generateSlug(newName),
+          clientEmail: newEmail.trim(),
+          clientPassword: newPassword,
+          agencyId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || "Error al crear demo.");
+
+      setSuccess(`Cliente creado: ${newName.trim()} — ${newEmail.trim()} ya puede iniciar sesión.`);
+      setNewName(""); setNewEmail(""); setNewPassword("");
       setShowForm(false);
       fetchSites();
-    } catch (err) {
-      console.error("Error creating client:", err);
-      setError("Error al crear el cliente. Intenta de nuevo.");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Error al crear el cliente.");
     } finally {
       setCreating(false);
     }
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.replace("/admin/login");
-  };
+  const handleSignOut = async () => { await signOut(); router.replace("/admin/login"); };
 
   const brandColor = agencyBranding?.colorPrincipal || "#002366";
-  const brandName = agencyBranding?.agencyName || "Panel de Agencia";
+  const brandLabel = agencyName || "Panel de Agencia";
+  const maxSitios = agencia?.planConfig?.maxSitios ?? 0;
+  const activeCount = sites.filter((s) => s.statusPago === "activo" || s.statusPago === "publicado").length;
+  const demoCount = sites.filter((s) => s.statusPago === "demo").length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -134,15 +138,13 @@ export default function AgencyDashboardPage() {
             {agencyBranding?.logoUrl ? (
               <img src={agencyBranding.logoUrl} alt="Logo" className="h-8 w-auto" />
             ) : (
-              <h1 className="text-lg font-extrabold text-white tracking-tight">{brandName}</h1>
+              <h1 className="text-lg font-extrabold text-white tracking-tight">{brandLabel}</h1>
             )}
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-white/70">{user?.email}</span>
-            <button
-              onClick={handleSignOut}
-              className="rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
-            >
+            <button onClick={handleSignOut}
+              className="rounded-lg bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20">
               Cerrar sesión
             </button>
           </div>
@@ -150,120 +152,95 @@ export default function AgencyDashboardPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-        {/* Stats */}
-        <div className="grid gap-4 sm:grid-cols-3 mb-8">
+        {/* Metrics */}
+        <div className="grid gap-4 sm:grid-cols-4 mb-8">
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <p className="text-sm font-medium text-gray-500">Total Clientes</p>
-            <p className="mt-1 text-3xl font-extrabold" style={{ color: brandColor }}>
-              {sites.length}
-            </p>
+            <p className="text-sm font-medium text-gray-500">Total Sitios</p>
+            <p className="mt-1 text-3xl font-extrabold" style={{ color: brandColor }}>{sites.length}</p>
           </div>
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-medium text-gray-500">Activos</p>
-            <p className="mt-1 text-3xl font-extrabold text-green-600">
-              {sites.filter((s) => s.statusPago === "activo" || s.statusPago === "publicado").length}
-            </p>
+            <p className="mt-1 text-3xl font-extrabold text-green-600">{activeCount}</p>
           </div>
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <p className="text-sm font-medium text-gray-500">Demos</p>
-            <p className="mt-1 text-3xl font-extrabold text-amber-600">
-              {sites.filter((s) => s.statusPago === "demo").length}
+            <p className="mt-1 text-3xl font-extrabold text-amber-600">{demoCount}</p>
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <p className="text-sm font-medium text-gray-500">Límite del Plan</p>
+            <p className="mt-1 text-3xl font-extrabold text-gray-700">
+              {sites.length}<span className="text-lg font-medium text-gray-400">/{maxSitios || "∞"}</span>
             </p>
+            {maxSitios > 0 && (
+              <div className="mt-2 h-2 rounded-full bg-gray-100">
+                <div className="h-2 rounded-full transition-all" style={{
+                  width: `${Math.min((sites.length / maxSitios) * 100, 100)}%`,
+                  backgroundColor: sites.length >= maxSitios ? "#dc2626" : brandColor,
+                }} />
+              </div>
+            )}
           </div>
         </div>
 
         {/* Actions */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-800">Mis Clientes</h2>
-          <button
-            onClick={() => { setShowForm(!showForm); setError(""); setSuccess(""); }}
+          <button onClick={() => { setShowForm(!showForm); setError(""); setSuccess(""); }}
             className="rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5"
-            style={{ backgroundColor: brandColor }}
-          >
-            + Crear Nuevo Cliente
+            style={{ backgroundColor: brandColor }}>
+            + Crear Demo
           </button>
         </div>
 
-        {/* Success / Error */}
-        {success && (
-          <div className="mb-4 rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-700">
-            {success}
-          </div>
-        )}
-        {error && (
-          <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+        {success && <div className="mb-4 rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-700">{success}</div>}
+        {error && <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-4 text-sm text-red-700">{error}</div>}
 
-        {/* New Client Form */}
+        {/* Create Demo Form */}
         {showForm && (
           <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">Nuevo Cliente</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">Crear Demo para Nuevo Cliente</h3>
             <div className="grid gap-4 sm:grid-cols-3">
               <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1">
-                  Nombre del negocio *
-                </label>
-                <input
-                  type="text"
-                  value={newName}
-                  onChange={(e) => {
-                    setNewName(e.target.value);
-                    if (!newSlug) setNewSlug(""); // auto-generate
-                  }}
+                <label className="block text-sm font-semibold text-gray-600 mb-1">Nombre del negocio *</label>
+                <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
                   placeholder="Ej. Tacos Don Pepe"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                />
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1">
-                  Slug (URL)
-                </label>
-                <input
-                  type="text"
-                  value={newSlug || generateSlug(newName)}
-                  onChange={(e) => setNewSlug(e.target.value)}
-                  placeholder="tacos-don-pepe"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1">
-                  Email del cliente
-                </label>
-                <input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
+                <label className="block text-sm font-semibold text-gray-600 mb-1">Email del cliente *</label>
+                <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
                   placeholder="cliente@ejemplo.com"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                />
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1">Contraseña temporal *</label>
+                <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
               </div>
             </div>
+            <div className="mt-2 text-xs text-gray-400">
+              Se creará una cuenta de Firebase Auth + un sitio demo asignado a tu agencia. El cliente podrá iniciar sesión con el email y contraseña proporcionados.
+            </div>
             <div className="mt-4 flex gap-3">
-              <button
-                onClick={handleCreateClient}
-                disabled={creating}
+              <button onClick={handleCreateDemo} disabled={creating}
                 className="rounded-xl px-6 py-2.5 text-sm font-bold text-white transition-all disabled:opacity-60"
-                style={{ backgroundColor: brandColor }}
-              >
-                {creating ? "Creando..." : "Crear Cliente"}
+                style={{ backgroundColor: brandColor }}>
+                {creating ? "Creando..." : "Crear Demo"}
               </button>
-              <button
-                onClick={() => setShowForm(false)}
-                className="rounded-xl border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
-              >
+              <button onClick={() => setShowForm(false)}
+                className="rounded-xl border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">
                 Cancelar
               </button>
             </div>
           </div>
         )}
 
-        {/* Sites Table */}
+        {/* Client Sites Table */}
         {loadingSites ? (
           <div className="flex justify-center py-12">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-t-transparent" style={{ borderColor: `${brandColor}40`, borderTopColor: "transparent" }} />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"
+              style={{ borderColor: `${brandColor}40`, borderTopColor: "transparent" }} />
           </div>
         ) : sites.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-gray-300 bg-white p-12 text-center">
@@ -271,7 +248,7 @@ export default function AgencyDashboardPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             </svg>
             <p className="mt-4 text-lg font-semibold text-gray-600">No tienes clientes aún</p>
-            <p className="mt-1 text-sm text-gray-400">Crea tu primer cliente para empezar.</p>
+            <p className="mt-1 text-sm text-gray-400">Usa el botón &quot;Crear Demo&quot; para empezar.</p>
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -293,27 +270,15 @@ export default function AgencyDashboardPage() {
                     <td className="px-6 py-4 text-gray-500 font-mono text-xs">{site.slug}</td>
                     <td className="px-6 py-4 text-gray-500">{site.ownerEmail || "—"}</td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          site.statusPago === "activo" || site.statusPago === "publicado"
-                            ? "bg-green-100 text-green-700"
-                            : site.statusPago === "demo"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {site.statusPago}
-                      </span>
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        site.statusPago === "activo" || site.statusPago === "publicado" ? "bg-green-100 text-green-700"
+                        : site.statusPago === "demo" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"
+                      }`}>{site.statusPago}</span>
                     </td>
                     <td className="px-6 py-4 text-gray-500">{site.createdAt}</td>
                     <td className="px-6 py-4">
-                      <a
-                        href={`/sitio/${site.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium hover:underline"
-                        style={{ color: brandColor }}
-                      >
+                      <a href={`/sitio/${site.slug}`} target="_blank" rel="noopener noreferrer"
+                        className="text-sm font-medium hover:underline" style={{ color: brandColor }}>
                         Ver sitio →
                       </a>
                     </td>
