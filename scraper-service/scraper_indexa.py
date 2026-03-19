@@ -690,6 +690,16 @@ def run_single_query(
                     "--lang=es-MX",
                     "--no-sandbox",
                     "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--disable-extensions",
+                    "--disable-background-networking",
+                    "--disable-default-apps",
+                    "--disable-sync",
+                    "--disable-translate",
+                    "--no-first-run",
+                    "--single-process",
+                    "--js-flags=--max-old-space-size=256",
                 ],
             )
             context = browser.new_context(
@@ -704,6 +714,15 @@ def run_single_query(
                 ),
             )
             page = context.new_page()
+
+            # Block heavy resources to save memory
+            await_route_done = []
+            def block_heavy(route):
+                if route.request.resource_type in ("image", "media", "font", "stylesheet"):
+                    route.abort()
+                else:
+                    route.continue_()
+            page.route("**/*", block_heavy)
 
             emit("phase", message="Buscando en Google Maps...", phase="searching", progress=20)
             buscar_en_maps(page, query_str)
