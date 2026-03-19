@@ -21,6 +21,8 @@ logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s")
 
 app = FastAPI(title="INDEXA Scraper Service")
 
+BUILD_VERSION = "2026-03-18-v2"
+
 FIREBASE_PROJECT_ID = os.getenv("NEXT_PUBLIC_FIREBASE_PROJECT_ID", "")
 CRON_SECRET = os.getenv("CRON_SECRET", "")
 ALLOWED_ORIGINS = os.getenv(
@@ -57,7 +59,32 @@ def verify_firebase_token(token: str) -> dict | None:
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "project": FIREBASE_PROJECT_ID}
+    return {"status": "ok", "project": FIREBASE_PROJECT_ID, "version": BUILD_VERSION}
+
+
+@app.get("/test-chromium")
+async def test_chromium():
+    """Quick test: can Playwright launch Chromium on this container?"""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "python", "-c",
+            "from playwright.sync_api import sync_playwright; pw = sync_playwright().start(); b = pw.chromium.launch(headless=True, args=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--single-process']); b.close(); pw.stop(); print('OK')",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(SCRIPT_DIR),
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        out = stdout.decode("utf-8", errors="replace").strip()
+        err = stderr.decode("utf-8", errors="replace").strip()
+        return {"chromium": "ok" if "OK" in out else "fail", "stdout": out[:500], "stderr": err[:500], "exit_code": proc.returncode}
+    except asyncio.TimeoutError:
+        return JSONResponse({"chromium": "timeout", "error": "Chromium launch timed out after 30s"}, status_code=500)
+    except Exception as e:
+        return JSONResponse({"chromium": "error", "error": str(e)[:500]}, status_code=500)
+
+
+# Cap max results on Railway to prevent OOM (Chromium uses ~100-200MB per session)
+MAX_RESULTS_LIMIT = int(os.getenv("SCRAPER_MAX_RESULTS", "15"))
 
 
 @app.get("/scrape")
@@ -74,54 +101,76 @@ async def scrape(
     if not SCRAPER_SCRIPT.exists():
         raise HTTPException(status_code=500, detail="scraper_indexa.py not found.")
 
+    # Enforce server-side max to prevent OOM
+    effective_max = min(max, MAX_RESULTS_LIMIT)
+    logger.info(f"[scrape] query={query!r} requested_max={max} effective_max={effective_max}")
+
     async def generate():
-        proc = await asyncio.create_subprocess_exec(
-            "python",
-            str(SCRAPER_SCRIPT),
-            query,
-            "--max",
-            str(max),
-            "--headless",
-            "true",
-            "--json-progress",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(SCRIPT_DIR),
-        )
+        proc = None
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "python",
+                str(SCRAPER_SCRIPT),
+                query,
+                "--max",
+                str(effective_max),
+                "--headless",
+                "true",
+                "--json-progress",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(SCRIPT_DIR),
+            )
 
-        buffer = ""
-        while True:
-            chunk = await proc.stdout.read(4096)
-            if not chunk:
-                break
-            buffer += chunk.decode("utf-8", errors="replace")
-            lines = buffer.split("\n")
-            buffer = lines.pop()
-            for line in lines:
-                if line.strip():
-                    yield f"data: {line}\n\n"
+            buffer = ""
+            while True:
+                try:
+                    chunk = await asyncio.wait_for(proc.stdout.read(4096), timeout=120)
+                except asyncio.TimeoutError:
+                    err = json.dumps({"event": "error", "message": "Timeout: el scraper tardó demasiado."})
+                    yield f"data: {err}\n\n"
+                    proc.kill()
+                    break
+                if not chunk:
+                    break
+                buffer += chunk.decode("utf-8", errors="replace")
+                lines = buffer.split("\n")
+                buffer = lines.pop()
+                for line in lines:
+                    if line.strip():
+                        yield f"data: {line}\n\n"
 
-        if buffer.strip():
-            yield f"data: {buffer}\n\n"
+            if buffer.strip():
+                yield f"data: {buffer}\n\n"
 
-        # Capture stderr
-        stderr_data = await proc.stderr.read()
-        if stderr_data:
-            stderr_text = stderr_data.decode("utf-8", errors="replace").strip()
-            if stderr_text:
-                for err_line in stderr_text.split("\n"):
-                    if err_line.strip():
-                        err_event = json.dumps(
-                            {"event": "log", "message": err_line.strip()}
-                        )
-                        yield f"data: {err_event}\n\n"
+            # Capture stderr
+            try:
+                stderr_data = await asyncio.wait_for(proc.stderr.read(), timeout=5)
+                if stderr_data:
+                    stderr_text = stderr_data.decode("utf-8", errors="replace").strip()
+                    if stderr_text:
+                        for err_line in stderr_text.split("\n")[-10:]:
+                            if err_line.strip():
+                                err_event = json.dumps(
+                                    {"event": "log", "message": err_line.strip()}
+                                )
+                                yield f"data: {err_event}\n\n"
+            except asyncio.TimeoutError:
+                pass
 
-        await proc.wait()
+            await proc.wait()
 
-        end_event = json.dumps(
-            {"event": "stream_end", "exitCode": proc.returncode}
-        )
-        yield f"data: {end_event}\n\n"
+            end_event = json.dumps(
+                {"event": "stream_end", "exitCode": proc.returncode}
+            )
+            yield f"data: {end_event}\n\n"
+
+        except Exception as e:
+            logger.error(f"[scrape] generate() crashed: {e}")
+            err_event = json.dumps({"event": "error", "message": f"Error del servidor: {str(e)[:200]}"})
+            yield f"data: {err_event}\n\n"
+            if proc and proc.returncode is None:
+                proc.kill()
 
     return StreamingResponse(
         generate(),
