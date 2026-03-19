@@ -87,18 +87,26 @@ async def health():
 async def debug_memory():
     """Show memory info for diagnosing OOM issues."""
     import resource
-    try:
-        with open("/proc/meminfo") as f:
-            meminfo = {}
-            for line in f:
-                parts = line.split()
-                if len(parts) >= 2:
-                    meminfo[parts[0].rstrip(":")] = int(parts[1])
-        total_mb = meminfo.get("MemTotal", 0) // 1024
-        avail_mb = meminfo.get("MemAvailable", 0) // 1024
-        free_mb = meminfo.get("MemFree", 0) // 1024
-    except Exception:
-        total_mb = avail_mb = free_mb = -1
+    
+    # Cgroup memory limit (actual container limit)
+    cgroup_limit_mb = -1
+    cgroup_usage_mb = -1
+    for limit_path in ["/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"]:
+        try:
+            with open(limit_path) as f:
+                val = f.read().strip()
+                if val != "max" and val != "9223372036854771712":
+                    cgroup_limit_mb = int(val) // (1024 * 1024)
+                break
+        except Exception:
+            continue
+    for usage_path in ["/sys/fs/cgroup/memory.current", "/sys/fs/cgroup/memory/memory.usage_in_bytes"]:
+        try:
+            with open(usage_path) as f:
+                cgroup_usage_mb = int(f.read().strip()) // (1024 * 1024)
+                break
+        except Exception:
+            continue
     
     # Current process RSS
     try:
@@ -107,15 +115,12 @@ async def debug_memory():
     except Exception:
         rss_mb = -1
     
-    disk = shutil.disk_usage("/")
     return {
-        "ram_total_mb": total_mb,
-        "ram_available_mb": avail_mb,
-        "ram_free_mb": free_mb,
+        "container_limit_mb": cgroup_limit_mb,
+        "container_usage_mb": cgroup_usage_mb,
         "process_rss_mb": rss_mb,
-        "disk_total_gb": round(disk.total / (1024**3), 1),
-        "disk_free_gb": round(disk.free / (1024**3), 1),
         "active_jobs": len([j for j in _jobs.values() if j["status"] == "running"]),
+        "note": "container_limit_mb is the REAL memory limit for this Railway container",
     }
 
 
