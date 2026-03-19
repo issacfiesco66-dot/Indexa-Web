@@ -16,6 +16,7 @@ import {
 } from "firebase/storage";
 import { db, storage } from "@/lib/firebaseConfig";
 import { useAuth } from "@/lib/AuthContext";
+import { buildSearchIndex } from "@/lib/searchUtils";
 import type { SitioData, UserProfile, TemplateId, Oferta, BioLink, BioStats } from "@/types/lead";
 import {
   Eye,
@@ -42,6 +43,7 @@ import {
   Link2,
 } from "lucide-react";
 import Link from "next/link";
+import AiMagicButton from "@/components/AiMagicButton";
 
 // ── Tabs ───────────────────────────────────────────────────────────
 type Tab = "general" | "contacto" | "visual";
@@ -462,6 +464,9 @@ export default function ClientDashboardPage() {
         ownerId: user.uid,
       };
 
+      (newSitio as unknown as Record<string, unknown>).searchIndex = buildSearchIndex({
+        nombre: displayName,
+      });
       await setDoc(doc(db, "sitios", newSitioId), newSitio);
 
       // Link sitio to user profile
@@ -814,6 +819,23 @@ export default function ClientDashboardPage() {
               bg="bg-green-50"
             />
           </div>
+        </section>
+
+        {/* ── AI Magic Button ──────────────────────────────────────── */}
+        <section className="mb-10">
+          <AiMagicButton
+            sitioId={sitioId}
+            sitioNombre={sitio.nombre}
+            sitioSlug={sitio.slug}
+            onOfertaCreated={() => {
+              // Refresh sitio data to reflect new oferta
+              if (db && sitioId) {
+                getDoc(doc(db, "sitios", sitioId)).then((snap) => {
+                  if (snap.exists()) setSitio(docToSitio(snap.data()));
+                });
+              }
+            }}
+          />
         </section>
 
         {/* ── Subscription section ──────────────────────────────────── */}
