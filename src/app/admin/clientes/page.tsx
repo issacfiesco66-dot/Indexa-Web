@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   collection,
   onSnapshot,
@@ -22,7 +22,10 @@ import {
   Link2,
   UserCheck,
   UserX,
+  SearchX,
+  UserPlus,
 } from "lucide-react";
+import { createFuseSearch, fuzzySearch, normalizePhone, buildSearchIndex } from "@/lib/searchUtils";
 
 // ── Types ────────────────────────────────────────────────────────────
 interface ClientUser {
@@ -38,6 +41,9 @@ interface SitioMin {
   nombre: string;
   slug: string;
   statusPago: string;
+  telefono: string;
+  email: string;
+  direccion: string;
 }
 
 function generateSlug(name: string): string {
@@ -107,6 +113,9 @@ export default function ClientesPage() {
             nombre: (raw.nombre as string) ?? "",
             slug: (raw.slug as string) ?? "",
             statusPago: (raw.statusPago as string) ?? "inactivo",
+            telefono: (raw.whatsapp as string) ?? (raw.telefono as string) ?? "",
+            email: (raw.emailContacto as string) ?? (raw.email as string) ?? "",
+            direccion: (raw.direccion as string) ?? "",
           };
         });
         setSitios(data);
@@ -124,13 +133,41 @@ export default function ClientesPage() {
   const getSitioForClient = (sitioId: string) =>
     sitios.find((s) => s.id === sitioId);
 
-  const filtered = searchTerm
-    ? clients.filter(
-        (c) =>
-          c.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          c.email.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : clients;
+  // ── Fuse.js fuzzy search ────────────────────────────────────────
+  type SearchableClient = ClientUser & { sitioNombre: string; sitioSlug: string; telefono: string; direccion: string; _phoneNorm: string };
+
+  const searchableClients = useMemo<SearchableClient[]>(() => {
+    return clients.map((c) => {
+      const sitio = getSitioForClient(c.sitioId);
+      return {
+        ...c,
+        sitioNombre: sitio?.nombre ?? "",
+        sitioSlug: sitio?.slug ?? "",
+        telefono: sitio?.telefono ?? "",
+        direccion: sitio?.direccion ?? "",
+        _phoneNorm: normalizePhone(sitio?.telefono ?? ""),
+      };
+    });
+  }, [clients, sitios]);
+
+  const fuse = useMemo(
+    () =>
+      createFuseSearch(searchableClients, [
+        "displayName",
+        "email",
+        "sitioNombre",
+        "sitioSlug",
+        "telefono",
+        "_phoneNorm",
+        "direccion",
+      ]),
+    [searchableClients]
+  );
+
+  const filtered = useMemo(
+    () => fuzzySearch(fuse, searchTerm, searchableClients),
+    [fuse, searchTerm, searchableClients]
+  );
 
   // ── Open create modal ────────────────────────────────────────────
   const openCreateModal = (client: ClientUser) => {
@@ -176,6 +213,11 @@ export default function ClientesPage() {
         templateId: "modern",
         horarios: "",
         googleMapsUrl: "",
+        searchIndex: buildSearchIndex({
+          nombre: sitioNombre.trim(),
+          telefono: sitioWhatsapp.trim(),
+          email: sitioEmail.trim(),
+        }),
         createdAt: serverTimestamp(),
       });
 
@@ -253,18 +295,39 @@ export default function ClientesPage() {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Buscar por nombre o email..."
+          placeholder="Buscar por nombre, teléfono, email o slug..."
           className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
         />
       </div>
 
       {/* ── Client list ─────────────────────────────────────── */}
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white py-16">
-          <Users size={32} className="text-gray-300" />
-          <h3 className="mt-4 text-base font-semibold text-indexa-gray-dark">
-            {clients.length === 0 ? "No hay clientes registrados" : "Sin resultados"}
-          </h3>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-300 bg-white py-16 px-6">
+          {clients.length === 0 ? (
+            <>
+              <Users size={32} className="text-gray-300" />
+              <h3 className="mt-4 text-base font-semibold text-indexa-gray-dark">No hay clientes registrados</h3>
+            </>
+          ) : (
+            <>
+              <SearchX size={36} className="text-gray-300" />
+              <h3 className="mt-4 text-base font-semibold text-indexa-gray-dark">
+                No encontramos &ldquo;{searchTerm}&rdquo;
+              </h3>
+              <p className="mt-1 text-sm text-gray-400 text-center">
+                No hay clientes que coincidan con tu búsqueda.
+              </p>
+              <a
+                href="/registro"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indexa-blue px-5 py-2.5 text-sm font-bold text-white shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5"
+              >
+                <UserPlus size={16} />
+                ¿Deseas darlo de alta ahora?
+              </a>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-2">

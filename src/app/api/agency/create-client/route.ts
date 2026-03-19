@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAgency } from "@/lib/verifyAuth";
 import { addDocument, readDoc, queryCollection } from "@/lib/firestoreRest";
+import { buildSearchIndex } from "@/lib/searchUtils";
 
 const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 

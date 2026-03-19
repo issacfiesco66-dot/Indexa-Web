@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { createFuseSearch, fuzzySearch, normalizePhone } from "@/lib/searchUtils";
 import {
   collection,
   query,
@@ -160,6 +161,7 @@ export default function ProspectosPage() {
   const { user } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [prospectoFilter, setProspectoFilter] = useState<ProspectoFilter>("todos");
+  const [searchTerm, setSearchTerm] = useState("");
 
   // ── Scraper state ──────────────────────────────────────────────────
   const [scraperServicio, setScraperServicio] = useState("");
@@ -503,6 +505,33 @@ export default function ProspectosPage() {
       setSendingEmailId(null);
     }
   }, [user]);
+
+  // ── Fuse.js fuzzy search ──────────────────────────────────────────────
+  const searchableProspectos = useMemo(
+    () => prospectos.map((p) => ({ ...p, _phoneNorm: normalizePhone(p.telefono || "") })),
+    [prospectos]
+  );
+
+  const prospFuse = useMemo(
+    () =>
+      createFuseSearch(searchableProspectos, [
+        "nombre",
+        "telefono",
+        "_phoneNorm",
+        "email",
+        "direccion",
+        "categoria",
+        "ciudad",
+      ]),
+    [searchableProspectos]
+  );
+
+  const filteredProspectos = useMemo(() => {
+    const textFiltered = fuzzySearch(prospFuse, searchTerm, searchableProspectos);
+    return textFiltered.filter((p) =>
+      prospectoFilter === "todos" ? true : prospectoFilter === "sin_web" ? !p.tieneWeb : p.tieneWeb
+    );
+  }, [prospFuse, searchTerm, searchableProspectos, prospectoFilter]);
 
   // ── Selection helpers ────────────────────────────────────────────────
   const eligibleForBulk = prospectos.filter((p) => p.status === "nuevo");
@@ -989,6 +1018,20 @@ export default function ProspectosPage() {
         </div>
       )}
 
+      {/* ── Search ────────────────────────────────────────────────── */}
+      {prospectos.length > 0 && (
+        <div className="relative">
+          <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar por nombre, teléfono, email, dirección..."
+            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
+          />
+        </div>
+      )}
+
       {/* ── Filter bar ──────────────────────────────────────────── */}
       {prospectos.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
@@ -1067,7 +1110,7 @@ export default function ProspectosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {prospectos.filter(p => prospectoFilter === "todos" ? true : prospectoFilter === "sin_web" ? !p.tieneWeb : p.tieneWeb).map((p) => (
+                {filteredProspectos.map((p) => (
                   <tr key={p.id} className={`transition-colors hover:bg-gray-50/50 ${selectedIds.has(p.id) ? "bg-indexa-blue/5" : ""}`}>
                     <td className="w-10 px-4 py-4">
                       {p.status === "nuevo" ? (
@@ -1185,7 +1228,7 @@ export default function ProspectosPage() {
 
           {/* ── Mobile cards ────────────────────────────────────── */}
           <div className="space-y-3 md:hidden">
-            {prospectos.filter(p => prospectoFilter === "todos" ? true : prospectoFilter === "sin_web" ? !p.tieneWeb : p.tieneWeb).map((p) => (
+            {filteredProspectos.map((p) => (
               <div key={p.id} className={`rounded-2xl border bg-white p-4 shadow-sm ${selectedIds.has(p.id) ? "border-indexa-blue/40 bg-indexa-blue/5" : "border-gray-200"}`}>
                 <div className="flex items-start justify-between gap-3">
                   {p.status === "nuevo" && (

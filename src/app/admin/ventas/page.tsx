@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { createFuseSearch, fuzzySearch, normalizePhone } from "@/lib/searchUtils";
 import {
   collection,
   onSnapshot,
@@ -366,15 +367,29 @@ export default function VentasPage() {
     }
   }, []);
 
-  // ── Filter cards ───────────────────────────────────────────────────
-  const filtered = search.trim()
-    ? cards.filter(
-        (c) =>
-          c.nombre.toLowerCase().includes(search.toLowerCase()) ||
-          c.categoria.toLowerCase().includes(search.toLowerCase()) ||
-          c.ciudad.toLowerCase().includes(search.toLowerCase())
-      )
-    : cards;
+  // ── Fuse.js fuzzy filter ──────────────────────────────────────────
+  const searchableCards = useMemo(
+    () => cards.map((c) => ({ ...c, _phoneNorm: normalizePhone(c.telefono) })),
+    [cards]
+  );
+
+  const fuse = useMemo(
+    () =>
+      createFuseSearch(searchableCards, [
+        "nombre",
+        "telefono",
+        "_phoneNorm",
+        "email",
+        "categoria",
+        "ciudad",
+      ]),
+    [searchableCards]
+  );
+
+  const filtered = useMemo(
+    () => fuzzySearch(fuse, search, searchableCards),
+    [fuse, search, searchableCards]
+  );
 
   const byColumn = (col: KanbanColumn) =>
     filtered
@@ -419,7 +434,7 @@ export default function VentasPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, categoría, ciudad..."
+            placeholder="Buscar por nombre, teléfono, email, categoría..."
             className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-9 pr-4 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20 sm:w-72"
           />
         </div>
