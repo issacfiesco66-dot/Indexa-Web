@@ -698,15 +698,14 @@ def run_single_query(
                     "--disable-sync",
                     "--disable-translate",
                     "--no-first-run",
-                    "--single-process",
-                    "--js-flags=--max-old-space-size=256",
+                    "--js-flags=--max-old-space-size=384",
                 ],
             )
             context = browser.new_context(
                 locale="es-MX",
                 geolocation={"latitude": 19.4326, "longitude": -99.1332},
                 permissions=["geolocation"],
-                viewport={"width": 1280, "height": 900},
+                viewport={"width": 1024, "height": 600},
                 user_agent=(
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -715,14 +714,13 @@ def run_single_query(
             )
             page = context.new_page()
 
-            # Block heavy resources to save memory
-            await_route_done = []
-            def block_heavy(route):
-                if route.request.resource_type in ("image", "media", "font", "stylesheet"):
+            # Block images & media to save memory (keep CSS/fonts for Maps)
+            def _block_heavy(route):
+                if route.request.resource_type in ("image", "media"):
                     route.abort()
                 else:
                     route.continue_()
-            page.route("**/*", block_heavy)
+            page.route("**/*", _block_heavy)
 
             emit("phase", message="Buscando en Google Maps...", phase="searching", progress=20)
             buscar_en_maps(page, query_str)

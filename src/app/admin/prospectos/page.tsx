@@ -165,7 +165,7 @@ export default function ProspectosPage() {
   const [scraperServicio, setScraperServicio] = useState("");
   const [scraperCiudad, setScraperCiudad] = useState("");
   const [scraperPais, setScraperPais] = useState("México");
-  const [scraperMax, setScraperMax] = useState(15);
+  const [scraperMax, setScraperMax] = useState(10);
   const [scraperHistory, setScraperHistory] = useState<string[]>([]);
   const [scraperRunning, setScraperRunning] = useState(false);
   const [scraperProgress, setScraperProgress] = useState(0);
@@ -284,7 +284,10 @@ export default function ProspectosPage() {
       })
       .catch((err) => {
         if (err.name !== "AbortError") {
-          setScraperMessage(`Error: ${err.message}`);
+          const msg = err.message?.includes("Failed to fetch") || err.message?.includes("network")
+            ? "Error de conexión con el servidor de scraping. Intenta con menos resultados."
+            : `Error: ${err.message}`;
+          setScraperMessage(msg);
         }
         setScraperRunning(false);
       });
@@ -779,9 +782,9 @@ export default function ProspectosPage() {
                 <input
                   type="number"
                   value={scraperMax}
-                  onChange={(e) => setScraperMax(Math.max(1, Math.min(50, Number(e.target.value))))}
+                  onChange={(e) => setScraperMax(Math.max(1, Math.min(10, Number(e.target.value))))}
                   min={1}
-                  max={50}
+                  max={10}
                   disabled={scraperRunning}
                   className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:bg-white focus:ring-2 focus:ring-indexa-blue/20 disabled:opacity-50"
                 />

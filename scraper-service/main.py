@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s")
 
 app = FastAPI(title="INDEXA Scraper Service")
 
-BUILD_VERSION = "2026-03-18-v2"
+BUILD_VERSION = "2026-03-18-v3"
 
 FIREBASE_PROJECT_ID = os.getenv("NEXT_PUBLIC_FIREBASE_PROJECT_ID", "")
 CRON_SECRET = os.getenv("CRON_SECRET", "")
@@ -84,7 +84,7 @@ async def test_chromium():
 
 
 # Cap max results on Railway to prevent OOM (Chromium uses ~100-200MB per session)
-MAX_RESULTS_LIMIT = int(os.getenv("SCRAPER_MAX_RESULTS", "15"))
+MAX_RESULTS_LIMIT = int(os.getenv("SCRAPER_MAX_RESULTS", "10"))
 
 
 @app.get("/scrape")
