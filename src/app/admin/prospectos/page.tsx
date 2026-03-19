@@ -37,6 +37,7 @@ import {
   Megaphone,
   Filter,
   Globe,
+  Handshake,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -139,6 +140,26 @@ Sin contratos, sin letra chiquita, y los primeros 7 días de campaña corren por
 function generateAdsMessage(nombre: string, ciudad: string, categoria: string): string {
   const variant = ADS_MESSAGES[Math.floor(Math.random() * ADS_MESSAGES.length)];
   return variant(nombre, ciudad, categoria);
+}
+
+function generateAgencyMessage(nombre: string, ciudad: string, categoria: string): string {
+  const zona = ciudad || "CDMX";
+  const sector = categoria || "Agencia Marketing Digital";
+  return `Hola, ¿qué tal, equipo de ${nombre}? Soy Isaac, de INDEXA.
+
+Estuve revisando su portafolio en ${zona} y me llamó mucho la atención su enfoque en ${sector}. Les escribo porque, más que una agencia, somos una plataforma de infraestructura y estamos buscando socios tecnológicos en la zona para escalar su prospección.
+
+Sabemos que ustedes ya dominan el tema de pauta, por eso no vengo a ofrecerles publicidad. Vengo a mostrarles el 'Motor de Inteligencia de Mercado' que desarrollamos para que agencias como la suya multipliquen su facturación sin esfuerzo operativo:
+
+*Detección Automática de Oportunidades:* Nuestro sistema identifica en tiempo real negocios con brechas digitales críticas en toda ${zona}, entregándoles cientos de prospectos pre-calificados diariamente.
+
+*Abordaje de 'Un Solo Clic':* El sistema procesa la información de cada negocio y genera un mensaje personalizado de alto impacto. Con un solo botón, ustedes disparan la propuesta directa, lista para cerrar.
+
+*Infraestructura de Marca Blanca:* Pueden rentar nuestra plataforma, ponerle el logo de ${nombre} y ofrecérsela a sus clientes como un software propio de la agencia.
+
+Básicamente, nosotros ponemos la 'maquinaria de guerra' y ustedes la estrategia de cierre.
+
+¿Me permiten enviarles una demo visual de cómo nuestro sistema está detectando oportunidades para ${nombre} justo ahora? Es un acceso de 3 minutos y no tiene costo.`;
 }
 
 type ProspectoFilter = "todos" | "sin_web" | "con_web";
@@ -456,6 +477,32 @@ export default function ProspectosPage() {
     const digits = prospecto.telefono.replace(/[^\d+]/g, "");
     const num = digits.startsWith("+") ? digits : `+52${digits}`;
     const message = generateAdsMessage(prospecto.nombre, prospecto.ciudad, prospecto.categoria);
+    const url = `https://wa.me/${num}?text=${encodeURIComponent(message)}`;
+
+    window.open(url, "_blank", "noopener,noreferrer");
+
+    if (db) {
+      try {
+        const updates: Record<string, unknown> = {
+          fechaUltimoContacto: serverTimestamp(),
+          ultimoWhatsAppAt: serverTimestamp(),
+          whatsappCount: increment(1),
+        };
+        if (prospecto.status !== "contactado_wa" && prospecto.status !== "contactado") {
+          updates.status = "contactado_wa" as ProspectoStatus;
+        }
+        await updateDoc(doc(db, "prospectos_frios", prospecto.id), updates);
+      } catch (err) {
+        console.error("Error al actualizar status:", err);
+      }
+    }
+  }, []);
+
+  // ── WhatsApp contact (agency partnership pitch) ──────────────────────
+  const handleWhatsAppAgency = useCallback(async (prospecto: ProspectoFrio) => {
+    const digits = prospecto.telefono.replace(/[^\d+]/g, "");
+    const num = digits.startsWith("+") ? digits : `+52${digits}`;
+    const message = generateAgencyMessage(prospecto.nombre, prospecto.ciudad, prospecto.categoria);
     const url = `https://wa.me/${num}?text=${encodeURIComponent(message)}`;
 
     window.open(url, "_blank", "noopener,noreferrer");
@@ -1203,6 +1250,14 @@ export default function ProspectosPage() {
                                 WhatsApp
                               </button>
                             )}
+                            <button
+                              onClick={() => handleWhatsAppAgency(p)}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
+                              title="Pitch de socio tecnológico para agencias"
+                            >
+                              <Handshake size={13} />
+                              Agencia
+                            </button>
                             {p.whatsappCount > 0 && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700" title={p.ultimoWhatsAppAt ? `Último: ${p.ultimoWhatsAppAt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}>
                                 ✓ {p.whatsappCount}x
@@ -1304,6 +1359,16 @@ export default function ProspectosPage() {
                         WhatsApp
                       </button>
                     )
+                  )}
+                  {p.telefono && (
+                    <button
+                      onClick={() => handleWhatsAppAgency(p)}
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
+                      title="Pitch de socio tecnológico para agencias"
+                    >
+                      <Handshake size={13} />
+                      Agencia
+                    </button>
                   )}
                   {p.whatsappCount > 0 && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">

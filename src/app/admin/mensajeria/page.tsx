@@ -25,10 +25,11 @@ import {
   CheckCircle2,
   Loader2,
   SearchX,
+  Handshake,
 } from "lucide-react";
 
 // ── Message templates ──────────────────────────────────────────────────
-type MessageType = "directo" | "educativo" | "gancho";
+type MessageType = "directo" | "educativo" | "gancho" | "agencia";
 
 interface MessageTemplate {
   id: MessageType;
@@ -66,6 +67,32 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     hoverColor: "hover:bg-green-700",
     buildMessage: (nombre, ciudad, _cat, url) =>
       `Hola, ${nombre}. Soy de INDEXA y tengo algo para ustedes: estamos activando gratis los primeros 3 meses de nuestro sistema completo a negocios en ${ciudad || "su zona"}. Incluye: sitio web profesional, aparecer en Google cuando busquen lo que ustedes venden, WhatsApp directo para cerrar ventas, y un panel para lanzar anuncios en Facebook y TikTok con presupuestos desde $50 al día. ¿Por qué gratis? Porque confiamos en que cuando vean los resultados, se van a querer quedar. Aquí está su propuesta: ${url}. Cero riesgo, cero contratos, cero letra chiquita. ¿Cuándo les queda bien una llamada de 5 minutos?`,
+  },
+  {
+    id: "agencia",
+    label: "Agencia",
+    icon: Handshake,
+    color: "bg-indigo-600 text-white",
+    hoverColor: "hover:bg-indigo-700",
+    buildMessage: (nombre, ciudad, categoria, _url) => {
+      const zona = ciudad || "CDMX";
+      const sector = categoria || "Agencia Marketing Digital";
+      return `Hola, ¿qué tal, equipo de ${nombre}? Soy Isaac, de INDEXA.
+
+Estuve revisando su portafolio en ${zona} y me llamó mucho la atención su enfoque en ${sector}. Les escribo porque, más que una agencia, somos una plataforma de infraestructura y estamos buscando socios tecnológicos en la zona para escalar su prospección.
+
+Sabemos que ustedes ya dominan el tema de pauta, por eso no vengo a ofrecerles publicidad. Vengo a mostrarles el 'Motor de Inteligencia de Mercado' que desarrollamos para que agencias como la suya multipliquen su facturación sin esfuerzo operativo:
+
+*Detección Automática de Oportunidades:* Nuestro sistema identifica en tiempo real negocios con brechas digitales críticas en toda ${zona}, entregándoles cientos de prospectos pre-calificados diariamente.
+
+*Abordaje de 'Un Solo Clic':* El sistema procesa la información de cada negocio y genera un mensaje personalizado de alto impacto. Con un solo botón, ustedes disparan la propuesta directa, lista para cerrar.
+
+*Infraestructura de Marca Blanca:* Pueden rentar nuestra plataforma, ponerle el logo de ${nombre} y ofrecérsela a sus clientes como un software propio de la agencia.
+
+Básicamente, nosotros ponemos la 'maquinaria de guerra' y ustedes la estrategia de cierre.
+
+¿Me permiten enviarles una demo visual de cómo nuestro sistema está detectando oportunidades para ${nombre} justo ahora? Es un acceso de 3 minutos y no tiene costo.`;
+    },
   },
 ];
 
