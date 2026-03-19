@@ -1,27 +1,30 @@
 """
 INDEXA Scraper Service — FastAPI wrapper for Railway deployment.
-Runs scraper_indexa.py as subprocess and streams SSE progress events.
+Uses async jobs + polling instead of SSE streaming (Railway kills SSE connections).
 """
 
 import asyncio
 import json
 import os
+import uuid
+import time
 from pathlib import Path
 
 import logging
 
-from fastapi import FastAPI, Query, Header, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, Header, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
+from pydantic import BaseModel
 
 logger = logging.getLogger("indexa_scraper_service")
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s")
 
 app = FastAPI(title="INDEXA Scraper Service")
 
-BUILD_VERSION = "2026-03-18-v4"
+BUILD_VERSION = "2026-03-18-v5"
 
 FIREBASE_PROJECT_ID = os.getenv("NEXT_PUBLIC_FIREBASE_PROJECT_ID", "")
 CRON_SECRET = os.getenv("CRON_SECRET", "")
@@ -43,6 +46,10 @@ _batch_running = False
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCRAPER_SCRIPT = SCRIPT_DIR / "scraper_indexa.py"
 
+# ── In-memory job store ──────────────────────────────────────────────
+_jobs: dict[str, dict] = {}
+MAX_JOBS = 20  # keep last N jobs in memory
+
 
 def verify_firebase_token(token: str) -> dict | None:
     """Verify a Firebase ID token using Google's public keys."""
@@ -57,141 +64,192 @@ def verify_firebase_token(token: str) -> dict | None:
         return None
 
 
+def _cleanup_old_jobs():
+    """Remove oldest jobs if over MAX_JOBS."""
+    if len(_jobs) <= MAX_JOBS:
+        return
+    sorted_ids = sorted(_jobs.keys(), key=lambda k: _jobs[k].get("created", 0))
+    while len(_jobs) > MAX_JOBS:
+        del _jobs[sorted_ids.pop(0)]
+
+
+# ── Health / diagnostics ─────────────────────────────────────────────
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "project": FIREBASE_PROJECT_ID, "version": BUILD_VERSION}
 
 
-@app.get("/test-chromium")
-async def test_chromium():
-    """Quick test: can Playwright launch Chromium on this container?"""
+# ── Async scrape job endpoints ───────────────────────────────────────
+
+class ScrapeRequest(BaseModel):
+    query: str
+    max: int = 30
+    token: str
+
+
+async def _run_scrape_job(job_id: str, query: str, max_results: int):
+    """Background task: run scraper subprocess, capture progress into _jobs."""
+    job = _jobs[job_id]
     try:
+        args = [
+            "python", str(SCRAPER_SCRIPT),
+            query,
+            "--max", str(max_results),
+            "--headless", "true",
+            "--json-progress",
+        ]
+        logger.info(f"[job:{job_id}] Starting: {query} (max={max_results})")
+
         proc = await asyncio.create_subprocess_exec(
-            "python", "-c",
-            "from playwright.sync_api import sync_playwright; pw = sync_playwright().start(); b = pw.chromium.launch(headless=True, args=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--single-process']); b.close(); pw.stop(); print('OK')",
+            *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(SCRIPT_DIR),
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
-        out = stdout.decode("utf-8", errors="replace").strip()
-        err = stderr.decode("utf-8", errors="replace").strip()
-        return {"chromium": "ok" if "OK" in out else "fail", "stdout": out[:500], "stderr": err[:500], "exit_code": proc.returncode}
-    except asyncio.TimeoutError:
-        return JSONResponse({"chromium": "timeout", "error": "Chromium launch timed out after 30s"}, status_code=500)
+        job["pid"] = proc.pid
+
+        buffer = ""
+        while True:
+            try:
+                chunk = await asyncio.wait_for(proc.stdout.read(4096), timeout=300)
+            except asyncio.TimeoutError:
+                job["status"] = "error"
+                job["error"] = "Timeout: el scraper tardó más de 5 minutos sin enviar datos."
+                proc.kill()
+                break
+            if not chunk:
+                break
+            buffer += chunk.decode("utf-8", errors="replace")
+            lines = buffer.split("\n")
+            buffer = lines.pop()
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    evt = json.loads(line)
+                    # Update job progress
+                    if evt.get("progress") is not None:
+                        job["progress"] = evt["progress"]
+                    if evt.get("message"):
+                        job["message"] = evt["message"]
+                    if evt.get("event") == "done":
+                        job["result"] = evt
+                    # Keep last 30 log lines
+                    job["log"].append(evt.get("message", line)[:200])
+                    if len(job["log"]) > 30:
+                        job["log"] = job["log"][-30:]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+        # Process remaining buffer
+        if buffer.strip():
+            try:
+                evt = json.loads(buffer.strip())
+                if evt.get("event") == "done":
+                    job["result"] = evt
+                if evt.get("progress") is not None:
+                    job["progress"] = evt["progress"]
+                if evt.get("message"):
+                    job["message"] = evt["message"]
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        # Capture stderr
+        try:
+            stderr_data = await asyncio.wait_for(proc.stderr.read(), timeout=5)
+            if stderr_data:
+                job["stderr"] = stderr_data.decode("utf-8", errors="replace").strip()[-500:]
+        except asyncio.TimeoutError:
+            pass
+
+        await proc.wait()
+        job["exit_code"] = proc.returncode
+
+        if job["status"] != "error":
+            if proc.returncode == 0:
+                job["status"] = "done"
+                job["progress"] = 100
+                logger.info(f"[job:{job_id}] Completed successfully")
+            else:
+                job["status"] = "error"
+                job["error"] = job.get("stderr", f"Exit code {proc.returncode}")[:300]
+                logger.error(f"[job:{job_id}] Failed: exit={proc.returncode}")
+
     except Exception as e:
-        return JSONResponse({"chromium": "error", "error": str(e)[:500]}, status_code=500)
+        job["status"] = "error"
+        job["error"] = str(e)[:300]
+        logger.error(f"[job:{job_id}] Exception: {e}")
+
+    job["finished_at"] = time.time()
 
 
-# Cap max results on Railway to prevent OOM (Chromium uses ~100-200MB per session)
-MAX_RESULTS_LIMIT = int(os.getenv("SCRAPER_MAX_RESULTS", "10"))
-
-
-@app.get("/scrape")
-async def scrape(
-    query: str = Query(..., min_length=3, description="Search query for Google Maps"),
-    max: int = Query(20, ge=1, le=100, description="Max results"),
-    token: str = Query("", description="Firebase ID token"),
-):
+@app.post("/scrape-async")
+async def scrape_async(body: ScrapeRequest):
+    """Start a scrape job in the background. Returns job_id to poll."""
     # Validate Firebase token
-    user = verify_firebase_token(token)
+    user = verify_firebase_token(body.token)
     if not user:
         raise HTTPException(status_code=401, detail="Token inválido o expirado.")
 
     if not SCRAPER_SCRIPT.exists():
         raise HTTPException(status_code=500, detail="scraper_indexa.py not found.")
 
-    # Enforce server-side max to prevent OOM
-    effective_max = min(max, MAX_RESULTS_LIMIT)
-    logger.info(f"[scrape] query={query!r} requested_max={max} effective_max={effective_max}")
+    # Cap max at 50
+    effective_max = min(max(body.max, 1), 50)
 
-    async def generate():
-        proc = None
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "python",
-                str(SCRAPER_SCRIPT),
-                query,
-                "--max",
-                str(effective_max),
-                "--headless",
-                "true",
-                "--json-progress",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(SCRIPT_DIR),
-            )
+    job_id = uuid.uuid4().hex[:12]
+    _jobs[job_id] = {
+        "status": "running",
+        "query": body.query,
+        "max": effective_max,
+        "progress": 0,
+        "message": "Iniciando scraper...",
+        "log": [],
+        "result": None,
+        "error": None,
+        "stderr": None,
+        "exit_code": None,
+        "pid": None,
+        "created": time.time(),
+        "finished_at": None,
+    }
+    _cleanup_old_jobs()
 
-            buffer = ""
-            total_elapsed = 0
-            HEARTBEAT_INTERVAL = 5   # seconds between keep-alive pings
-            MAX_TOTAL_TIME = 300     # 5 minutes absolute max
+    # Fire and forget
+    asyncio.create_task(_run_scrape_job(job_id, body.query, effective_max))
 
-            while total_elapsed < MAX_TOTAL_TIME:
-                try:
-                    chunk = await asyncio.wait_for(
-                        proc.stdout.read(4096), timeout=HEARTBEAT_INTERVAL
-                    )
-                except asyncio.TimeoutError:
-                    # No data yet — send heartbeat to keep connection alive
-                    total_elapsed += HEARTBEAT_INTERVAL
-                    yield ": heartbeat\n\n"
-                    continue
-                if not chunk:
-                    break
-                total_elapsed = 0  # reset timer on real data
-                buffer += chunk.decode("utf-8", errors="replace")
-                lines = buffer.split("\n")
-                buffer = lines.pop()
-                for line in lines:
-                    if line.strip():
-                        yield f"data: {line}\n\n"
+    return {"job_id": job_id, "status": "running", "max": effective_max}
 
-            if total_elapsed >= MAX_TOTAL_TIME:
-                err = json.dumps({"event": "error", "message": "Timeout: el scraper tardó más de 5 minutos."})
-                yield f"data: {err}\n\n"
-                proc.kill()
 
-            if buffer.strip():
-                yield f"data: {buffer}\n\n"
+@app.get("/scrape-status/{job_id}")
+async def scrape_status(job_id: str):
+    """Poll job progress. Returns current status, progress %, message, and result when done."""
+    job = _jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job no encontrado.")
 
-            # Capture stderr (last 10 lines)
-            try:
-                stderr_data = await asyncio.wait_for(proc.stderr.read(), timeout=5)
-                if stderr_data:
-                    stderr_text = stderr_data.decode("utf-8", errors="replace").strip()
-                    if stderr_text:
-                        for err_line in stderr_text.split("\n")[-10:]:
-                            if err_line.strip():
-                                err_event = json.dumps(
-                                    {"event": "log", "message": err_line.strip()}
-                                )
-                                yield f"data: {err_event}\n\n"
-            except asyncio.TimeoutError:
-                pass
+    return {
+        "job_id": job_id,
+        "status": job["status"],
+        "progress": job["progress"],
+        "message": job["message"],
+        "log": job["log"],
+        "result": job["result"],
+        "error": job["error"],
+        "exit_code": job["exit_code"],
+    }
 
-            await proc.wait()
 
-            end_event = json.dumps(
-                {"event": "stream_end", "exitCode": proc.returncode}
-            )
-            yield f"data: {end_event}\n\n"
+# ── Legacy SSE endpoint (kept for local dev compatibility) ───────────
 
-        except Exception as e:
-            logger.error(f"[scrape] generate() crashed: {e}")
-            err_event = json.dumps({"event": "error", "message": f"Error del servidor: {str(e)[:200]}"})
-            yield f"data: {err_event}\n\n"
-            if proc and proc.returncode is None:
-                proc.kill()
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
+@app.get("/scrape")
+async def scrape_legacy():
+    """Legacy endpoint — redirects to use /scrape-async instead."""
+    return JSONResponse(
+        {"error": "Este endpoint fue reemplazado. Usa POST /scrape-async + GET /scrape-status/{job_id}."},
+        status_code=410,
     )
 
 
@@ -259,7 +317,6 @@ async def batch(
     authorization: str = Header(""),
 ):
     """Start a batch scraping job. Secured with CRON_SECRET."""
-    # Auth: check Bearer <CRON_SECRET>
     token = authorization.replace("Bearer ", "") if authorization.startswith("Bearer ") else authorization
     if not CRON_SECRET or token != CRON_SECRET:
         raise HTTPException(status_code=401, detail="Invalid CRON_SECRET.")
@@ -273,7 +330,6 @@ async def batch(
     if not SCRAPER_SCRIPT.exists():
         raise HTTPException(status_code=500, detail="scraper_indexa.py not found.")
 
-    # Accept config from body or use defaults
     try:
         body = await request.json()
     except Exception:

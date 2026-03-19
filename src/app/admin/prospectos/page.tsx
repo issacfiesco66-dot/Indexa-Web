@@ -165,7 +165,7 @@ export default function ProspectosPage() {
   const [scraperServicio, setScraperServicio] = useState("");
   const [scraperCiudad, setScraperCiudad] = useState("");
   const [scraperPais, setScraperPais] = useState("México");
-  const [scraperMax, setScraperMax] = useState(10);
+  const [scraperMax, setScraperMax] = useState(30);
   const [scraperHistory, setScraperHistory] = useState<string[]>([]);
   const [scraperRunning, setScraperRunning] = useState(false);
   const [scraperProgress, setScraperProgress] = useState(0);
@@ -189,6 +189,17 @@ export default function ProspectosPage() {
     ? prospectos.filter((p) => p.ciudad.toLowerCase() === cityClean.toLowerCase()).length
     : 0;
 
+  const scraperJobRef = useRef<string | null>(null);
+  const scraperPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const getScraperBaseUrl = () => {
+    const isLocal = typeof window !== "undefined"
+      && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+    return !isLocal && process.env.NEXT_PUBLIC_SCRAPER_URL
+      ? process.env.NEXT_PUBLIC_SCRAPER_URL
+      : "";
+  };
+
   const startScraper = useCallback(async () => {
     const svc = cleanService(scraperServicio);
     const city = scraperCiudad.trim();
@@ -210,9 +221,6 @@ export default function ProspectosPage() {
     setScraperMessage("Iniciando scraper...");
     setScraperLog([]);
 
-    const abort = new AbortController();
-    scraperAbortRef.current = abort;
-
     // Get auth token for the scraper API
     let authToken = "";
     try {
@@ -223,78 +231,82 @@ export default function ProspectosPage() {
       return;
     }
 
-    const params = new URLSearchParams({ query: q, max: String(scraperMax), token: authToken });
+    const base = getScraperBaseUrl();
+    if (!base) {
+      setScraperMessage("Error: NEXT_PUBLIC_SCRAPER_URL no configurado.");
+      setScraperRunning(false);
+      return;
+    }
 
-    // On production, call Railway scraper service directly (Vercel can't run Python).
-    // On localhost, use the local /api/scraper route.
-    const isLocal = typeof window !== "undefined"
-      && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-    const scraperBaseUrl = !isLocal && process.env.NEXT_PUBLIC_SCRAPER_URL
-      ? `${process.env.NEXT_PUBLIC_SCRAPER_URL}/scrape`
-      : "/api/scraper";
-
-    fetch(`${scraperBaseUrl}?${params}`, { signal: abort.signal })
-      .then(async (res) => {
-        if (!res.ok || !res.body) {
-          setScraperMessage("Error al iniciar el scraper.");
-          setScraperRunning(false);
-          return;
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            const dataLine = line.replace(/^data: /, "").trim();
-            if (!dataLine) continue;
-
-            try {
-              const evt = JSON.parse(dataLine);
-              if (evt.progress !== undefined) setScraperProgress(evt.progress);
-              if (evt.message) {
-                setScraperMessage(evt.message);
-                setScraperLog((prev) => [...prev.slice(-50), evt.message]);
-              }
-              if (evt.event === "done" || evt.event === "stream_end") {
-                setScraperRunning(false);
-                if (evt.event === "done") {
-                  setScraperMessage(`✓ Completado: ${evt.sin_web ?? 0} prospectos sin web, ${evt.subidos ?? 0} subidos.`);
-                }
-              }
-              if (evt.event === "error") {
-                setScraperRunning(false);
-                setScraperMessage(`Error: ${evt.message}`);
-              }
-            } catch {
-              // Not JSON, skip
-            }
-          }
-        }
-
-        setScraperRunning(false);
-      })
-      .catch((err) => {
-        if (err.name !== "AbortError") {
-          const msg = err.message?.includes("Failed to fetch") || err.message?.includes("network")
-            ? "Error de conexión con el servidor de scraping. Intenta con menos resultados."
-            : `Error: ${err.message}`;
-          setScraperMessage(msg);
-        }
-        setScraperRunning(false);
+    try {
+      // Start async job
+      const startRes = await fetch(`${base}/scrape-async`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q, max: scraperMax, token: authToken }),
       });
+
+      if (!startRes.ok) {
+        const err = await startRes.json().catch(() => ({ detail: "Error desconocido" }));
+        setScraperMessage(`Error: ${err.detail || err.error || "No se pudo iniciar el scraper."}`);
+        setScraperRunning(false);
+        return;
+      }
+
+      const { job_id } = await startRes.json();
+      scraperJobRef.current = job_id;
+
+      // Poll for progress every 3 seconds
+      scraperPollRef.current = setInterval(async () => {
+        try {
+          const statusRes = await fetch(`${base}/scrape-status/${job_id}`);
+          if (!statusRes.ok) {
+            clearInterval(scraperPollRef.current!);
+            scraperPollRef.current = null;
+            setScraperMessage("Error al consultar estado del scraper.");
+            setScraperRunning(false);
+            return;
+          }
+
+          const data = await statusRes.json();
+          if (data.progress !== undefined) setScraperProgress(data.progress);
+          if (data.message) setScraperMessage(data.message);
+          if (data.log?.length) setScraperLog(data.log);
+
+          if (data.status === "done") {
+            clearInterval(scraperPollRef.current!);
+            scraperPollRef.current = null;
+            const r = data.result;
+            if (r) {
+              setScraperMessage(`✓ Completado: ${r.sin_web ?? 0} prospectos sin web, ${r.subidos ?? 0} subidos.`);
+            } else {
+              setScraperMessage("✓ Scraper completado.");
+            }
+            setScraperProgress(100);
+            setScraperRunning(false);
+          } else if (data.status === "error") {
+            clearInterval(scraperPollRef.current!);
+            scraperPollRef.current = null;
+            setScraperMessage(`Error: ${data.error || "Error desconocido en el scraper."}`);
+            setScraperRunning(false);
+          }
+        } catch {
+          // Network error during poll — keep trying
+        }
+      }, 3000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error de conexión";
+      setScraperMessage(`Error: ${msg}`);
+      setScraperRunning(false);
+    }
   }, [scraperServicio, scraperCiudad, scraperPais, scraperMax, scraperRunning, user]);
 
   const stopScraper = useCallback(() => {
-    scraperAbortRef.current?.abort();
+    if (scraperPollRef.current) {
+      clearInterval(scraperPollRef.current);
+      scraperPollRef.current = null;
+    }
+    scraperJobRef.current = null;
     setScraperRunning(false);
     setScraperMessage("Scraper detenido.");
   }, []);
@@ -782,9 +794,9 @@ export default function ProspectosPage() {
                 <input
                   type="number"
                   value={scraperMax}
-                  onChange={(e) => setScraperMax(Math.max(1, Math.min(10, Number(e.target.value))))}
+                  onChange={(e) => setScraperMax(Math.max(1, Math.min(50, Number(e.target.value))))}
                   min={1}
-                  max={10}
+                  max={50}
                   disabled={scraperRunning}
                   className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:bg-white focus:ring-2 focus:ring-indexa-blue/20 disabled:opacity-50"
                 />
