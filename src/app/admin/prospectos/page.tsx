@@ -16,7 +16,7 @@ import {
   type Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
-import type { ProspectoFrio, ProspectoStatus } from "@/types/lead";
+import type { ProspectoFrio, ProspectoStatus, TipoProspecto } from "@/types/lead";
 import {
   Upload,
   FileJson,
@@ -66,6 +66,18 @@ const PROSPECTO_STATUS_STYLES: Record<ProspectoStatus, { label: string; classes:
   demo_generada: { label: "Demo Lista", classes: "bg-teal-100 text-teal-700 border-teal-200" },
   rechazado: { label: "Rechazado", classes: "bg-gray-100 text-gray-500 border-gray-200" },
 };
+
+const AGENCY_KEYWORDS = [
+  "agencia", "marketing", "publicidad", "ads", "advertising",
+  "digital", "media", "branding", "creativa", "comunicaci",
+  "social media", "seo", "sem", "growth", "consultor",
+  "diseño gráfico", "diseño web", "web design",
+];
+
+function isAgencyCategoria(categoria: string, nombre: string): boolean {
+  const text = `${categoria} ${nombre}`.toLowerCase();
+  return AGENCY_KEYWORDS.some((kw) => text.includes(kw));
+}
 
 function generateSlug(name: string): string {
   return name
@@ -162,7 +174,7 @@ Básicamente, nosotros ponemos la 'maquinaria de guerra' y ustedes la estrategia
 ¿Me permiten enviarles una demo visual de cómo nuestro sistema está detectando oportunidades para ${nombre} justo ahora? Es un acceso de 3 minutos y no tiene costo.`;
 }
 
-type ProspectoFilter = "todos" | "sin_web" | "con_web";
+type ProspectoFilter = "todos" | "sin_web" | "con_web" | "agencias";
 
 export default function ProspectosPage() {
   const [prospectos, setProspectos] = useState<ProspectoFrio[]>([]);
@@ -371,6 +383,7 @@ export default function ProspectosPage() {
           whatsappCount: raw.whatsappCount ?? 0,
           ultimoWhatsAppAt: raw.ultimoWhatsAppAt ? (raw.ultimoWhatsAppAt as Timestamp).toDate() : null,
           tieneWeb: raw.tieneWeb ?? false,
+          tipoProspecto: (raw.tipoProspecto as TipoProspecto) ?? (isAgencyCategoria(raw.categoria ?? "", raw.nombre ?? "") ? "agencia" : "negocio"),
         };
       });
       setProspectos(data);
@@ -498,6 +511,17 @@ export default function ProspectosPage() {
     }
   }, []);
 
+  // ── Toggle tipoProspecto (negocio ↔ agencia) ──────────────────────
+  const handleToggleTipo = useCallback(async (prospecto: ProspectoFrio) => {
+    if (!db) return;
+    const newTipo: TipoProspecto = prospecto.tipoProspecto === "agencia" ? "negocio" : "agencia";
+    try {
+      await updateDoc(doc(db, "prospectos_frios", prospecto.id), { tipoProspecto: newTipo });
+    } catch (err) {
+      console.error("Error al cambiar tipo de prospecto:", err);
+    }
+  }, []);
+
   // ── WhatsApp contact (agency partnership pitch) ──────────────────────
   const handleWhatsAppAgency = useCallback(async (prospecto: ProspectoFrio) => {
     const digits = prospecto.telefono.replace(/[^\d+]/g, "");
@@ -575,9 +599,12 @@ export default function ProspectosPage() {
 
   const filteredProspectos = useMemo(() => {
     const textFiltered = fuzzySearch(prospFuse, searchTerm, searchableProspectos);
-    return textFiltered.filter((p) =>
-      prospectoFilter === "todos" ? true : prospectoFilter === "sin_web" ? !p.tieneWeb : p.tieneWeb
-    );
+    return textFiltered.filter((p) => {
+      if (prospectoFilter === "agencias") return p.tipoProspecto === "agencia";
+      if (prospectoFilter === "sin_web") return !p.tieneWeb && p.tipoProspecto !== "agencia";
+      if (prospectoFilter === "con_web") return p.tieneWeb && p.tipoProspecto !== "agencia";
+      return true;
+    });
   }, [prospFuse, searchTerm, searchableProspectos, prospectoFilter]);
 
   // ── Selection helpers ────────────────────────────────────────────────
@@ -754,7 +781,7 @@ export default function ProspectosPage() {
         <div>
           <h2 className="text-2xl font-bold text-indexa-gray-dark">Prospectos Fríos</h2>
           <p className="mt-1 text-sm text-gray-500">
-            {prospectos.length} prospecto{prospectos.length !== 1 && "s"} — {prospectos.filter(p => !p.tieneWeb).length} sin web, {prospectos.filter(p => p.tieneWeb).length} con web
+            {prospectos.length} prospecto{prospectos.length !== 1 && "s"} — {prospectos.filter(p => !p.tieneWeb && p.tipoProspecto !== "agencia").length} sin web, {prospectos.filter(p => p.tieneWeb && p.tipoProspecto !== "agencia").length} con web, {prospectos.filter(p => p.tipoProspecto === "agencia").length} agencias
           </p>
         </div>
 
@@ -1113,7 +1140,18 @@ export default function ProspectosPage() {
             }`}
           >
             <Megaphone size={12} />
-            Con Web — Vender Ads ({prospectos.filter(p => p.tieneWeb).length})
+            Con Web — Vender Ads ({prospectos.filter(p => p.tieneWeb && p.tipoProspecto !== "agencia").length})
+          </button>
+          <button
+            onClick={() => setProspectoFilter("agencias")}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+              prospectoFilter === "agencias"
+                ? "bg-indigo-600 text-white"
+                : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+            }`}
+          >
+            <Handshake size={12} />
+            Agencias ({prospectos.filter(p => p.tipoProspecto === "agencia").length})
           </button>
         </div>
       )}
@@ -1232,7 +1270,16 @@ export default function ProspectosPage() {
                         )}
                         {p.telefono && (
                           <div className="flex items-center gap-1.5">
-                            {p.tieneWeb ? (
+                            {p.tipoProspecto === "agencia" ? (
+                              <button
+                                onClick={() => handleWhatsAppAgency(p)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
+                                title="Pitch de socio tecnológico para agencias"
+                              >
+                                <Handshake size={13} />
+                                Pitch Agencia
+                              </button>
+                            ) : p.tieneWeb ? (
                               <button
                                 onClick={() => handleWhatsAppAds(p)}
                                 className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-purple-700"
@@ -1251,12 +1298,15 @@ export default function ProspectosPage() {
                               </button>
                             )}
                             <button
-                              onClick={() => handleWhatsAppAgency(p)}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
-                              title="Pitch de socio tecnológico para agencias"
+                              onClick={() => handleToggleTipo(p)}
+                              className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-semibold transition-colors ${
+                                p.tipoProspecto === "agencia"
+                                  ? "border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                                  : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100"
+                              }`}
+                              title={p.tipoProspecto === "agencia" ? "Cambiar a negocio" : "Marcar como agencia"}
                             >
-                              <Handshake size={13} />
-                              Agencia
+                              {p.tipoProspecto === "agencia" ? "🏢 Agencia" : "🏪 Negocio"}
                             </button>
                             {p.whatsappCount > 0 && (
                               <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700" title={p.ultimoWhatsAppAt ? `Último: ${p.ultimoWhatsAppAt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}>
@@ -1342,7 +1392,15 @@ export default function ProspectosPage() {
                     </button>
                   )}
                   {p.telefono && (
-                    p.tieneWeb ? (
+                    p.tipoProspecto === "agencia" ? (
+                      <button
+                        onClick={() => handleWhatsAppAgency(p)}
+                        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
+                      >
+                        <Handshake size={13} />
+                        Pitch Agencia
+                      </button>
+                    ) : p.tieneWeb ? (
                       <button
                         onClick={() => handleWhatsAppAds(p)}
                         className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-purple-700"
@@ -1360,16 +1418,17 @@ export default function ProspectosPage() {
                       </button>
                     )
                   )}
-                  {p.telefono && (
-                    <button
-                      onClick={() => handleWhatsAppAgency(p)}
-                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
-                      title="Pitch de socio tecnológico para agencias"
-                    >
-                      <Handshake size={13} />
-                      Agencia
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleToggleTipo(p)}
+                    className={`inline-flex items-center justify-center gap-1 rounded-lg border px-2 py-2 text-[10px] font-semibold transition-colors ${
+                      p.tipoProspecto === "agencia"
+                        ? "border-indigo-200 bg-indigo-50 text-indigo-600"
+                        : "border-gray-200 bg-gray-50 text-gray-500"
+                    }`}
+                    title={p.tipoProspecto === "agencia" ? "Cambiar a negocio" : "Marcar como agencia"}
+                  >
+                    {p.tipoProspecto === "agencia" ? "🏢" : "🏪"}
+                  </button>
                   {p.whatsappCount > 0 && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">
                       ✓ {p.whatsappCount}x

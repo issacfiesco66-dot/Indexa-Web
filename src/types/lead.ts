@@ -110,6 +110,8 @@ export type ProspectoStatus =
   | "vendido"
   | "rechazado";
 
+export type TipoProspecto = "negocio" | "agencia";
+
 export interface ProspectoFrio {
   id: string;
   nombre: string;
@@ -128,4 +130,5 @@ export interface ProspectoFrio {
   whatsappCount: number;
   ultimoWhatsAppAt: Date | null;
   tieneWeb: boolean;
+  tipoProspecto: TipoProspecto;
 }

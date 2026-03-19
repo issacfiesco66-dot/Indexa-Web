@@ -96,6 +96,7 @@ export default function SeguimientosPage() {
           whatsappCount: raw.whatsappCount ?? 0,
           ultimoWhatsAppAt: raw.ultimoWhatsAppAt ? (raw.ultimoWhatsAppAt as Timestamp).toDate() : null,
           tieneWeb: raw.tieneWeb ?? false,
+          tipoProspecto: (raw.tipoProspecto as "negocio" | "agencia") ?? "negocio",
         });
       }
 

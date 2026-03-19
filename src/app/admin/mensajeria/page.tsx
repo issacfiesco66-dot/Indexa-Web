@@ -152,6 +152,7 @@ export default function MensajeriaPage() {
           whatsappCount: raw.whatsappCount ?? 0,
           ultimoWhatsAppAt: raw.ultimoWhatsAppAt ? (raw.ultimoWhatsAppAt as Timestamp).toDate() : null,
           tieneWeb: raw.tieneWeb ?? false,
+          tipoProspecto: (raw.tipoProspecto as "negocio" | "agencia") ?? "negocio",
         };
       });
       data.sort((a, b) => {
