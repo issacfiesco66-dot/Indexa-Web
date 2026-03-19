@@ -21,7 +21,7 @@ logging.basicConfig(level=logging.INFO, format="[%(asctime)s] %(message)s")
 
 app = FastAPI(title="INDEXA Scraper Service")
 
-BUILD_VERSION = "2026-03-18-v3"
+BUILD_VERSION = "2026-03-18-v4"
 
 FIREBASE_PROJECT_ID = os.getenv("NEXT_PUBLIC_FIREBASE_PROJECT_ID", "")
 CRON_SECRET = os.getenv("CRON_SECRET", "")
@@ -123,16 +123,23 @@ async def scrape(
             )
 
             buffer = ""
-            while True:
+            total_elapsed = 0
+            HEARTBEAT_INTERVAL = 5   # seconds between keep-alive pings
+            MAX_TOTAL_TIME = 300     # 5 minutes absolute max
+
+            while total_elapsed < MAX_TOTAL_TIME:
                 try:
-                    chunk = await asyncio.wait_for(proc.stdout.read(4096), timeout=120)
+                    chunk = await asyncio.wait_for(
+                        proc.stdout.read(4096), timeout=HEARTBEAT_INTERVAL
+                    )
                 except asyncio.TimeoutError:
-                    err = json.dumps({"event": "error", "message": "Timeout: el scraper tardó demasiado."})
-                    yield f"data: {err}\n\n"
-                    proc.kill()
-                    break
+                    # No data yet — send heartbeat to keep connection alive
+                    total_elapsed += HEARTBEAT_INTERVAL
+                    yield ": heartbeat\n\n"
+                    continue
                 if not chunk:
                     break
+                total_elapsed = 0  # reset timer on real data
                 buffer += chunk.decode("utf-8", errors="replace")
                 lines = buffer.split("\n")
                 buffer = lines.pop()
@@ -140,10 +147,15 @@ async def scrape(
                     if line.strip():
                         yield f"data: {line}\n\n"
 
+            if total_elapsed >= MAX_TOTAL_TIME:
+                err = json.dumps({"event": "error", "message": "Timeout: el scraper tardó más de 5 minutos."})
+                yield f"data: {err}\n\n"
+                proc.kill()
+
             if buffer.strip():
                 yield f"data: {buffer}\n\n"
 
-            # Capture stderr
+            # Capture stderr (last 10 lines)
             try:
                 stderr_data = await asyncio.wait_for(proc.stderr.read(), timeout=5)
                 if stderr_data:
