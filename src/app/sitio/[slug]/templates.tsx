@@ -1,4 +1,5 @@
 import type { SitioData } from "@/types/lead";
+import Image from "next/image";
 import OfertasBanner from "./OfertasBanner";
 
 interface TemplateProps {
@@ -69,7 +70,7 @@ export function ModernTemplate({ data, services, whatsAppUrl }: TemplateProps) {
         <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
             {logoUrl ? (
-              <img src={logoUrl} alt={altLogo} className="h-9 w-9 rounded-lg object-contain" />
+              <Image src={logoUrl} alt={altLogo} width={36} height={36} className="h-9 w-9 rounded-lg object-contain" priority />
             ) : (
               <div className="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: colorPrincipal }}>
                 {nombre.charAt(0).toUpperCase()}
@@ -92,7 +93,7 @@ export function ModernTemplate({ data, services, whatsAppUrl }: TemplateProps) {
         </div>
         <div className="relative mx-auto max-w-6xl px-4 py-20 text-center sm:px-6 sm:py-28 lg:py-36">
           {logoUrl && (
-            <img src={logoUrl} alt={altHero} className="mx-auto mb-8 h-20 w-20 rounded-2xl bg-white/10 object-contain p-2 shadow-lg backdrop-blur-sm sm:h-24 sm:w-24" />
+            <Image src={logoUrl} alt={altHero} width={96} height={96} className="mx-auto mb-8 h-20 w-20 rounded-2xl bg-white/10 object-contain p-2 shadow-lg backdrop-blur-sm sm:h-24 sm:w-24" priority />
           )}
           <h1 className="mx-auto max-w-3xl text-3xl font-extrabold leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
             {nombre}
@@ -205,7 +206,7 @@ export function ElegantTemplate({ data, services, whatsAppUrl }: TemplateProps) 
         <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
           <div className="flex items-center gap-4">
             {logoUrl ? (
-              <img src={logoUrl} alt={altLogo} className="h-10 w-10 rounded-sm object-contain" />
+              <Image src={logoUrl} alt={altLogo} width={40} height={40} className="h-10 w-10 rounded-sm object-contain" priority />
             ) : (
               <div className="flex h-10 w-10 items-center justify-center rounded-sm border-2 text-sm font-bold" style={{ borderColor: colorPrincipal, color: colorPrincipal }}>
                 {nombre.charAt(0).toUpperCase()}
@@ -225,7 +226,7 @@ export function ElegantTemplate({ data, services, whatsAppUrl }: TemplateProps) 
         <div className="mx-auto max-w-4xl px-6 text-center">
           <div className="mx-auto mb-8 h-px w-16" style={{ backgroundColor: colorPrincipal }} />
           {logoUrl && (
-            <img src={logoUrl} alt={altHero} className="mx-auto mb-10 h-16 w-16 rounded-sm object-contain sm:h-20 sm:w-20" />
+            <Image src={logoUrl} alt={altHero} width={80} height={80} className="mx-auto mb-10 h-16 w-16 rounded-sm object-contain sm:h-20 sm:w-20" priority />
           )}
           <h1 className="font-serif text-4xl font-semibold leading-tight tracking-wide text-stone-900 sm:text-5xl lg:text-6xl">
             {nombre}
@@ -350,7 +351,7 @@ export function MinimalistTemplate({ data, services, whatsAppUrl }: TemplateProp
         <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             {logoUrl ? (
-              <img src={logoUrl} alt={altLogo} className="h-8 w-8 object-contain" />
+              <Image src={logoUrl} alt={altLogo} width={32} height={32} className="h-8 w-8 object-contain" priority />
             ) : (
               <div className="flex h-8 w-8 items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: colorPrincipal }}>
                 {nombre.charAt(0).toUpperCase()}
@@ -369,7 +370,7 @@ export function MinimalistTemplate({ data, services, whatsAppUrl }: TemplateProp
       <section className="border-b border-gray-200 bg-white py-20 sm:py-28 lg:py-36">
         <div className="mx-auto max-w-4xl px-6 text-center">
           {logoUrl && (
-            <img src={logoUrl} alt={altHero} className="mx-auto mb-8 h-14 w-14 object-contain sm:h-16 sm:w-16" />
+            <Image src={logoUrl} alt={altHero} width={64} height={64} className="mx-auto mb-8 h-14 w-14 object-contain sm:h-16 sm:w-16" priority />
           )}
           <h1 className="text-3xl font-bold uppercase tracking-wider text-gray-900 sm:text-4xl lg:text-5xl">
             {nombre}

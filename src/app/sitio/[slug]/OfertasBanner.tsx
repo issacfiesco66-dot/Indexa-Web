@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import type { Oferta } from "@/types/lead";
 
 interface OfertasBannerProps {
@@ -52,9 +53,11 @@ export default function OfertasBanner({ ofertas, colorPrincipal }: OfertasBanner
 
         {/* Image (optional) */}
         {oferta.imagenUrl && (
-          <img
+          <Image
             src={oferta.imagenUrl}
             alt={oferta.titulo}
+            width={64}
+            height={64}
             className="h-14 w-14 flex-shrink-0 rounded-xl border-2 border-white/30 object-cover shadow-lg sm:h-16 sm:w-16"
           />
         )}

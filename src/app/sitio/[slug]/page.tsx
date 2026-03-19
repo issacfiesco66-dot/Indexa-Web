@@ -87,6 +87,10 @@ export async function generateMetadata({ params }: SitioPageProps): Promise<Meta
   // Trim to ~155 chars for SERP
   if (seoDescription.length > 160) seoDescription = seoDescription.slice(0, 157) + "...";
 
+  const ogImages = sitio.data.logoUrl
+    ? [{ url: sitio.data.logoUrl, width: 400, height: 400, alt: `Logo de ${nombre}` }]
+    : [];
+
   return {
     title: seoTitle,
     description: seoDescription,
@@ -96,12 +100,20 @@ export async function generateMetadata({ params }: SitioPageProps): Promise<Meta
       type: "website",
       locale: "es_MX",
       siteName: nombre,
+      url: `/sitio/${slug}`,
+      ...(ogImages.length > 0 && { images: ogImages }),
+    },
+    twitter: {
+      card: ogImages.length > 0 ? "summary_large_image" : "summary",
+      title: seoTitle,
+      description: seoDescription,
+      ...(ogImages.length > 0 && { images: ogImages.map((i) => i.url) }),
     },
     other: {
       "theme-color": colorPrincipal,
     },
     alternates: {
-      canonical: `https://indexa-web-ten.vercel.app/sitio/${slug}`,
+      canonical: `/sitio/${slug}`,
     },
   };
 }

@@ -243,6 +243,53 @@ export async function queryCollection(
 }
 
 /**
+ * List documents from a collection, returning only specified fields.
+ * Useful for sitemap generation where we only need slugs.
+ * Uses structuredQuery with select to minimize data transfer.
+ */
+export async function listCollectionFields(
+  collectionId: string,
+  fields: string[],
+  maxResults = 500
+): Promise<{ id: string; data: Record<string, unknown> }[]> {
+  if (!PROJECT_ID || !API_KEY) {
+    console.error("Firestore REST: missing PROJECT_ID or API_KEY");
+    return [];
+  }
+
+  const url = `${BASE_URL}:runQuery?key=${API_KEY}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId }],
+        select: {
+          fields: fields.map((f) => ({ fieldPath: f })),
+        },
+        limit: maxResults,
+      },
+    }),
+    next: { revalidate: 3600 },
+  });
+
+  if (!res.ok) {
+    console.error("Firestore REST list error:", res.status, await res.text());
+    return [];
+  }
+
+  const results: { document?: FirestoreDocument }[] = await res.json();
+
+  return results
+    .filter((r) => r.document)
+    .map((r) => ({
+      id: extractDocId(r.document!.name),
+      data: parseFields(r.document!.fields),
+    }));
+}
+
+/**
  * Add a new document to a collection.
  * Returns the new document ID or null on failure.
  */
