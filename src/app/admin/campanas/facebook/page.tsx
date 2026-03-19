@@ -250,6 +250,7 @@ export default function AdminFacebookAdsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
+  const [extending, setExtending] = useState(false);
   const [showGuide, setShowGuide] = useState(true);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [insights, setInsights] = useState<Record<string, CampaignInsights>>({});
@@ -368,6 +369,39 @@ export default function AdminFacebookAdsPage() {
       setSaving(false);
     }
   }, [user, metaToken, adAccountId, nanoBananaKey, metaPageId]);
+
+  // ── Extend token to long-lived (60 days) ───────────────────────
+  const handleExtendToken = useCallback(async () => {
+    if (!user || !savedToken) return;
+    setExtending(true);
+    setSaveMsg("");
+    try {
+      const authToken = await user.getIdToken();
+      const res = await fetch("/api/meta-ads/extend-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ shortToken: savedToken }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSaveMsg(data.error || "Error al extender el token.");
+        return;
+      }
+      // Save the new long-lived token
+      const longToken = data.access_token;
+      setSavedToken(longToken);
+      setMetaToken(longToken);
+      if (db) {
+        await updateDoc(doc(db, "usuarios", user.uid), { metaAccessToken: longToken });
+      }
+      const days = data.expires_in ? Math.round(data.expires_in / 86400) : 60;
+      setSaveMsg(`Token extendido exitosamente. Expira en ~${days} días.`);
+    } catch {
+      setSaveMsg("Error de conexión al extender token.");
+    } finally {
+      setExtending(false);
+    }
+  }, [user, savedToken]);
 
   // ── Fetch campaigns ───────────────────────────────────────────
   const fetchCampaigns = useCallback(async () => {
@@ -957,14 +991,27 @@ export default function AdminFacebookAdsPage() {
                     {saveMsg}
                   </p>
                 )}
-                <button
-                  onClick={handleSaveCredentials}
-                  disabled={saving}
-                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indexa-blue px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indexa-blue/90 disabled:opacity-60"
-                >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  {saving ? "Guardando..." : isConnected ? "Actualizar" : "Conectar"}
-                </button>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={handleSaveCredentials}
+                    disabled={saving}
+                    className="inline-flex items-center gap-2 rounded-xl bg-indexa-blue px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indexa-blue/90 disabled:opacity-60"
+                  >
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    {saving ? "Guardando..." : isConnected ? "Actualizar" : "Conectar"}
+                  </button>
+                  {isConnected && (
+                    <button
+                      onClick={handleExtendToken}
+                      disabled={extending}
+                      className="inline-flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-2.5 text-sm font-bold text-green-700 transition-colors hover:bg-green-100 disabled:opacity-60"
+                      title="Convierte tu token corto (~2h) en uno de larga duración (~60 días)"
+                    >
+                      {extending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                      {extending ? "Extendiendo..." : "Extender Token (60 días)"}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
