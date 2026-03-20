@@ -666,23 +666,23 @@ async function executeTool(
         const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
         const campaignName = `MX_${objective}_${bizName}_${monthNames[now.getMonth()]}${now.getFullYear()}`;
 
-        // Step 4: Create campaign
+        // Step 4: Create campaign with INFINITE budget mode (budget controlled at ad group level)
         let campaignId = "";
         try {
           const result = await createCampaign(creds, {
             campaignName,
             objectiveType: objective,
-            budgetMode: "BUDGET_MODE_DAY",
-            budget: totalBudget,
+            budgetMode: "BUDGET_MODE_INFINITE",
           });
           campaignId = result.campaignId;
-          steps.push(`✅ Campaña: "${campaignName}" (ID: ${campaignId}) — $${totalBudget} ${currency}/día — PAUSADA`);
+          steps.push(`✅ Campaña: "${campaignName}" (ID: ${campaignId}) — Presupuesto controlado a nivel Ad Group — PAUSADA`);
         } catch (e) {
           return JSON.stringify({ success: false, error: `Error creando campaña: ${e instanceof Error ? e.message : String(e)}`, steps });
         }
 
-        // Step 5: Create 3 Ad Groups
-        const agBudget = Math.max(Math.floor(totalBudget / 3), currency === "MXN" ? 200 : 20);
+        // Step 5: Create 3 Ad Groups — budget split evenly, min $200 MXN or $20 USD per AG
+        const minAgBudget = currency === "MXN" ? 200 : 20;
+        const agBudget = Math.max(Math.floor(totalBudget / 3), minAgBudget);
         const optGoalMap: Record<string, string> = {
           TRAFFIC: "CLICK",
           CONVERSIONS: "CONVERSION",
@@ -751,17 +751,20 @@ async function executeTool(
           errors.push(`AG3: ${e instanceof Error ? e.message : String(e)}`);
         }
 
+        const agCount = [ag1Id, ag2Id, ag3Id].filter(Boolean).length;
+        const totalAgBudget = agCount * agBudget;
+
         return JSON.stringify({
-          success: true,
-          campaign: { id: campaignId, name: campaignName, objective, budget: totalBudget, currency, status: "PAUSADA" },
+          success: agCount > 0,
+          campaign: { id: campaignId, name: campaignName, objective, totalDailyBudget: `$${totalAgBudget} ${currency}/día (${agCount} AGs × $${agBudget})`, currency, status: "PAUSADA" },
           adGroups: {
-            ag1_interest: { id: ag1Id, name: `${bizName} - Interest Stack`, budget: agBudget, ageGroups: ageNarrow, location: locationName },
-            ag2_broad: { id: ag2Id, name: `${bizName} - Broad`, budget: agBudget, ageGroups: ageBroad, location: locationName },
-            ag3_wide: { id: ag3Id, name: `${bizName} - Amplio General`, budget: agBudget, ageGroups: ageAll, location: locationName },
+            ag1_interest: ag1Id ? { id: ag1Id, name: `${bizName} - Interest Stack`, budget: agBudget, ageGroups: ageNarrow, location: locationName } : "FALLÓ",
+            ag2_broad: ag2Id ? { id: ag2Id, name: `${bizName} - Broad`, budget: agBudget, ageGroups: ageBroad, location: locationName } : "FALLÓ",
+            ag3_wide: ag3Id ? { id: ag3Id, name: `${bizName} - Amplio General`, budget: agBudget, ageGroups: ageAll, location: locationName } : "FALLÓ",
           },
           steps,
           errors: errors.length > 0 ? errors : undefined,
-          nextStep: "Usa generate_ad_image para crear imágenes publicitarias con IA, luego create_ad para crear anuncios en cada ad group.",
+          nextStep: ag1Id ? `Usa generate_ad_image para crear imagen, luego create_ad con adgroup_id "${ag1Id}" para crear el anuncio.` : "Los ad groups fallaron. Revisa los errores.",
         });
       }
 
