@@ -567,9 +567,22 @@ export async function POST(request: NextRequest) {
       { role: "user", content: message },
     ];
 
-    // Agentic loop — up to 10 rounds for complex multi-tool operations
-    for (let round = 0; round < 10; round++) {
-      console.log(`[tiktok-ads/ai] round ${round}, calling Claude`);
+    // Time budget: stop 10s before Vercel timeout to return a partial response
+    const startTime = Date.now();
+    const DEADLINE_MS = 50_000; // 50s, leaving 10s buffer for maxDuration=60
+
+    let lastText = "";
+
+    // Agentic loop — up to 8 rounds with time budget
+    for (let round = 0; round < 8; round++) {
+      // Check time budget before starting a new round
+      const elapsed = Date.now() - startTime;
+      if (elapsed > DEADLINE_MS) {
+        console.log(`[tiktok-ads/ai] time budget exceeded at round ${round} (${elapsed}ms)`);
+        break;
+      }
+
+      console.log(`[tiktok-ads/ai] round ${round}, elapsed ${elapsed}ms, calling Claude`);
 
       const claudeRes = await fetch(ANTHROPIC_URL, {
         method: "POST",
@@ -580,7 +593,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           model: CLAUDE_MODEL,
-          max_tokens: 2048,
+          max_tokens: 1536,
           system: SYSTEM_PROMPT,
           tools,
           messages: claudeMessages,
@@ -588,7 +601,7 @@ export async function POST(request: NextRequest) {
       });
 
       const claudeText = await claudeRes.text();
-      console.log(`[tiktok-ads/ai] Claude status: ${claudeRes.status}`);
+      console.log(`[tiktok-ads/ai] Claude status: ${claudeRes.status}, elapsed ${Date.now() - startTime}ms`);
 
       if (!claudeRes.ok) {
         let errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${claudeText.slice(0, 300)}`;
@@ -607,15 +620,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Respuesta inválida de Claude API." }, { status: 400 });
       }
 
+      // Capture any text from this response
+      const contentBlocks = (response.content as { type: string; text?: string }[]) || [];
+      const textBlock = contentBlocks.find((c) => c.type === "text");
+      if (textBlock?.text) lastText = textBlock.text;
+
       if (response.stop_reason === "end_turn") {
-        const content = (response.content as { type: string; text?: string }[]) || [];
-        const text = content.find((c) => c.type === "text")?.text ?? "";
         return NextResponse.json({
-          reply: text,
+          reply: lastText,
           newHistory: [
             ...(Array.isArray(history) ? history : []),
             { role: "user", content: message },
-            { role: "assistant", content: text },
+            { role: "assistant", content: lastText },
           ],
         });
       }
@@ -628,13 +644,19 @@ export async function POST(request: NextRequest) {
 
         claudeMessages.push({ role: "assistant", content });
 
-        const toolResults = await Promise.all(
-          toolBlocks.map(async (block) => {
-            console.log(`[tiktok-ads/ai] executing tool: ${block.name}`);
-            const result = await executeTool(block.name, block.input, creds);
-            return { type: "tool_result", tool_use_id: block.id, content: result };
-          })
-        );
+        // Execute tools sequentially to stay within time budget
+        const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
+        for (const block of toolBlocks) {
+          const toolElapsed = Date.now() - startTime;
+          if (toolElapsed > DEADLINE_MS) {
+            console.log(`[tiktok-ads/ai] time budget hit during tool execution`);
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: "Tiempo agotado, no se pudo ejecutar esta herramienta." });
+            continue;
+          }
+          console.log(`[tiktok-ads/ai] executing tool: ${block.name} (${toolElapsed}ms)`);
+          const result = await executeTool(block.name, block.input, creds);
+          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+        }
 
         claudeMessages.push({ role: "user", content: toolResults });
         continue;
@@ -644,9 +666,15 @@ export async function POST(request: NextRequest) {
       break;
     }
 
+    // If we exhausted the loop or time, return last captured text or a fallback
+    const fallback = lastText || "Se agotó el tiempo procesando tu solicitud. Intenta dividir tu petición en pasos más pequeños (ej: primero busca ubicaciones, luego crea la campaña).";
     return NextResponse.json({
-      reply: "No pude completar la solicitud. Intenta de nuevo.",
-      newHistory: Array.isArray(history) ? history : [],
+      reply: fallback,
+      newHistory: [
+        ...(Array.isArray(history) ? history : []),
+        { role: "user", content: message },
+        { role: "assistant", content: fallback },
+      ],
     });
 
   } catch (err) {
