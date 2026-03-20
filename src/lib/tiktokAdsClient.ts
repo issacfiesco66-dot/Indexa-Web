@@ -667,12 +667,17 @@ export async function createAdGroup(
     budget: params.budget,
     budget_mode: params.budgetMode,
     optimization_goal: params.optimizationGoal,
-    billing_event: params.billingEvent || "CPC",
+    billing_event: params.billingEvent || "OCPM",
     bid_type: params.bidType || "BID_TYPE_NO_BID",
-    placement_type: params.placementType || "PLACEMENT_TYPE_AUTOMATIC",
+    placement_type: params.placementType || "PLACEMENT_TYPE_NORMAL",
     operation_status: "DISABLE",
     schedule_type: "SCHEDULE_FROM_NOW",
   };
+
+  // Add schedule_start_time if provided, otherwise use current time + 1 hour
+  if (params.scheduleStartTime) {
+    body.schedule_start_time = params.scheduleStartTime;
+  }
 
   if (params.location_ids && params.location_ids.length > 0) {
     body.location_ids = params.location_ids;

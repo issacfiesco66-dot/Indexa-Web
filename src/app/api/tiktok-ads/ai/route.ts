@@ -66,9 +66,11 @@ Todos con: placement solo TikTok (sin Pangle), bid Lowest Cost, estado PAUSADO.
 - operation_status: SIEMPRE DISABLE en creación inicial
 - Naming: MX_[OBJETIVO]_[Negocio]_[Mes][Año]
 
-═══ CREATIVOS ═══
-Después de crear la campaña, sugiere usar generate_ad_image para generar imágenes con IA.
-Propón 3 ángulos de venta con framework Hook-Body-CTA:
+═══ CREATIVOS (AUTOMÁTICO) ═══
+Después de crear la campaña con create_full_campaign, INMEDIATAMENTE genera 1 imagen con generate_ad_image.
+NO preguntes "¿quieres que genere imágenes?". HAZLO directamente.
+Luego usa create_ad para crear el anuncio en el AG1 con la imagen generada.
+Propón los 3 ángulos Hook-Body-CTA en tu respuesta para que el usuario sepa qué más puede crear:
 1. Problema/Solución — dolor del cliente
 2. Social Proof/Autoridad — confianza y certificaciones
 3. Urgencia/Oferta — beneficio inmediato
@@ -681,7 +683,15 @@ async function executeTool(
 
         // Step 5: Create 3 Ad Groups
         const agBudget = Math.max(Math.floor(totalBudget / 3), currency === "MXN" ? 200 : 20);
-        const optGoal = objective === "TRAFFIC" ? "CLICK" : objective === "REACH" ? "REACH" : objective === "VIDEO_VIEWS" ? "VIDEO_VIEW" : "CLICK";
+        const optGoalMap: Record<string, string> = {
+          TRAFFIC: "CLICK",
+          CONVERSIONS: "CONVERSION",
+          LEAD_GENERATION: "LEAD_GENERATION",
+          REACH: "REACH",
+          VIDEO_VIEWS: "VIDEO_VIEW",
+          ENGAGEMENT: "ENGAGEMENT",
+        };
+        const optGoal = optGoalMap[objective] || "CLICK";
 
         // AG1: Interest Stack
         let ag1Id = "";
