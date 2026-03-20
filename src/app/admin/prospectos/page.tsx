@@ -1178,8 +1178,8 @@ export default function ProspectosPage() {
       ) : (
         <>
           {/* ── Desktop table ───────────────────────────────────── */}
-          <div className="hidden overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm md:block">
-            <table className="w-full text-left text-sm">
+          <div className="hidden overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm md:block">
+            <table className="min-w-[1100px] w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-indexa-gray-light">
                   <th className="w-10 px-4 py-3.5">
@@ -1187,11 +1187,11 @@ export default function ProspectosPage() {
                       {selectedIds.size > 0 && selectedIds.size === Math.min(eligibleForBulk.length, 10) ? <CheckSquare size={18} /> : <Square size={18} />}
                     </button>
                   </th>
-                  <th className="px-6 py-3.5 font-semibold text-indexa-gray-dark">Negocio</th>
-                  <th className="px-6 py-3.5 font-semibold text-indexa-gray-dark">Categoría</th>
-                  <th className="px-6 py-3.5 font-semibold text-indexa-gray-dark">Ciudad</th>
-                  <th className="px-6 py-3.5 font-semibold text-indexa-gray-dark">Estatus</th>
-                  <th className="px-6 py-3.5 font-semibold text-indexa-gray-dark text-right">Acciones</th>
+                  <th className="px-4 py-3.5 font-semibold text-indexa-gray-dark">Negocio</th>
+                  <th className="px-3 py-3.5 font-semibold text-indexa-gray-dark">Categoría</th>
+                  <th className="px-3 py-3.5 font-semibold text-indexa-gray-dark">Ciudad</th>
+                  <th className="px-3 py-3.5 font-semibold text-indexa-gray-dark">Estatus</th>
+                  <th className="px-3 py-3.5 font-semibold text-indexa-gray-dark text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -1206,9 +1206,9 @@ export default function ProspectosPage() {
                         <span className="block w-[18px]" />
                       )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 max-w-[220px]">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-indexa-gray-dark">{p.nombre}</p>
+                        <p className="font-medium text-indexa-gray-dark truncate">{p.nombre}</p>
                         {p.tieneWeb && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700">
                             <Globe size={10} />
@@ -1220,17 +1220,17 @@ export default function ProspectosPage() {
                         <p className="mt-0.5 text-xs text-gray-400">{p.telefono}</p>
                       )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-4 max-w-[150px]">
                       {p.categoria ? (
-                        <span className="inline-flex rounded-full bg-indexa-blue/10 px-3 py-1 text-xs font-medium text-indexa-blue">
+                        <span className="inline-flex rounded-full bg-indexa-blue/10 px-2.5 py-1 text-[11px] font-medium text-indexa-blue truncate max-w-full">
                           {p.categoria}
                         </span>
                       ) : (
                         <span className="text-gray-300">—</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-indexa-gray-dark">{p.ciudad || "—"}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-4 text-indexa-gray-dark whitespace-nowrap">{p.ciudad || "—"}</td>
+                    <td className="px-3 py-4">
                       {(() => {
                         const s = PROSPECTO_STATUS_STYLES[p.status] ?? PROSPECTO_STATUS_STYLES.nuevo;
                         return (
@@ -1240,8 +1240,8 @@ export default function ProspectosPage() {
                         );
                       })()}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-3 py-4">
+                      <div className="flex items-center justify-end gap-1.5 flex-nowrap">
                         {p.demoSlug && (
                           <a
                             href={`/sitio/${p.demoSlug}`}
