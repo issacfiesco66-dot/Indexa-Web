@@ -30,108 +30,60 @@ const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
-const SYSTEM_PROMPT = `Eres un Senior Media Buyer especializado en TikTok Ads API. SIEMPRE responde en español.
+const SYSTEM_PROMPT = `Eres un Senior Ads Solution Architect & Media Buyer para TikTok Ads API. SIEMPRE responde en español.
 
-═══ GUARDRAILS TÉCNICOS ═══
+═══ REGLA PRINCIPAL ═══
+Cuando el usuario pida crear una campaña, usa create_full_campaign. Esta herramienta crea TODO en una sola llamada:
+campaña + 3 ad groups con targeting + segmentación completa.
+NO uses create_campaign_draft ni create_adgroup por separado para crear campañas nuevas.
+NO digas "ve a TikTok Ads Manager". HAZLO TÚ.
 
-REGLA #1 — ANTES DE CUALQUIER ACCIÓN:
-Usa get_account_info para conocer la MONEDA de la cuenta. NO asumas USD ni MXN.
+═══ PROCESAMIENTO DE ENTRADA ═══
+Del mensaje del usuario identifica:
+- Nicho/Negocio: tipo de negocio y qué ofrece
+- Geo-Targeting: ciudad/estado/país
+- KPI Primario: conversiones, tráfico, leads (si no dice, infiere del negocio)
+- Budget: presupuesto diario. Si no especifica, usa el mínimo ($500 MXN o $50 USD según la moneda)
 
-REGLA #2 — MÍNIMOS DE PRESUPUESTO (dependen de la moneda):
-- MXN: Campaña ≥ $500/día, Ad Group ≥ $200/día
-- USD: Campaña ≥ $50/día, Ad Group ≥ $20/día
-NUNCA inventes otros mínimos. NUNCA digas $500 USD — eso es FALSO.
+═══ LÓGICA DE OBJETIVOS ═══
+- Negocio local que busca clientes → LEAD_GENERATION o CONVERSIONS
+- Busca visitas a web → TRAFFIC
+- Busca visibilidad/marca → REACH o VIDEO_VIEWS
+- E-commerce → CONVERSIONS
 
-REGLA #3 — EVITAR DUPLICADOS:
-SIEMPRE usa list_campaigns antes de crear. Si existe algo similar, pregunta antes de duplicar.
+═══ ESTRUCTURA DE 3 AD GROUPS (Anti-Overlap) ═══
+create_full_campaign crea automáticamente:
 
-REGLA #4 — UNA SOLA CAMPAÑA POR PETICIÓN:
-"Créame una campaña" = EXACTAMENTE 1 campaña. NUNCA crees múltiples campañas ni reintentos.
+AG1 "Interest Stack": Intereses de alta afinidad al negocio + edad segmentada
+AG2 "Broad/Algoritmo": Solo ubicación + edad + género. El algoritmo de TikTok optimiza.
+AG3 "Amplio General": Ubicación + rango de edad más amplio. Máxima exploración.
 
-REGLA #5 — HAZLO TÚ:
-NO digas "ve a TikTok Ads Manager". USA tus herramientas para hacer todo lo que pida el usuario.
+Todos con: placement solo TikTok (sin Pangle), bid Lowest Cost, estado PAUSADO.
 
-═══ ARQUITECTURA DE CAMPAÑA (LEVEL 1: CAMPAIGN) ═══
+═══ PARÁMETROS TÉCNICOS ═══
+- Placement: PLACEMENT_TYPE_NORMAL (solo TikTok, sin Pangle/Global App Bundle)
+- Bid: BID_TYPE_NO_BID (Lowest Cost / Smart Bidding)
+- operation_status: SIEMPRE DISABLE en creación inicial
+- Naming: MX_[OBJETIVO]_[Negocio]_[Mes][Año]
 
-Naming convention: [PAÍS]_[OBJETIVO]_[NOMBRE_NEGOCIO]_[MES_AÑO]
-Ejemplo: MX_CONVERSIONS_ElectrodomesticosQRO_Mar2026
-
-Objetivo: Si busca ventas/leads/contactos → CONVERSIONS. Si busca visitas → TRAFFIC. Si busca visibilidad → REACH.
-Presupuesto: En la moneda de la cuenta. Si no especifica, usa el mínimo.
-Estado: SIEMPRE pausada (DISABLE) para evitar cobros accidentales.
-
-═══ SEGMENTACIÓN INTELIGENTE (LEVEL 2: AD GROUPS) ═══
-
-Crea 2 Ad Groups para testeo A/B:
-
-Ad Group A — "[Negocio] - Intereses Directos":
-- Segmenta por intereses y comportamientos relacionados al producto/servicio
-- Usa get_interest_categories para encontrar categorías relevantes
-- Edad según el negocio (ej: 25-54 para servicios del hogar, 18-34 para moda)
-
-Ad Group B — "[Negocio] - Broad/Amplio":
-- Solo ubicación geográfica + edad + género
-- Deja que el algoritmo de TikTok encuentre al cliente (ideal para negocios locales)
-
-Para ambos:
-- Ubicación: usa search_locations para obtener IDs exactos de la ciudad/estado
-- Placement: PLACEMENT_TYPE_NORMAL (solo TikTok, sin Pangle) a menos que se pida lo contrario
-- Género: GENDER_UNLIMITED salvo que el negocio lo requiera
-
-═══ ESTRATEGIA DE CONTENIDO (LEVEL 3: ADS) ═══
-
-Cuando el usuario tenga creativos (imágenes/videos), genera 3 propuestas de anuncio con framework Hook-Body-CTA:
-
-Ad 1 — "Problema/Solución": Enfocado en el dolor del cliente.
-  Hook: "¿Tu [electrodoméstico] dejó de funcionar?"
-  Body: Beneficio principal del servicio
-  CTA: CONTACT_US o GET_QUOTE
-
-Ad 2 — "Social Proof/Autoridad": Enfocado en confianza.
-  Hook: "Más de X clientes confían en nosotros"
-  Body: Certificaciones, experiencia, garantía
-  CTA: LEARN_MORE o BOOK_NOW
-
-Ad 3 — "Urgencia/Oferta": Beneficio inmediato.
-  Hook: "Solo esta semana: diagnóstico GRATIS"
-  Body: Oferta concreta con límite de tiempo
-  CTA: SHOP_NOW o ORDER_NOW
-
-Si NO tiene creativos, usa generate_ad_image para crear imágenes con IA automáticamente.
-SIEMPRE que crees una campaña completa, genera al menos 1 imagen con generate_ad_image y crea el anuncio.
-
-═══ FLUJO DE EJECUCIÓN ═══
-
-1. get_account_info → moneda y estado de cuenta
-2. list_campaigns → verificar duplicados
-3. search_locations → IDs de ubicación
-4. create_campaign_draft → campaña + ad group base (PAUSADA)
-5. update_adgroup → aplicar targeting al Ad Group A (intereses + ubicación + edad)
-6. create_adgroup → crear Ad Group B (broad: solo ubicación + edad)
-7. generate_ad_image → generar imagen publicitaria con IA (DALL-E)
-8. create_ad → crear anuncio con la imagen generada + copy + CTA
-9. Confirmar resumen técnico completo
-
-IMPORTANTE sobre generate_ad_image:
-- Genera imágenes profesionales con DALL-E 3 y las sube automáticamente a TikTok
-- Devuelve image_id listo para usar en create_ad
-- Formato vertical 9:16 optimizado para TikTok
-- Si el usuario tiene sus propias imágenes/videos, usa upload_image/upload_video en su lugar
+═══ CREATIVOS ═══
+Después de crear la campaña, sugiere usar generate_ad_image para generar imágenes con IA.
+Propón 3 ángulos de venta con framework Hook-Body-CTA:
+1. Problema/Solución — dolor del cliente
+2. Social Proof/Autoridad — confianza y certificaciones
+3. Urgencia/Oferta — beneficio inmediato
 
 ═══ FORMATO DE RESPUESTA ═══
+Al crear, muestra resumen técnico completo:
+📋 Campaign: nombre, ID, objetivo, presupuesto, moneda
+📊 AG1 Interest Stack: ID, targeting, edad
+📊 AG2 Broad: ID, targeting, edad
+📊 AG3 Amplio: ID, targeting, edad
+🔒 Estado: PAUSADA
+💡 Siguiente paso: generar creativos con generate_ad_image
 
-Al crear, devuelve un resumen técnico:
-- Campaign ID + nombre + objetivo + presupuesto
-- Ad Group A: ID + targeting aplicado
-- Ad Group B: ID + targeting aplicado
-- Ads creados (si aplica)
-- Estado: PAUSADA
-- Siguiente paso sugerido
-
-Formato numérico: $1,234.56 para dinero, 2.5% para porcentajes.
-
-Objetivos: TRAFFIC, CONVERSIONS, APP_INSTALL, REACH, VIDEO_VIEWS, LEAD_GENERATION, ENGAGEMENT, CATALOG_SALES.
-CTAs: LEARN_MORE, SIGN_UP, DOWNLOAD, SHOP_NOW, CONTACT_US, APPLY_NOW, GET_QUOTE, BOOK_NOW, SUBSCRIBE, ORDER_NOW.`;
+Formato: $1,234.56 dinero, 2.5% porcentajes.
+CTAs válidos: LEARN_MORE, SIGN_UP, DOWNLOAD, SHOP_NOW, CONTACT_US, APPLY_NOW, GET_QUOTE, BOOK_NOW, SUBSCRIBE, ORDER_NOW.`;
 
 // ── Tool definitions ─────────────────────────────────────────────────
 const tools = [
@@ -390,6 +342,43 @@ const tools = [
       required: ["adgroup_id", "ad_name", "ad_text"],
     },
   },
+  {
+    name: "create_full_campaign",
+    description: "HERRAMIENTA PRINCIPAL. Crea una campaña COMPLETA con 3 Ad Groups segmentados en UNA sola llamada. Incluye: campaña + AG1 (Interest Stack) + AG2 (Broad) + AG3 (Amplio) + targeting geográfico + edad. Todo queda PAUSADO.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        business_name: { type: "string", description: "Nombre corto del negocio (ej: 'ElectrodomesticosQRO')" },
+        business_description: { type: "string", description: "Descripción del negocio/servicio para optimizar targeting" },
+        location_keyword: { type: "string", description: "Ciudad o estado para geo-targeting (ej: 'Querétaro', 'CDMX')" },
+        objective: {
+          type: "string",
+          enum: ["TRAFFIC", "CONVERSIONS", "LEAD_GENERATION", "REACH", "VIDEO_VIEWS", "ENGAGEMENT"],
+          description: "Objetivo de la campaña. Para negocios locales usa LEAD_GENERATION o CONVERSIONS.",
+        },
+        daily_budget: {
+          type: "number",
+          description: "Presupuesto diario TOTAL en la moneda de la cuenta. Se divide entre los 3 ad groups. Mínimo $500 MXN o $50 USD.",
+        },
+        age_groups_narrow: {
+          type: "array",
+          items: { type: "string", enum: ["AGE_13_17", "AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_100"] },
+          description: "Rangos de edad para AG1 (Interest Stack). Ej: ['AGE_25_34', 'AGE_35_44', 'AGE_45_54'] para servicios del hogar.",
+        },
+        age_groups_broad: {
+          type: "array",
+          items: { type: "string", enum: ["AGE_13_17", "AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_100"] },
+          description: "Rangos de edad para AG2/AG3 (Broad). Más amplio que AG1.",
+        },
+        gender: {
+          type: "string",
+          enum: ["GENDER_MALE", "GENDER_FEMALE", "GENDER_UNLIMITED"],
+          description: "Género para targeting (default: GENDER_UNLIMITED)",
+        },
+      },
+      required: ["business_name", "business_description", "location_keyword", "objective", "daily_budget", "age_groups_narrow", "age_groups_broad"],
+    },
+  },
 ];
 
 // ── Tool executor ────────────────────────────────────────────────────
@@ -630,6 +619,140 @@ async function executeTool(
           callToAction: (input.call_to_action as string) || "LEARN_MORE",
         });
         return JSON.stringify({ success: true, adId: adResult.adId, note: `Anuncio "${input.ad_name}" creado. Ad ID: ${adResult.adId}.` });
+      }
+
+      case "create_full_campaign": {
+        const bizName = input.business_name as string;
+        const locationKw = input.location_keyword as string;
+        const objective = (input.objective as string) || "CONVERSIONS";
+        const totalBudget = (input.daily_budget as number) || 500;
+        const ageNarrow = (input.age_groups_narrow as string[]) || ["AGE_25_34", "AGE_35_44", "AGE_45_54"];
+        const ageBroad = (input.age_groups_broad as string[]) || ["AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_100"];
+        const gender = (input.gender as string) || "GENDER_UNLIMITED";
+
+        const steps: string[] = [];
+        const errors: string[] = [];
+
+        // Step 1: Get account info for currency
+        let currency = "MXN";
+        try {
+          const info = await getAdvertiserInfo(creds);
+          currency = (info as unknown as Record<string, unknown>).currency as string || "MXN";
+          steps.push(`✅ Cuenta: moneda ${currency}`);
+        } catch (e) {
+          steps.push(`⚠️ No se pudo obtener info de cuenta, asumiendo ${currency}`);
+        }
+
+        // Step 2: Search locations
+        let locationIds: string[] = [];
+        let locationName = locationKw;
+        try {
+          const locations = await searchLocations(creds, locationKw);
+          if (locations.length > 0) {
+            locationIds = [locations[0].locationId];
+            locationName = locations[0].name;
+            steps.push(`✅ Ubicación: ${locationName} (ID: ${locationIds[0]})`);
+          } else {
+            steps.push(`⚠️ No se encontró "${locationKw}", los ad groups se crearán sin geo-targeting específico`);
+          }
+        } catch (e) {
+          errors.push(`Búsqueda de ubicación: ${e instanceof Error ? e.message : String(e)}`);
+        }
+
+        // Step 3: Generate campaign name
+        const now = new Date();
+        const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+        const campaignName = `MX_${objective}_${bizName}_${monthNames[now.getMonth()]}${now.getFullYear()}`;
+
+        // Step 4: Create campaign
+        let campaignId = "";
+        try {
+          const result = await createCampaign(creds, {
+            campaignName,
+            objectiveType: objective,
+            budgetMode: "BUDGET_MODE_DAY",
+            budget: totalBudget,
+          });
+          campaignId = result.campaignId;
+          steps.push(`✅ Campaña: "${campaignName}" (ID: ${campaignId}) — $${totalBudget} ${currency}/día — PAUSADA`);
+        } catch (e) {
+          return JSON.stringify({ success: false, error: `Error creando campaña: ${e instanceof Error ? e.message : String(e)}`, steps });
+        }
+
+        // Step 5: Create 3 Ad Groups
+        const agBudget = Math.max(Math.floor(totalBudget / 3), currency === "MXN" ? 200 : 20);
+        const optGoal = objective === "TRAFFIC" ? "CLICK" : objective === "REACH" ? "REACH" : objective === "VIDEO_VIEWS" ? "VIDEO_VIEW" : "CLICK";
+
+        // AG1: Interest Stack
+        let ag1Id = "";
+        try {
+          const ag1 = await createAdGroup(creds, {
+            campaignId,
+            adgroupName: `${bizName} - Interest Stack`,
+            budget: agBudget,
+            budgetMode: "BUDGET_MODE_DAY",
+            optimizationGoal: optGoal,
+            location_ids: locationIds.length > 0 ? locationIds : undefined,
+            ageGroups: ageNarrow,
+            gender,
+          });
+          ag1Id = ag1.adgroupId;
+          steps.push(`✅ AG1 Interest Stack (ID: ${ag1Id}) — $${agBudget}/día — Edad: ${ageNarrow.join(", ")} — ${locationName}`);
+        } catch (e) {
+          errors.push(`AG1: ${e instanceof Error ? e.message : String(e)}`);
+        }
+
+        // AG2: Broad/Algoritmo
+        let ag2Id = "";
+        try {
+          const ag2 = await createAdGroup(creds, {
+            campaignId,
+            adgroupName: `${bizName} - Broad`,
+            budget: agBudget,
+            budgetMode: "BUDGET_MODE_DAY",
+            optimizationGoal: optGoal,
+            location_ids: locationIds.length > 0 ? locationIds : undefined,
+            ageGroups: ageBroad,
+            gender,
+          });
+          ag2Id = ag2.adgroupId;
+          steps.push(`✅ AG2 Broad (ID: ${ag2Id}) — $${agBudget}/día — Edad: ${ageBroad.join(", ")} — ${locationName}`);
+        } catch (e) {
+          errors.push(`AG2: ${e instanceof Error ? e.message : String(e)}`);
+        }
+
+        // AG3: Amplio General
+        let ag3Id = "";
+        const ageAll = ["AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_100"];
+        try {
+          const ag3 = await createAdGroup(creds, {
+            campaignId,
+            adgroupName: `${bizName} - Amplio General`,
+            budget: agBudget,
+            budgetMode: "BUDGET_MODE_DAY",
+            optimizationGoal: optGoal,
+            location_ids: locationIds.length > 0 ? locationIds : undefined,
+            ageGroups: ageAll,
+            gender: "GENDER_UNLIMITED",
+          });
+          ag3Id = ag3.adgroupId;
+          steps.push(`✅ AG3 Amplio (ID: ${ag3Id}) — $${agBudget}/día — Edad: 18-55+ — ${locationName}`);
+        } catch (e) {
+          errors.push(`AG3: ${e instanceof Error ? e.message : String(e)}`);
+        }
+
+        return JSON.stringify({
+          success: true,
+          campaign: { id: campaignId, name: campaignName, objective, budget: totalBudget, currency, status: "PAUSADA" },
+          adGroups: {
+            ag1_interest: { id: ag1Id, name: `${bizName} - Interest Stack`, budget: agBudget, ageGroups: ageNarrow, location: locationName },
+            ag2_broad: { id: ag2Id, name: `${bizName} - Broad`, budget: agBudget, ageGroups: ageBroad, location: locationName },
+            ag3_wide: { id: ag3Id, name: `${bizName} - Amplio General`, budget: agBudget, ageGroups: ageAll, location: locationName },
+          },
+          steps,
+          errors: errors.length > 0 ? errors : undefined,
+          nextStep: "Usa generate_ad_image para crear imágenes publicitarias con IA, luego create_ad para crear anuncios en cada ad group.",
+        });
       }
 
       default:
