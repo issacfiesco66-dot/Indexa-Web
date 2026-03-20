@@ -1178,139 +1178,135 @@ export default function ProspectosPage() {
       ) : (
         <>
           {/* ── Desktop table ───────────────────────────────────── */}
-          <div className="hidden overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm md:block">
-            <table className="min-w-[1280px] w-full text-left text-sm">
+          <div className="hidden rounded-2xl border border-gray-200 bg-white shadow-sm md:block">
+            <table className="w-full table-fixed text-left text-xs">
               <thead>
                 <tr className="border-b border-gray-100 bg-indexa-gray-light">
-                  <th className="w-10 px-4 py-3.5">
+                  <th className="w-8 px-2 py-2.5">
                     <button onClick={toggleSelectAll} className="text-gray-400 hover:text-indexa-blue transition-colors">
-                      {selectedIds.size > 0 && selectedIds.size === Math.min(eligibleForBulk.length, 10) ? <CheckSquare size={18} /> : <Square size={18} />}
+                      {selectedIds.size > 0 && selectedIds.size === Math.min(eligibleForBulk.length, 10) ? <CheckSquare size={15} /> : <Square size={15} />}
                     </button>
                   </th>
-                  <th className="px-4 py-3.5 font-semibold text-indexa-gray-dark">Negocio</th>
-                  <th className="px-3 py-3.5 font-semibold text-indexa-gray-dark">Categoría</th>
-                  <th className="px-3 py-3.5 font-semibold text-indexa-gray-dark">Ciudad</th>
-                  <th className="px-3 py-3.5 font-semibold text-indexa-gray-dark">Estatus</th>
-                  <th className="px-3 py-3.5 font-semibold text-indexa-gray-dark text-right">Acciones</th>
+                  <th className="w-[28%] px-2 py-2.5 font-semibold text-indexa-gray-dark">Negocio</th>
+                  <th className="w-[18%] px-2 py-2.5 font-semibold text-indexa-gray-dark">Categoría</th>
+                  <th className="w-[10%] px-2 py-2.5 font-semibold text-indexa-gray-dark">Ciudad</th>
+                  <th className="w-[12%] px-2 py-2.5 font-semibold text-indexa-gray-dark">Estatus</th>
+                  <th className="px-2 py-2.5 font-semibold text-indexa-gray-dark text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredProspectos.map((p) => (
                   <tr key={p.id} className={`transition-colors hover:bg-gray-50/50 ${selectedIds.has(p.id) ? "bg-indexa-blue/5" : ""}`}>
-                    <td className="w-10 px-4 py-4">
+                    <td className="w-8 px-2 py-2.5">
                       {p.status === "nuevo" ? (
                         <button onClick={() => toggleSelect(p.id)} className="text-gray-400 hover:text-indexa-blue transition-colors">
-                          {selectedIds.has(p.id) ? <CheckSquare size={18} className="text-indexa-blue" /> : <Square size={18} />}
+                          {selectedIds.has(p.id) ? <CheckSquare size={15} className="text-indexa-blue" /> : <Square size={15} />}
                         </button>
                       ) : (
-                        <span className="block w-[18px]" />
+                        <span className="block w-[15px]" />
                       )}
                     </td>
-                    <td className="px-4 py-4 max-w-[220px]">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-indexa-gray-dark truncate">{p.nombre}</p>
+                    <td className="px-2 py-2.5 overflow-hidden">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium text-indexa-gray-dark truncate text-[11px] leading-tight">{p.nombre}</p>
                         {p.tieneWeb && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700">
-                            <Globe size={10} />
-                            Web
+                          <span className="shrink-0 inline-flex items-center rounded-full bg-purple-100 px-1.5 py-0.5 text-[9px] font-bold text-purple-700">
+                            <Globe size={9} className="mr-0.5" />Web
                           </span>
                         )}
                       </div>
                       {p.telefono && (
-                        <p className="mt-0.5 text-xs text-gray-400">{p.telefono}</p>
+                        <p className="text-[10px] text-gray-400 truncate">{p.telefono}</p>
                       )}
                     </td>
-                    <td className="px-3 py-4 max-w-[150px]">
+                    <td className="px-2 py-2.5 overflow-hidden">
                       {p.categoria ? (
-                        <span className="inline-flex rounded-full bg-indexa-blue/10 px-2.5 py-1 text-[11px] font-medium text-indexa-blue truncate max-w-full">
+                        <span className="inline-block rounded-full bg-indexa-blue/10 px-2 py-0.5 text-[10px] font-medium text-indexa-blue truncate max-w-full">
                           {p.categoria}
                         </span>
                       ) : (
                         <span className="text-gray-300">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-4 text-indexa-gray-dark whitespace-nowrap">{p.ciudad || "—"}</td>
-                    <td className="px-3 py-4">
+                    <td className="px-2 py-2.5 text-[11px] text-indexa-gray-dark whitespace-nowrap truncate">{p.ciudad || "—"}</td>
+                    <td className="px-2 py-2.5">
                       {(() => {
                         const s = PROSPECTO_STATUS_STYLES[p.status] ?? PROSPECTO_STATUS_STYLES.nuevo;
                         return (
-                          <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${s.classes}`}>
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${s.classes}`}>
                             {s.label}
                           </span>
                         );
                       })()}
                     </td>
-                    <td className="px-3 py-4">
-                      <div className="flex items-center justify-end gap-1.5 flex-nowrap">
+                    <td className="px-2 py-2.5">
+                      <div className="flex items-center justify-end gap-1 flex-nowrap">
                         {p.demoSlug && (
                           <a
                             href={`/sitio/${p.demoSlug}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 transition-colors hover:bg-teal-100"
-                            title="Ver demo del sitio"
+                            className="inline-flex items-center justify-center rounded-lg border border-teal-200 bg-teal-50 p-1.5 text-teal-700 transition-colors hover:bg-teal-100"
+                            title="Ver demo"
                           >
-                            <Eye size={13} />
-                            Ver Demo
+                            <Eye size={14} />
                           </a>
                         )}
                         {p.email && p.status !== "correo_enviado" && (
                           <button
                             onClick={() => handleSendEmail(p)}
                             disabled={sendingEmailId === p.id}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-purple-700 disabled:opacity-50"
+                            className="inline-flex items-center justify-center rounded-lg bg-purple-600 p-1.5 text-white transition-colors hover:bg-purple-700 disabled:opacity-50"
+                            title="Enviar correo"
                           >
                             {sendingEmailId === p.id ? (
                               <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
                             ) : (
-                              <Mail size={13} />
+                              <Mail size={14} />
                             )}
-                            Enviar Correo
                           </button>
                         )}
                         {p.telefono && (
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1">
                             {p.tipoProspecto === "agencia" ? (
                               <button
                                 onClick={() => handleWhatsAppAgency(p)}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
-                                title="Pitch de socio tecnológico para agencias"
+                                className="inline-flex items-center justify-center rounded-lg bg-indigo-600 p-1.5 text-white transition-colors hover:bg-indigo-700"
+                                title="Pitch Agencia"
                               >
-                                <Handshake size={13} />
-                                Pitch Agencia
+                                <Handshake size={14} />
                               </button>
                             ) : p.tieneWeb ? (
                               <button
                                 onClick={() => handleWhatsAppAds(p)}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-purple-700"
-                                title="Ofrecer plataforma de Ads (Facebook/TikTok)"
+                                className="inline-flex items-center justify-center rounded-lg bg-purple-600 p-1.5 text-white transition-colors hover:bg-purple-700"
+                                title="Vender Ads"
                               >
-                                <Megaphone size={13} />
-                                Vender Ads
+                                <Megaphone size={14} />
                               </button>
                             ) : (
                               <button
                                 onClick={() => handleWhatsAppContact(p)}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-indexa-orange px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indexa-orange/90"
+                                className="inline-flex items-center justify-center rounded-lg bg-indexa-orange p-1.5 text-white transition-colors hover:bg-indexa-orange/90"
+                                title="WhatsApp"
                               >
-                                <MessageCircle size={13} />
-                                WhatsApp
+                                <MessageCircle size={14} />
                               </button>
                             )}
                             <button
                               onClick={() => handleToggleTipo(p)}
-                              className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-[10px] font-semibold transition-colors ${
+                              className={`inline-flex items-center justify-center rounded-lg border p-1.5 text-[10px] transition-colors ${
                                 p.tipoProspecto === "agencia"
                                   ? "border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
                                   : "border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100"
                               }`}
                               title={p.tipoProspecto === "agencia" ? "Cambiar a negocio" : "Marcar como agencia"}
                             >
-                              {p.tipoProspecto === "agencia" ? "🏢 Agencia" : "🏪 Negocio"}
+                              {p.tipoProspecto === "agencia" ? "🏢" : "🏪"}
                             </button>
                             {p.whatsappCount > 0 && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700" title={p.ultimoWhatsAppAt ? `Último: ${p.ultimoWhatsAppAt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}>
-                                ✓ {p.whatsappCount}x
+                              <span className="inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-[9px] font-semibold text-green-700" title={p.ultimoWhatsAppAt ? `Último: ${p.ultimoWhatsAppAt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}>
+                                ✓{p.whatsappCount}
                               </span>
                             )}
                           </div>
@@ -1318,10 +1314,10 @@ export default function ProspectosPage() {
                         <button
                           onClick={() => handleDescartar(p.id)}
                           disabled={deletingId === p.id}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                          className="inline-flex items-center justify-center rounded-lg border border-gray-200 p-1.5 text-gray-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                          title="Descartar"
                         >
-                          <Trash2 size={13} />
-                          Descartar
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
