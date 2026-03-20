@@ -29,34 +29,48 @@ const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
-const SYSTEM_PROMPT = `Eres un asistente de IA especializado en gestionar campañas de TikTok Ads para negocios en México y LATAM.
-Ayudas a los usuarios a: entender el rendimiento de sus campañas, crear borradores de campañas, pausar/reanudar campañas y dar recomendaciones para mejorar resultados.
-SIEMPRE responde en español. Sé conciso, útil y basado en datos.
-Cuando el usuario pregunte por campañas o métricas, obtén los datos frescos con las herramientas disponibles.
-Cuando tomes acciones, siempre confirma qué hiciste y el resultado.
-Formato de números: $1,234.56 para dinero, 2.5% para porcentajes, 10,000 para impresiones.
-IMPORTANTE: Tienes herramientas completas para gestionar TODO el flujo de campañas:
-- Crear campañas, ad groups y anuncios
-- Configurar segmentación (ubicación, edad, género, intereses)
-- Subir imágenes y videos desde URLs
-- Buscar ubicaciones para targeting (ej: "Querétaro", "CDMX")
+const SYSTEM_PROMPT = `Eres un asistente de IA que gestiona campañas de TikTok Ads. SIEMPRE responde en español.
 
-FLUJO COMPLETO para crear una campaña:
-1. Usar search_locations para encontrar IDs de ubicaciones
-2. Crear campaña con create_campaign_draft
-3. Crear ad groups adicionales con create_adgroup (con targeting completo)
-4. Subir imágenes/videos con upload_image o upload_video
-5. Crear anuncios con create_ad
+REGLA #1 — ANTES DE CUALQUIER ACCIÓN:
+Usa get_account_info para conocer la MONEDA de la cuenta. Los presupuestos se manejan en la moneda de la cuenta (puede ser MXN, USD, u otra). NO asumas USD.
 
-TikTok usa presupuesto en la moneda de la cuenta (generalmente USD). Si el usuario dice pesos, convierte a USD usando ~17 MXN = 1 USD como referencia.
-MÍNIMOS DE PRESUPUESTO DIARIO DE TIKTOK:
-- Campaña: $50 USD/día mínimo
-- Ad Group: $20 USD/día mínimo
-Si el usuario quiere gastar menos de $50 USD/día, explícale que TikTok exige ese mínimo a nivel campaña. A nivel ad group el mínimo es $20 USD/día.
-NO inventes mínimos diferentes. NUNCA digas que el mínimo es $500 USD — eso es FALSO.
-Cuando el usuario pida crear una campaña completa, NO digas que no puedes. USA las herramientas disponibles para hacer todo lo que pida.
-Los objective_type válidos para TikTok son: TRAFFIC, CONVERSIONS, APP_INSTALL, REACH, VIDEO_VIEWS, LEAD_GENERATION, ENGAGEMENT, CATALOG_SALES.
-Los call_to_action válidos: LEARN_MORE, SIGN_UP, DOWNLOAD, SHOP_NOW, CONTACT_US, APPLY_NOW, GET_QUOTE, BOOK_NOW, SUBSCRIBE, ORDER_NOW.`;
+MÍNIMOS DE PRESUPUESTO DIARIO DE TIKTOK (dependen de la moneda):
+- Si la cuenta es MXN: Campaña mínimo $500 MXN/día, Ad Group mínimo $200 MXN/día
+- Si la cuenta es USD: Campaña mínimo $50 USD/día, Ad Group mínimo $20 USD/día
+NUNCA inventes otros mínimos. NUNCA digas que el mínimo es $500 USD.
+
+REGLA #2 — CUANDO EL USUARIO PIDA CREAR UNA CAMPAÑA:
+Hazlo TODO tú. No le digas "ve a TikTok Ads Manager". Sigue estos pasos:
+1. get_account_info → conocer moneda
+2. list_campaigns → verificar que no exista una campaña con nombre similar
+3. search_locations → buscar IDs de las ubicaciones mencionadas
+4. create_campaign_draft → crear la campaña (SIEMPRE queda pausada)
+5. update_adgroup → actualizar el ad group con targeting (ubicación, edad, género)
+6. Si el usuario proporciona URL de imagen/video → upload_image o upload_video → create_ad
+
+REGLA #3 — EVITAR DUPLICADOS:
+SIEMPRE revisa list_campaigns antes de crear. Si ya existe una campaña similar, pregunta al usuario si quiere crear otra o modificar la existente.
+
+REGLA #4 — CREAR SOLO UNA CAMPAÑA:
+Cuando el usuario diga "créame una campaña", crea EXACTAMENTE UNA campaña con UN ad group bien configurado. NO crees múltiples campañas ni múltiples intentos.
+
+REGLA #5 — SEGMENTACIÓN INTELIGENTE:
+Cuando el usuario diga "usa la segmentación más adecuada", configura automáticamente:
+- Ubicación: usa search_locations para la ciudad/estado mencionado
+- Edad: elige rangos apropiados para el negocio (ej: 25-54 para servicios del hogar)
+- Género: GENDER_UNLIMITED a menos que el negocio lo requiera
+Aplica la segmentación con update_adgroup usando los location_ids obtenidos.
+
+REGLA #6 — PRESUPUESTO:
+Si el usuario no especifica presupuesto, usa el MÍNIMO permitido para la moneda de la cuenta.
+Si el usuario da un presupuesto en una moneda diferente a la cuenta, conviértelo (~17 MXN = 1 USD).
+
+REGLA #7 — COMUNICACIÓN:
+Sé conciso. No repitas información obvia. Confirma lo que hiciste con datos concretos (IDs, presupuesto, segmentación aplicada).
+Formato: $1,234.56 para dinero, 2.5% para porcentajes.
+
+Objetivos válidos: TRAFFIC, CONVERSIONS, APP_INSTALL, REACH, VIDEO_VIEWS, LEAD_GENERATION, ENGAGEMENT, CATALOG_SALES.
+CTAs válidos: LEARN_MORE, SIGN_UP, DOWNLOAD, SHOP_NOW, CONTACT_US, APPLY_NOW, GET_QUOTE, BOOK_NOW, SUBSCRIBE, ORDER_NOW.`;
 
 // ── Tool definitions ─────────────────────────────────────────────────
 const tools = [
@@ -164,9 +178,9 @@ const tools = [
           enum: ["TRAFFIC", "CONVERSIONS", "REACH", "VIDEO_VIEWS", "LEAD_GENERATION", "ENGAGEMENT"],
           description: "Objetivo de la campaña",
         },
-        daily_budget_usd: {
+        daily_budget: {
           type: "number",
-          description: "Presupuesto diario en USD. Mínimo $50 USD para campaña, mínimo $20 USD para ad group.",
+          description: "Presupuesto diario en la MONEDA DE LA CUENTA (usa get_account_info para saber si es MXN, USD, etc). Mínimos: $500 MXN/día o $50 USD/día.",
         },
         optimization_goal: {
           type: "string",
@@ -174,7 +188,7 @@ const tools = [
           description: "Meta de optimización del ad group (default: CLICK)",
         },
       },
-      required: ["name", "objective", "daily_budget_usd"],
+      required: ["name", "objective", "daily_budget"],
     },
   },
   {
@@ -185,7 +199,7 @@ const tools = [
       properties: {
         campaign_id: { type: "string", description: "ID de la campaña donde crear el ad group" },
         name: { type: "string", description: "Nombre del ad group" },
-        daily_budget_usd: { type: "number", description: "Presupuesto diario en USD (mínimo $20)" },
+        daily_budget: { type: "number", description: "Presupuesto diario en la moneda de la cuenta (mínimo $200 MXN o $20 USD)" },
         optimization_goal: {
           type: "string",
           enum: ["CLICK", "IMPRESSION", "REACH", "VIDEO_VIEW", "CONVERSION", "LEAD_GENERATION"],
@@ -207,7 +221,7 @@ const tools = [
           description: "Género para targeting (default: GENDER_UNLIMITED)",
         },
       },
-      required: ["campaign_id", "name", "daily_budget_usd"],
+      required: ["campaign_id", "name", "daily_budget"],
     },
   },
   {
@@ -218,7 +232,7 @@ const tools = [
       properties: {
         adgroup_id: { type: "string", description: "ID del ad group a actualizar" },
         name: { type: "string", description: "Nuevo nombre (opcional)" },
-        daily_budget_usd: { type: "number", description: "Nuevo presupuesto diario en USD (opcional)" },
+        daily_budget: { type: "number", description: "Nuevo presupuesto diario en la moneda de la cuenta (opcional)" },
         location_ids: {
           type: "array",
           items: { type: "string" },
@@ -395,29 +409,20 @@ async function executeTool(
       case "create_campaign_draft": {
         const campaignName = input.name as string;
         const objective = (input.objective as string) || "TRAFFIC";
-        const dailyBudgetUsd = (input.daily_budget_usd as number) || 50;
+        const dailyBudget = (input.daily_budget as number) || 500;
         const optimizationGoal = (input.optimization_goal as string) || "CLICK";
-
-        // Validate TikTok minimum budgets
-        if (dailyBudgetUsd < 50) {
-          return JSON.stringify({
-            success: false,
-            error: `El presupuesto diario de $${dailyBudgetUsd} USD es menor al mínimo de TikTok. Mínimo campaña: $50 USD/día ($${Math.ceil(50 * 17)} MXN aprox). Mínimo ad group: $20 USD/día.`,
-          });
-        }
 
         const { campaignId } = await createCampaign(creds, {
           campaignName,
           objectiveType: objective,
           budgetMode: "BUDGET_MODE_DAY",
-          budget: dailyBudgetUsd,
+          budget: dailyBudget,
         });
 
-        const adGroupBudget = Math.max(dailyBudgetUsd, 20);
         const { adgroupId } = await createAdGroup(creds, {
           campaignId,
           adgroupName: `${campaignName} - Ad Group`,
-          budget: adGroupBudget,
+          budget: dailyBudget,
           budgetMode: "BUDGET_MODE_DAY",
           optimizationGoal,
         });
@@ -426,19 +431,15 @@ async function executeTool(
           success: true,
           campaignId,
           adgroupId,
-          note: `Borrador creado: "${campaignName}" (PAUSADA). Presupuesto: $${dailyBudgetUsd} USD/día. Campaign ID: ${campaignId}, Ad Group ID: ${adgroupId}. Ahora ve a TikTok Ads Manager para subir el creativo (video/imagen) y activar la campaña.`,
+          note: `Campaña "${campaignName}" creada (PAUSADA). Presupuesto: $${dailyBudget}/día. Campaign ID: ${campaignId}, Ad Group ID: ${adgroupId}. Usa update_adgroup para configurar targeting.`,
         });
       }
 
       case "create_adgroup": {
         const campaignId = input.campaign_id as string;
         const agName = input.name as string;
-        const dailyBudget = (input.daily_budget_usd as number) || 20;
+        const dailyBudget = (input.daily_budget as number) || 200;
         const optGoal = (input.optimization_goal as string) || "CLICK";
-
-        if (dailyBudget < 20) {
-          return JSON.stringify({ success: false, error: `Presupuesto $${dailyBudget} USD menor al mínimo de $20 USD/día para ad groups.` });
-        }
 
         const { adgroupId } = await createAdGroup(creds, {
           campaignId,
@@ -454,7 +455,7 @@ async function executeTool(
         return JSON.stringify({
           success: true,
           adgroupId,
-          note: `Ad group "${agName}" creado en campaña ${campaignId}. ID: ${adgroupId}. Presupuesto: $${dailyBudget} USD/día.`,
+          note: `Ad group "${agName}" creado en campaña ${campaignId}. ID: ${adgroupId}. Presupuesto: $${dailyBudget}/día.`,
         });
       }
 
@@ -463,8 +464,8 @@ async function executeTool(
         const updateParams: Record<string, unknown> = { adgroupId: agId };
 
         if (input.name) updateParams.adgroupName = input.name;
-        if (input.daily_budget_usd) updateParams.budget = input.daily_budget_usd;
-        if (input.daily_budget_usd) updateParams.budgetMode = "BUDGET_MODE_DAY";
+        if (input.daily_budget) updateParams.budget = input.daily_budget;
+        if (input.daily_budget) updateParams.budgetMode = "BUDGET_MODE_DAY";
         if (input.location_ids) updateParams.location_ids = input.location_ids;
         if (input.age_groups) updateParams.ageGroups = input.age_groups;
         if (input.gender) updateParams.gender = input.gender;

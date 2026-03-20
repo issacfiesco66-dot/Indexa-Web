@@ -620,11 +620,6 @@ export async function createCampaign(
     budget?: number;
   }
 ): Promise<{ campaignId: string }> {
-  // TikTok minimum: $50 USD/day for campaigns
-  if (params.budget && params.budgetMode === "BUDGET_MODE_DAY" && params.budget < 50) {
-    throw new Error(`Presupuesto diario de $${params.budget} USD es menor al mínimo de TikTok ($50 USD/día para campañas).`);
-  }
-
   const body: Record<string, unknown> = {
     advertiser_id: creds.advertiserId,
     campaign_name: params.campaignName,
@@ -665,11 +660,6 @@ export async function createAdGroup(
     scheduleStartTime?: string;
   }
 ): Promise<{ adgroupId: string }> {
-  // TikTok minimum: $20 USD/day for ad groups
-  if (params.budgetMode === "BUDGET_MODE_DAY" && params.budget < 20) {
-    throw new Error(`Presupuesto diario de $${params.budget} USD es menor al mínimo de TikTok ($20 USD/día para ad groups).`);
-  }
-
   const body: Record<string, unknown> = {
     advertiser_id: creds.advertiserId,
     campaign_id: params.campaignId,
