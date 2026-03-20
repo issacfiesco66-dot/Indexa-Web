@@ -222,20 +222,36 @@ async function tiktokFetch<T>(
     "Content-Type": "application/json",
   };
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      signal: controller.signal,
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch (fetchErr) {
+    clearTimeout(timeout);
+    if (fetchErr instanceof DOMException && fetchErr.name === "AbortError") {
+      throw new Error(`TikTok API timeout (15s) en ${endpoint}`);
+    }
+    throw new Error(`TikTok API network error en ${endpoint}: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`);
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!res.ok) {
-    throw new Error(`TikTok API HTTP ${res.status}: ${await res.text()}`);
+    const text = await res.text().catch(() => "(sin cuerpo)");
+    throw new Error(`TikTok API HTTP ${res.status} en ${endpoint}: ${text}`);
   }
 
   const data = await res.json();
 
   if (data.code !== 0) {
-    throw new Error(`TikTok API error ${data.code}: ${data.message}`);
+    throw new Error(`TikTok API error ${data.code} en ${endpoint}: ${data.message}`);
   }
 
   return data as TikTokApiResponse<T>;

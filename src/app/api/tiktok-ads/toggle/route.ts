@@ -4,6 +4,8 @@ import { verifyIdToken, extractToken } from "@/lib/verifyAuth";
 import { createRateLimiter } from "@/lib/rateLimit";
 
 // Rate limit: 10 toggles per minute per IP
+export const maxDuration = 30;
+
 const limiter = createRateLimiter({ windowMs: 60_000, max: 10 });
 
 export async function POST(request: Request) {

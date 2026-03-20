@@ -3,6 +3,8 @@ import { getAdvertiserInfo, getBalance, type TikTokCredentials } from "@/lib/tik
 import { verifyIdToken, extractToken } from "@/lib/verifyAuth";
 import { createRateLimiter } from "@/lib/rateLimit";
 
+export const maxDuration = 30;
+
 const limiter = createRateLimiter({ windowMs: 60_000, max: 20 });
 
 export async function GET(request: Request) {
@@ -35,6 +37,8 @@ export async function GET(request: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error desconocido";
     console.error("TikTok account error:", message);
-    return NextResponse.json({ error: message }, { status: 502 });
+    const status = message.includes("40001") || message.includes("40100") || message.includes("Access Token")
+      ? 401 : message.includes("timeout") ? 504 : 502;
+    return NextResponse.json({ error: message }, { status });
   }
 }

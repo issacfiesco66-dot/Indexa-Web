@@ -3,6 +3,8 @@ import { getReporting, type TikTokCredentials } from "@/lib/tiktokAdsClient";
 import { verifyIdToken, extractToken } from "@/lib/verifyAuth";
 import { createRateLimiter } from "@/lib/rateLimit";
 
+export const maxDuration = 30;
+
 const limiter = createRateLimiter({ windowMs: 60_000, max: 15 });
 
 export async function GET(request: Request) {
