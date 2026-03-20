@@ -609,6 +609,91 @@ export async function getPixels(
 }
 
 /**
+ * Create a new campaign.
+ */
+export async function createCampaign(
+  creds: TikTokCredentials,
+  params: {
+    campaignName: string;
+    objectiveType: string;
+    budgetMode: "BUDGET_MODE_DAY" | "BUDGET_MODE_TOTAL" | "BUDGET_MODE_INFINITE";
+    budget?: number;
+  }
+): Promise<{ campaignId: string }> {
+  const body: Record<string, unknown> = {
+    advertiser_id: creds.advertiserId,
+    campaign_name: params.campaignName,
+    objective_type: params.objectiveType,
+    budget_mode: params.budgetMode,
+    operation_status: "DISABLE",
+  };
+  if (params.budget && params.budgetMode !== "BUDGET_MODE_INFINITE") {
+    body.budget = params.budget;
+  }
+
+  const response = await tiktokFetch<{ campaign_id: string }>(
+    "/campaign/create/",
+    creds.accessToken,
+    { method: "POST", body }
+  );
+
+  return { campaignId: response.data.campaign_id };
+}
+
+/**
+ * Create a new ad group within a campaign.
+ */
+export async function createAdGroup(
+  creds: TikTokCredentials,
+  params: {
+    campaignId: string;
+    adgroupName: string;
+    budget: number;
+    budgetMode: "BUDGET_MODE_DAY" | "BUDGET_MODE_TOTAL";
+    optimizationGoal: string;
+    billingEvent?: string;
+    bidType?: string;
+    placementType?: string;
+    location_ids?: string[];
+    ageGroups?: string[];
+    gender?: string;
+    scheduleStartTime?: string;
+  }
+): Promise<{ adgroupId: string }> {
+  const body: Record<string, unknown> = {
+    advertiser_id: creds.advertiserId,
+    campaign_id: params.campaignId,
+    adgroup_name: params.adgroupName,
+    budget: params.budget,
+    budget_mode: params.budgetMode,
+    optimization_goal: params.optimizationGoal,
+    billing_event: params.billingEvent || "CPC",
+    bid_type: params.bidType || "BID_TYPE_NO_BID",
+    placement_type: params.placementType || "PLACEMENT_TYPE_AUTOMATIC",
+    operation_status: "DISABLE",
+    schedule_type: "SCHEDULE_FROM_NOW",
+  };
+
+  if (params.location_ids && params.location_ids.length > 0) {
+    body.location_ids = params.location_ids;
+  }
+  if (params.ageGroups && params.ageGroups.length > 0) {
+    body.age_groups = params.ageGroups;
+  }
+  if (params.gender) {
+    body.gender = params.gender;
+  }
+
+  const response = await tiktokFetch<{ adgroup_id: string }>(
+    "/adgroup/create/",
+    creds.accessToken,
+    { method: "POST", body }
+  );
+
+  return { adgroupId: response.data.adgroup_id };
+}
+
+/**
  * Get account transactions.
  */
 export async function getTransactions(

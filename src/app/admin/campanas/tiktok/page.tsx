@@ -27,6 +27,9 @@ import {
   Copy,
   Check,
   ChevronRight,
+  Bot,
+  Send,
+  X,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -114,7 +117,7 @@ interface Pixel {
   createTime: string;
 }
 
-type TikTokTab = "resumen" | "campanas" | "adgroups" | "anuncios" | "reportes" | "audiencias" | "pixel";
+type TikTokTab = "resumen" | "campanas" | "adgroups" | "anuncios" | "reportes" | "audiencias" | "pixel" | "ia";
 
 // ── Status helpers ───────────────────────────────────────────────────
 const STATUS_MAP: Record<string, { label: string; classes: string; icon: React.ElementType }> = {
@@ -151,6 +154,7 @@ const TABS: { id: TikTokTab; label: string; icon: React.ElementType }[] = [
   { id: "reportes", label: "Reportes", icon: BarChart3 },
   { id: "audiencias", label: "Audiencias", icon: Users },
   { id: "pixel", label: "Pixel", icon: Crosshair },
+  { id: "ia", label: "Asistente IA", icon: Bot },
 ];
 
 function formatBudget(budget: number): string {
@@ -225,6 +229,12 @@ export default function TikTokAdsPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+
+  // ── AI assistant ──────────────────────────────────────────────
+  const [aiMessages, setAiMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [aiInput, setAiInput] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiHistory, setAiHistory] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
 
   // ── Auth token ─────────────────────────────────────────────────
   const getToken = useCallback(async () => {
@@ -456,6 +466,34 @@ export default function TikTokAdsPage() {
       setTogglingId(null);
     }
   }, [advertiserId, accessToken, authHeaders]);
+
+  // ── AI assistant send message ────────────────────────────────
+  const sendAIMessage = useCallback(async () => {
+    if (!user || !advertiserId.trim() || !accessToken.trim() || !aiInput.trim() || aiLoading) return;
+    const userMsg = aiInput.trim();
+    setAiInput("");
+    setAiMessages((prev) => [...prev, { role: "user", content: userMsg }]);
+    setAiLoading(true);
+    try {
+      const headers = await authHeaders();
+      const res = await fetch("/api/tiktok-ads/ai", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ message: userMsg, history: aiHistory, advertiserId: advertiserId.trim(), accessToken: accessToken.trim() }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setAiMessages((prev) => [...prev, { role: "assistant", content: `Error: ${data.error}` }]);
+      } else {
+        setAiMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
+        setAiHistory(data.newHistory || []);
+      }
+    } catch {
+      setAiMessages((prev) => [...prev, { role: "assistant", content: "Error de conexión. Intenta de nuevo." }]);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [user, advertiserId, accessToken, aiInput, aiLoading, aiHistory, authHeaders]);
 
   // ── Disconnect ─────────────────────────────────────────────────
   const handleDisconnect = () => {
@@ -1130,6 +1168,89 @@ export default function TikTokAdsPage() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════
+          TAB: ASISTENTE IA
+         ══════════════════════════════════════════════════════ */}
+      {activeTab === "ia" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-indexa-gray-dark flex items-center gap-2"><Bot size={20} className="text-indigo-600" /> Asistente IA de TikTok Ads</h2>
+              <p className="mt-0.5 text-xs text-gray-400">Describe lo que quieres en lenguaje natural y el asistente lo ejecuta en tu cuenta de TikTok Ads.</p>
+            </div>
+            {aiMessages.length > 0 && (
+              <button onClick={() => { setAiMessages([]); setAiHistory([]); }} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-500 hover:bg-gray-50">
+                <X size={12} /> Limpiar chat
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div className="border-b border-gray-100 bg-gray-50 px-4 py-2.5">
+              <div className="flex flex-wrap gap-1.5">
+                {["¿Cuál es mi balance?", "Dame un resumen de mis campañas", "Crea una campaña de tráfico con $20 USD diarios", "¿Cuánto he gastado esta semana?"].map((s) => (
+                  <button key={s} onClick={() => { setAiInput(s); }} className="rounded-full bg-white px-2.5 py-1 text-[10px] font-medium text-gray-500 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-colors">{s}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex min-h-[320px] flex-col">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {aiMessages.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center py-10 text-center">
+                    <Bot size={36} className="text-gray-200" />
+                    <p className="mt-3 text-sm font-medium text-gray-400">Hola, soy tu asistente de TikTok Ads.</p>
+                    <p className="mt-1 text-xs text-gray-300">Pregúntame sobre tus campañas, métricas, o dime qué campaña quieres crear.</p>
+                  </div>
+                ) : (
+                  aiMessages.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      {msg.role === "assistant" && (
+                        <div className="mr-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-100">
+                          <Bot size={14} className="text-indigo-600" />
+                        </div>
+                      )}
+                      <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${
+                        msg.role === "user" ? "bg-indexa-blue text-white" : "bg-gray-100 text-indexa-gray-dark"
+                      }`}>
+                        {msg.content}
+                      </div>
+                    </div>
+                  ))
+                )}
+                {aiLoading && (
+                  <div className="flex justify-start">
+                    <div className="mr-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-100">
+                      <Loader2 size={14} className="animate-spin text-indigo-600" />
+                    </div>
+                    <div className="rounded-2xl bg-gray-100 px-4 py-2.5 text-sm text-gray-400">Pensando...</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-gray-100 p-3 flex gap-2">
+                <input
+                  type="text"
+                  value={aiInput}
+                  onChange={(e) => setAiInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAIMessage(); } }}
+                  placeholder="Escribe tu mensaje... (Enter para enviar)"
+                  disabled={aiLoading}
+                  className="flex-1 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm outline-none placeholder:text-gray-300 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50"
+                />
+                <button
+                  onClick={sendAIMessage}
+                  disabled={aiLoading || !aiInput.trim()}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors shrink-0"
+                >
+                  {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
