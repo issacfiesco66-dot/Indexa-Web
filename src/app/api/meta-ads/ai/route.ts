@@ -7,106 +7,98 @@ export const maxDuration = 60;
 const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
 const META_GRAPH_URL = "https://graph.facebook.com/v21.0";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const CLAUDE_MODEL = "claude-3-haiku-20240307";
+const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
-const SYSTEM_PROMPT = `Eres un asistente de IA especializado en gestionar campañas de Meta Ads (Facebook e Instagram) para negocios.
-Ayudas a los usuarios a: entender el rendimiento de sus campañas, crear borradores de campañas, pausar/reanudar campañas y dar recomendaciones para mejorar resultados.
-SIEMPRE responde en español. Sé conciso, útil y basado en datos.
-Cuando el usuario pregunte por campañas o métricas, obtén los datos frescos con las herramientas disponibles.
-Cuando tomes acciones, siempre confirma qué hiciste y el resultado.
-Formato de números: $1,234.56 para dinero, 2.5% para porcentajes, 10,000 para impresiones.
-IMPORTANTE: create_campaign_draft solo crea la estructura (campaña + ad set en PAUSA). El usuario debe añadir la imagen manualmente desde la pestaña Campañas.`;
+const SYSTEM_PROMPT = `Eres un Senior Media Buyer especializado en Meta Ads (Facebook e Instagram). SIEMPRE responde en español.
 
-const TOOLS = [
-  {
-    name: "list_campaigns",
-    description: "Lista todas las campañas con su estado, presupuesto e información básica",
-    input_schema: { type: "object", properties: {}, required: [] },
-  },
-  {
-    name: "get_account_insights",
-    description: "Obtiene métricas de rendimiento de la cuenta: impresiones, clics, gasto, CTR, CPC, CPM, alcance",
-    input_schema: {
-      type: "object",
-      properties: {
-        date_preset: {
-          type: "string",
-          enum: ["last_7d", "last_14d", "last_30d", "last_90d", "this_month", "last_month"],
-          description: "Periodo de tiempo para las métricas (default: last_7d)",
-        },
-      },
-      required: [],
-    },
-  },
-  {
-    name: "get_campaign_insights",
-    description: "Obtiene métricas de rendimiento detalladas para una campaña específica",
-    input_schema: {
-      type: "object",
-      properties: {
-        campaign_id: { type: "string", description: "ID de la campaña" },
-        date_preset: {
-          type: "string",
-          enum: ["last_7d", "last_14d", "last_30d"],
-          description: "Periodo de tiempo (default: last_7d)",
-        },
-      },
-      required: ["campaign_id"],
-    },
-  },
-  {
-    name: "pause_campaign",
-    description: "Pausa una campaña activa",
-    input_schema: {
-      type: "object",
-      properties: {
-        campaign_id: { type: "string", description: "ID de la campaña a pausar" },
-      },
-      required: ["campaign_id"],
-    },
-  },
-  {
-    name: "resume_campaign",
-    description: "Reactiva una campaña pausada",
-    input_schema: {
-      type: "object",
-      properties: {
-        campaign_id: { type: "string", description: "ID de la campaña a reactivar" },
-      },
-      required: ["campaign_id"],
-    },
-  },
-  {
-    name: "create_campaign_draft",
-    description:
-      "Crea el borrador de una campaña con su ad set. Queda PAUSADA sin creativo (el usuario añade la imagen manualmente desde la pestaña Campañas).",
-    input_schema: {
-      type: "object",
-      properties: {
-        name: { type: "string", description: "Nombre de la campaña" },
-        objective: {
-          type: "string",
-          enum: [
-            "OUTCOME_TRAFFIC",
-            "OUTCOME_AWARENESS",
-            "OUTCOME_LEADS",
-            "OUTCOME_ENGAGEMENT",
-            "OUTCOME_SALES",
-          ],
-          description: "Objetivo de la campaña",
-        },
-        daily_budget_mxn: {
-          type: "number",
-          description: "Presupuesto diario en pesos mexicanos (MXN)",
-        },
-        age_min: { type: "number", description: "Edad mínima (default: 18)" },
-        age_max: { type: "number", description: "Edad máxima (default: 65)" },
-        country: { type: "string", description: "Código de país (default: MX)" },
-      },
-      required: ["name", "objective", "daily_budget_mxn"],
-    },
-  },
-];
+═══ GUARDRAILS TÉCNICOS ═══
+
+REGLA #1 — ANTES DE CREAR:
+Usa list_campaigns para verificar que no exista una campaña similar. Si existe, pregunta antes de duplicar.
+
+REGLA #2 — UNA SOLA CAMPAÑA POR PETICIÓN:
+"Créame una campaña" = EXACTAMENTE 1 campaña. NUNCA crees múltiples campañas ni reintentos.
+
+REGLA #3 — PRESUPUESTO:
+Meta usa la moneda de la cuenta (generalmente MXN para cuentas mexicanas).
+Mínimo diario en Meta: ~$70 MXN/día para la mayoría de objetivos.
+Si el usuario no especifica presupuesto, pregunta. Si dice "el mínimo", usa $70 MXN.
+Si dice pesos sin especificar, asume MXN. Conversión referencia: ~17 MXN = 1 USD.
+
+REGLA #4 — HAZLO TÚ:
+Ejecuta todo lo que puedas con las herramientas disponibles. Si necesitas que el usuario haga algo manualmente (como subir creativos), explícale paso a paso qué hacer.
+
+═══ ARQUITECTURA DE CAMPAÑA (LEVEL 1: CAMPAIGN) ═══
+
+Naming convention: [PAÍS]_[OBJETIVO]_[NOMBRE_NEGOCIO]_[MES_AÑO]
+Ejemplo: MX_LEADS_ElectrodomesticosQRO_Mar2026
+
+Objetivo: 
+- Ventas/leads/contactos → OUTCOME_LEADS o OUTCOME_SALES
+- Visitas a web → OUTCOME_TRAFFIC
+- Visibilidad/alcance → OUTCOME_AWARENESS
+- Interacción → OUTCOME_ENGAGEMENT
+
+Estado: SIEMPRE PAUSED para evitar cobros accidentales.
+
+═══ SEGMENTACIÓN INTELIGENTE (LEVEL 2: AD SETS) ═══
+
+Cuando el usuario pida "la mejor segmentación" o "la más adecuada", crea 2 Ad Sets para testeo A/B:
+
+Ad Set A — "[Negocio] - Intereses Directos":
+- Segmenta por intereses relacionados al producto/servicio
+- Edad según el negocio (ej: 25-55 para servicios del hogar, 18-34 para moda)
+- País/ciudad especificada
+
+Ad Set B — "[Negocio] - Broad/Amplio":
+- Solo ubicación geográfica + edad + género
+- Deja que el algoritmo de Meta Advantage+ encuentre al cliente
+- Ideal para negocios locales
+
+Para ambos:
+- Género: sin restricción salvo que el negocio lo requiera
+- Billing: IMPRESSIONS con LOWEST_COST_WITHOUT_CAP (mejor para presupuestos pequeños)
+
+═══ ESTRATEGIA DE CONTENIDO (LEVEL 3: ADS) ═══
+
+Sugiere 3 propuestas de anuncio con framework Hook-Body-CTA:
+
+Ad 1 — "Problema/Solución": Enfocado en el dolor del cliente.
+  Hook: "¿Tu [producto] dejó de funcionar?"
+  Body: Beneficio principal del servicio
+  CTA: CONTACT_US o GET_QUOTE
+
+Ad 2 — "Social Proof/Autoridad": Enfocado en confianza.
+  Hook: "Más de X clientes satisfechos"
+  Body: Certificaciones, experiencia, garantía
+  CTA: LEARN_MORE
+
+Ad 3 — "Urgencia/Oferta": Beneficio inmediato.
+  Hook: "Solo esta semana: diagnóstico GRATIS"
+  Body: Oferta concreta con límite de tiempo
+  CTA: SHOP_NOW o SIGN_UP
+
+Nota: Actualmente no puedes subir imágenes vía API. Explica al usuario que después de crear la campaña, debe ir a Meta Ads Manager → seleccionar la campaña → crear anuncio → subir imagen/video. Dale instrucciones claras.
+
+═══ FLUJO DE EJECUCIÓN ═══
+
+1. list_campaigns → verificar duplicados
+2. create_campaign_draft → campaña + ad set A (PAUSADA)
+3. Sugerir las 3 propuestas de copy (Hook-Body-CTA)
+4. Explicar cómo subir creativos en Meta Ads Manager
+5. Confirmar resumen técnico completo
+
+═══ FORMATO DE RESPUESTA ═══
+
+Al crear, devuelve un resumen técnico:
+- Campaign ID + nombre + objetivo + presupuesto
+- Ad Set: ID + targeting aplicado (edad, ubicación, intereses)
+- Propuestas de texto para anuncios
+- Estado: PAUSADA
+- Pasos siguientes claros
+
+Formato numérico: $1,234.56 para dinero, 2.5% para porcentajes.
+Cuando analices métricas, da insights accionables, no solo números.`;
 
 // ── Meta helpers ────────────────────────────────────────────────────
 async function metaGet(url: string): Promise<Record<string, unknown>> {
@@ -373,9 +365,20 @@ export async function POST(request: NextRequest) {
       { role: "user", content: message },
     ];
 
-    // Agentic loop — up to 5 rounds
-    for (let round = 0; round < 5; round++) {
-      console.log(`[meta-ads/ai] round ${round}, calling Claude`);
+    // Time budget: stop 10s before Vercel timeout
+    const startTime = Date.now();
+    const DEADLINE_MS = 50_000;
+    let lastText = "";
+
+    // Agentic loop — up to 8 rounds with time budget
+    for (let round = 0; round < 8; round++) {
+      const elapsed = Date.now() - startTime;
+      if (elapsed > DEADLINE_MS) {
+        console.log(`[meta-ads/ai] time budget exceeded at round ${round} (${elapsed}ms)`);
+        break;
+      }
+
+      console.log(`[meta-ads/ai] round ${round}, elapsed ${elapsed}ms, calling Claude`);
 
       const claudeRes = await fetch(ANTHROPIC_URL, {
         method: "POST",
@@ -386,7 +389,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           model: CLAUDE_MODEL,
-          max_tokens: 1024,
+          max_tokens: 1536,
           system: SYSTEM_PROMPT,
           tools,
           messages: claudeMessages,
@@ -394,7 +397,7 @@ export async function POST(request: NextRequest) {
       });
 
       const claudeText = await claudeRes.text();
-      console.log(`[meta-ads/ai] Claude status: ${claudeRes.status}`);
+      console.log(`[meta-ads/ai] Claude status: ${claudeRes.status}, elapsed ${Date.now() - startTime}ms`);
 
       if (!claudeRes.ok) {
         let errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${claudeText.slice(0, 300)}`;
@@ -413,15 +416,18 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Respuesta inválida de Claude API." }, { status: 400 });
       }
 
+      // Capture text from this response
+      const contentBlocks = (response.content as { type: string; text?: string }[]) || [];
+      const textBlock = contentBlocks.find((c) => c.type === "text");
+      if (textBlock?.text) lastText = textBlock.text;
+
       if (response.stop_reason === "end_turn") {
-        const content = (response.content as { type: string; text?: string }[]) || [];
-        const text = content.find((c) => c.type === "text")?.text ?? "";
         return NextResponse.json({
-          reply: text,
+          reply: lastText,
           newHistory: [
             ...(Array.isArray(history) ? history : []),
             { role: "user", content: message },
-            { role: "assistant", content: text },
+            { role: "assistant", content: lastText },
           ],
         });
       }
@@ -434,26 +440,35 @@ export async function POST(request: NextRequest) {
 
         claudeMessages.push({ role: "assistant", content });
 
-        const toolResults = await Promise.all(
-          toolBlocks.map(async (block) => {
-            console.log(`[meta-ads/ai] executing tool: ${block.name}`);
-            const result = await executeTool(block.name, block.input, metaToken, adAccountId);
-            return { type: "tool_result", tool_use_id: block.id, content: result };
-          })
-        );
+        // Sequential execution with time budget
+        const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
+        for (const block of toolBlocks) {
+          const toolElapsed = Date.now() - startTime;
+          if (toolElapsed > DEADLINE_MS) {
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: "Tiempo agotado." });
+            continue;
+          }
+          console.log(`[meta-ads/ai] executing tool: ${block.name} (${toolElapsed}ms)`);
+          const result = await executeTool(block.name, block.input, metaToken, adAccountId);
+          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+        }
 
         claudeMessages.push({ role: "user", content: toolResults });
         continue;
       }
 
-      // unexpected stop reason
       console.log(`[meta-ads/ai] unexpected stop_reason: ${response.stop_reason}`);
       break;
     }
 
+    const fallback = lastText || "Se agotó el tiempo. Intenta dividir tu petición en pasos más pequeños.";
     return NextResponse.json({
-      reply: "No pude completar la solicitud. Intenta de nuevo.",
-      newHistory: Array.isArray(history) ? history : [],
+      reply: fallback,
+      newHistory: [
+        ...(Array.isArray(history) ? history : []),
+        { role: "user", content: message },
+        { role: "assistant", content: fallback },
+      ],
     });
 
   } catch (err) {
