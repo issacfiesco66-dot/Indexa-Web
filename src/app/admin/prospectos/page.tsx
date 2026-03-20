@@ -1179,7 +1179,7 @@ export default function ProspectosPage() {
         <>
           {/* ── Desktop table ───────────────────────────────────── */}
           <div className="hidden overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm md:block">
-            <table className="min-w-[1100px] w-full text-left text-sm">
+            <table className="min-w-[1280px] w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-indexa-gray-light">
                   <th className="w-10 px-4 py-3.5">
