@@ -652,7 +652,7 @@ function TikTokAdsContent() {
                   className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
                 />
                 <p className="mt-1 text-[10px] text-gray-400">
-                  Genera uno en <a href="https://business-api.tiktok.com/portal/tools/accessToken" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline font-medium">Portal de Herramientas → Access Token</a>
+                  Genera uno en <a href="https://business-api.tiktok.com/portal/apps/" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline font-medium">business-api.tiktok.com/portal/apps</a> → selecciona tu app → Tools → Get Access Token
                 </p>
               </div>
 
@@ -703,8 +703,8 @@ function TikTokAdsContent() {
                 <div>
                   <p className="text-[11px] font-bold text-indexa-gray-dark">2. Obtener tu Access Token</p>
                   <p className="text-[10px] text-gray-500 mt-0.5">
-                    Ve a <a href="https://business-api.tiktok.com/portal/tools/accessToken" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline font-medium">business-api.tiktok.com/portal/tools/accessToken</a> → 
-                    Selecciona tu app → Genera un token con todos los permisos.
+                    Ve a <a href="https://business-api.tiktok.com/portal/apps/" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline font-medium">business-api.tiktok.com/portal/apps</a> → 
+                    Selecciona tu app → pestaña "Tools" → "Get Long-Term Access Token" → selecciona todos los permisos → copia el token generado.
                   </p>
                 </div>
                 <div>
