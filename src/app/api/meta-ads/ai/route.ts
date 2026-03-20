@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyIdToken } from "@/lib/verifyAuth";
 import { createRateLimiter } from "@/lib/rateLimit";
+import OpenAI from "openai";
 
 export const maxDuration = 60;
 
@@ -78,15 +79,18 @@ Ad 3 — "Urgencia/Oferta": Beneficio inmediato.
   Body: Oferta concreta con límite de tiempo
   CTA: SHOP_NOW o SIGN_UP
 
-Nota: Actualmente no puedes subir imágenes vía API. Explica al usuario que después de crear la campaña, debe ir a Meta Ads Manager → seleccionar la campaña → crear anuncio → subir imagen/video. Dale instrucciones claras.
+Puedes generar imágenes publicitarias con IA usando generate_ad_image.
+La imagen generada se devuelve como URL para que el usuario la descargue y suba a Meta Ads Manager.
+SIEMPRE que crees una campaña, genera al menos 1 imagen y muestra la URL al usuario.
 
 ═══ FLUJO DE EJECUCIÓN ═══
 
 1. list_campaigns → verificar duplicados
-2. create_campaign_draft → campaña + ad set A (PAUSADA)
-3. Sugerir las 3 propuestas de copy (Hook-Body-CTA)
-4. Explicar cómo subir creativos en Meta Ads Manager
-5. Confirmar resumen técnico completo
+2. create_campaign_draft → campaña + ad set (PAUSADA)
+3. generate_ad_image → generar imagen publicitaria con IA
+4. Sugerir las 3 propuestas de copy (Hook-Body-CTA)
+5. Dar instrucciones para subir la imagen generada en Meta Ads Manager
+6. Confirmar resumen técnico completo
 
 ═══ FORMATO DE RESPUESTA ═══
 
@@ -226,6 +230,36 @@ async function executeTool(
         });
       }
 
+      case "generate_ad_image": {
+        const openaiKey = process.env.OPENAI_API_KEY;
+        if (!openaiKey) return JSON.stringify({ success: false, error: "OPENAI_API_KEY no configurada en variables de entorno." });
+
+        const openai = new OpenAI({ apiKey: openaiKey });
+        const imgPrompt = input.prompt as string;
+        const imgStyle = (input.style as "vivid" | "natural") || "vivid";
+
+        const dallePrompt = `Imagen publicitaria profesional para Facebook/Instagram Ads. ${imgPrompt}. Estilo: limpio, moderno, atractivo para redes sociales. NO incluir texto ni letras en la imagen. Formato cuadrado 1:1.`;
+
+        const dalleRes = await openai.images.generate({
+          model: "dall-e-3",
+          prompt: dallePrompt,
+          n: 1,
+          size: "1024x1024",
+          style: imgStyle,
+          response_format: "url",
+        });
+
+        const imageUrl = dalleRes.data?.[0]?.url;
+        if (!imageUrl) return JSON.stringify({ success: false, error: "No se pudo generar la imagen." });
+
+        return JSON.stringify({
+          success: true,
+          imageUrl,
+          note: `Imagen generada exitosamente. El usuario debe descargar la imagen desde la URL y subirla manualmente en Meta Ads Manager al crear el anuncio.`,
+          instructions: "Para usar esta imagen: 1) Haz clic derecho en la imagen → Guardar imagen. 2) Ve a Meta Ads Manager → selecciona la campaña → Crear anuncio → Sube la imagen guardada.",
+        });
+      }
+
       default:
         return `Herramienta desconocida: ${name}`;
     }
@@ -340,7 +374,7 @@ export async function POST(request: NextRequest) {
       },
       {
         name: "create_campaign_draft",
-        description: "Crea borrador de campaña con ad set (PAUSADA, sin creativo). Usuario añade imagen después.",
+        description: "Crea borrador de campaña con ad set (PAUSADA). Luego genera imagen con generate_ad_image.",
         input_schema: {
           type: "object",
           properties: {
@@ -355,6 +389,25 @@ export async function POST(request: NextRequest) {
             country: { type: "string", description: "Código de país (default: MX)" },
           },
           required: ["name", "objective", "daily_budget_mxn"],
+        },
+      },
+      {
+        name: "generate_ad_image",
+        description: "Genera una imagen publicitaria con IA (DALL-E) basada en una descripción del negocio/producto. Devuelve una URL temporal para que el usuario la descargue y suba a Meta Ads Manager.",
+        input_schema: {
+          type: "object",
+          properties: {
+            prompt: {
+              type: "string",
+              description: "Descripción detallada de la imagen: tipo de negocio, producto/servicio, estilo visual, colores, ambiente.",
+            },
+            style: {
+              type: "string",
+              enum: ["vivid", "natural"],
+              description: "Estilo: 'vivid' para colores vibrantes (mejor para ads), 'natural' para look realista. Default: vivid",
+            },
+          },
+          required: ["prompt"],
         },
       },
     ];

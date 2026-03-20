@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyIdToken } from "@/lib/verifyAuth";
 import { createRateLimiter } from "@/lib/rateLimit";
+import OpenAI from "openai";
 import {
   getCampaigns,
   getAdGroups,
@@ -96,7 +97,8 @@ Ad 3 — "Urgencia/Oferta": Beneficio inmediato.
   Body: Oferta concreta con límite de tiempo
   CTA: SHOP_NOW o ORDER_NOW
 
-Si NO tiene creativos, sugiere las 3 propuestas de texto y explica qué tipo de video/imagen necesita para cada una.
+Si NO tiene creativos, usa generate_ad_image para crear imágenes con IA automáticamente.
+SIEMPRE que crees una campaña completa, genera al menos 1 imagen con generate_ad_image y crea el anuncio.
 
 ═══ FLUJO DE EJECUCIÓN ═══
 
@@ -106,8 +108,15 @@ Si NO tiene creativos, sugiere las 3 propuestas de texto y explica qué tipo de 
 4. create_campaign_draft → campaña + ad group base (PAUSADA)
 5. update_adgroup → aplicar targeting al Ad Group A (intereses + ubicación + edad)
 6. create_adgroup → crear Ad Group B (broad: solo ubicación + edad)
-7. Si hay URLs de creativos → upload_image/upload_video → create_ad (×3 variantes)
-8. Confirmar resumen técnico completo
+7. generate_ad_image → generar imagen publicitaria con IA (DALL-E)
+8. create_ad → crear anuncio con la imagen generada + copy + CTA
+9. Confirmar resumen técnico completo
+
+IMPORTANTE sobre generate_ad_image:
+- Genera imágenes profesionales con DALL-E 3 y las sube automáticamente a TikTok
+- Devuelve image_id listo para usar en create_ad
+- Formato vertical 9:16 optimizado para TikTok
+- Si el usuario tiene sus propias imágenes/videos, usa upload_image/upload_video en su lugar
 
 ═══ FORMATO DE RESPUESTA ═══
 
@@ -342,8 +351,27 @@ const tools = [
     },
   },
   {
+    name: "generate_ad_image",
+    description: "Genera una imagen publicitaria con IA (DALL-E) basada en una descripción del negocio/producto. La imagen se sube automáticamente a TikTok y devuelve el image_id listo para usar en create_ad. Ideal para cuando el usuario no tiene creativos propios.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        prompt: {
+          type: "string",
+          description: "Descripción detallada de la imagen a generar. Incluye: tipo de negocio, producto/servicio, estilo visual, colores, ambiente. Ej: 'Técnico reparando una lavadora en una cocina moderna, estilo profesional y confiable, colores azul y blanco'",
+        },
+        style: {
+          type: "string",
+          enum: ["vivid", "natural"],
+          description: "Estilo: 'vivid' para colores vibrantes (mejor para ads), 'natural' para look realista. Default: vivid",
+        },
+      },
+      required: ["prompt"],
+    },
+  },
+  {
     name: "create_ad",
-    description: "Crea un anuncio dentro de un ad group. Necesita image_id (de upload_image) o video_id (de upload_video). Incluye texto, CTA y landing page.",
+    description: "Crea un anuncio dentro de un ad group. Necesita image_id (de generate_ad_image o upload_image) o video_id (de upload_video). Incluye texto, CTA y landing page.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -554,6 +582,41 @@ async function executeTool(
         const fileName = input.file_name as string | undefined;
         const result = await uploadVideoByUrl(creds, videoUrl, fileName);
         return JSON.stringify({ success: true, ...result, note: `Video subido. Usa video_id: "${result.videoId}" en create_ad.` });
+      }
+
+      case "generate_ad_image": {
+        const openaiKey = process.env.OPENAI_API_KEY;
+        if (!openaiKey) return JSON.stringify({ success: false, error: "OPENAI_API_KEY no configurada en variables de entorno." });
+
+        const openai = new OpenAI({ apiKey: openaiKey });
+        const imgPrompt = input.prompt as string;
+        const imgStyle = (input.style as "vivid" | "natural") || "vivid";
+
+        const dallePrompt = `Imagen publicitaria profesional para TikTok Ads. ${imgPrompt}. Estilo: limpio, moderno, atractivo para redes sociales. NO incluir texto ni letras en la imagen. Formato vertical 9:16 optimizado para móvil.`;
+
+        const dalleRes = await openai.images.generate({
+          model: "dall-e-3",
+          prompt: dallePrompt,
+          n: 1,
+          size: "1024x1792",
+          style: imgStyle,
+          response_format: "url",
+        });
+
+        const imageUrl = dalleRes.data?.[0]?.url;
+        if (!imageUrl) return JSON.stringify({ success: false, error: "No se pudo generar la imagen." });
+
+        // Auto-upload to TikTok
+        const uploaded = await uploadImageByUrl(creds, imageUrl, `ad_image_${Date.now()}.png`);
+
+        return JSON.stringify({
+          success: true,
+          imageId: uploaded.imageId,
+          imageUrl: uploaded.imageUrl,
+          width: uploaded.width,
+          height: uploaded.height,
+          note: `Imagen generada y subida a TikTok. image_id: "${uploaded.imageId}". Úsalo directamente en create_ad.`,
+        });
       }
 
       case "create_ad": {
