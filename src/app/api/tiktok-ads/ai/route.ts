@@ -31,6 +31,11 @@ Cuando tomes acciones, siempre confirma qué hiciste y el resultado.
 Formato de números: $1,234.56 para dinero, 2.5% para porcentajes, 10,000 para impresiones.
 IMPORTANTE: create_campaign_draft crea campaña + ad group en estado PAUSADO. El usuario debe subir el creativo (video/imagen) manualmente desde TikTok Ads Manager.
 TikTok usa presupuesto en la moneda de la cuenta (generalmente USD). Si el usuario dice pesos, convierte a USD usando ~17 MXN = 1 USD como referencia.
+MÍNIMOS DE PRESUPUESTO DIARIO DE TIKTOK:
+- Campaña: $50 USD/día mínimo
+- Ad Group: $20 USD/día mínimo
+Si el usuario quiere gastar menos de $50 USD/día, explícale que TikTok exige ese mínimo a nivel campaña. A nivel ad group el mínimo es $20 USD/día.
+NO inventes mínimos diferentes. NUNCA digas que el mínimo es $500 USD — eso es FALSO.
 Los objective_type válidos para TikTok son: TRAFFIC, CONVERSIONS, APP_INSTALL, REACH, VIDEO_VIEWS, LEAD_GENERATION, ENGAGEMENT, CATALOG_SALES.`;
 
 // ── Tool definitions ─────────────────────────────────────────────────
@@ -141,7 +146,7 @@ const tools = [
         },
         daily_budget_usd: {
           type: "number",
-          description: "Presupuesto diario en USD (mínimo 20 USD para TikTok)",
+          description: "Presupuesto diario en USD. Mínimo $50 USD para campaña, mínimo $20 USD para ad group.",
         },
         optimization_goal: {
           type: "string",
@@ -251,8 +256,16 @@ async function executeTool(
       case "create_campaign_draft": {
         const campaignName = input.name as string;
         const objective = (input.objective as string) || "TRAFFIC";
-        const dailyBudgetUsd = (input.daily_budget_usd as number) || 20;
+        const dailyBudgetUsd = (input.daily_budget_usd as number) || 50;
         const optimizationGoal = (input.optimization_goal as string) || "CLICK";
+
+        // Validate TikTok minimum budgets
+        if (dailyBudgetUsd < 50) {
+          return JSON.stringify({
+            success: false,
+            error: `El presupuesto diario de $${dailyBudgetUsd} USD es menor al mínimo de TikTok. Mínimo campaña: $50 USD/día ($${Math.ceil(50 * 17)} MXN aprox). Mínimo ad group: $20 USD/día.`,
+          });
+        }
 
         const { campaignId } = await createCampaign(creds, {
           campaignName,
@@ -261,10 +274,11 @@ async function executeTool(
           budget: dailyBudgetUsd,
         });
 
+        const adGroupBudget = Math.max(dailyBudgetUsd, 20);
         const { adgroupId } = await createAdGroup(creds, {
           campaignId,
           adgroupName: `${campaignName} - Ad Group`,
-          budget: dailyBudgetUsd,
+          budget: adGroupBudget,
           budgetMode: "BUDGET_MODE_DAY",
           optimizationGoal,
         });
@@ -273,7 +287,7 @@ async function executeTool(
           success: true,
           campaignId,
           adgroupId,
-          note: `Borrador creado: "${campaignName}" (PAUSADA). Campaign ID: ${campaignId}, Ad Group ID: ${adgroupId}. Ahora ve a TikTok Ads Manager para subir el creativo (video/imagen) y activar la campaña.`,
+          note: `Borrador creado: "${campaignName}" (PAUSADA). Presupuesto: $${dailyBudgetUsd} USD/día. Campaign ID: ${campaignId}, Ad Group ID: ${adgroupId}. Ahora ve a TikTok Ads Manager para subir el creativo (video/imagen) y activar la campaña.`,
         });
       }
 
