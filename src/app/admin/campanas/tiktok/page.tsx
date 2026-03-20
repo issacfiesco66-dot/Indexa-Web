@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import {
   Video,
@@ -180,8 +181,11 @@ function getDateRange(days: number): { start: string; end: string } {
   };
 }
 
-export default function TikTokAdsPage() {
+function TikTokAdsContent() {
   const { user } = useAuth();
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   // ── Credentials ────────────────────────────────────────────────
   const [advertiserId, setAdvertiserId] = useState("");
@@ -189,6 +193,9 @@ export default function TikTokAdsPage() {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [oauthExchanging, setOauthExchanging] = useState(false);
+  const [oauthSuccess, setOauthSuccess] = useState(false);
 
   // ── Tab ────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<TikTokTab>("resumen");
@@ -235,6 +242,40 @@ export default function TikTokAdsPage() {
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiHistory, setAiHistory] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+
+  // ── OAuth auto-exchange ──────────────────────────────────────────
+  useEffect(() => {
+    const authCode = searchParams.get("auth_code");
+    if (!authCode || oauthExchanging || oauthSuccess || connected) return;
+
+    (async () => {
+      setOauthExchanging(true);
+      setConnectionError("");
+      try {
+        const res = await fetch(`/api/tiktok-ads/oauth?auth_code=${encodeURIComponent(authCode)}`);
+        const data = await res.json();
+
+        if (data?.data?.access_token) {
+          setAccessToken(data.data.access_token);
+          const advIds = data.data.advertiser_ids;
+          if (Array.isArray(advIds) && advIds.length > 0) {
+            setAdvertiserId(String(advIds[0]));
+          }
+          setOauthSuccess(true);
+          // Clean URL
+          router.replace("/admin/campanas/tiktok", { scroll: false });
+        } else {
+          setConnectionError(
+            data?.message || data?.error || "No se pudo obtener el token. Intenta de nuevo."
+          );
+        }
+      } catch {
+        setConnectionError("Error de conexión al intercambiar el código OAuth.");
+      } finally {
+        setOauthExchanging(false);
+      }
+    })();
+  }, [searchParams, oauthExchanging, oauthSuccess, connected, router]);
 
   // ── Auth token ─────────────────────────────────────────────────
   const getToken = useCallback(async () => {
@@ -517,6 +558,13 @@ export default function TikTokAdsPage() {
   };
 
   // ── Not connected ──────────────────────────────────────────────
+  // ── OAuth URL builder ────────────────────────────────────────────
+  const TIKTOK_APP_ID = "7619166839642865681";
+  const getOAuthUrl = useCallback(() => {
+    const redirectUri = `${window.location.origin}/admin/campanas/tiktok`;
+    return `https://business-api.tiktok.com/portal/auth?app_id=${TIKTOK_APP_ID}&state=indexa&redirect_uri=${encodeURIComponent(redirectUri)}`;
+  }, []);
+
   if (!connected) {
     return (
       <div className="space-y-6">
@@ -527,7 +575,29 @@ export default function TikTokAdsPage() {
           </p>
         </div>
 
-        <div className="mx-auto max-w-lg">
+        <div className="mx-auto max-w-lg space-y-4">
+          {/* OAuth exchanging state */}
+          {oauthExchanging && (
+            <div className="flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+              <Loader2 size={20} className="animate-spin text-blue-600" />
+              <div>
+                <p className="text-sm font-bold text-blue-700">Intercambiando código de autorización...</p>
+                <p className="text-xs text-blue-500">Obteniendo tu Access Token y Advertiser ID automáticamente.</p>
+              </div>
+            </div>
+          )}
+
+          {/* OAuth success */}
+          {oauthSuccess && !connected && (
+            <div className="flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 p-5">
+              <CheckCircle2 size={20} className="mt-0.5 text-green-600 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-green-700">Token obtenido exitosamente</p>
+                <p className="text-xs text-green-600 mt-1">Advertiser ID y Access Token se llenaron automáticamente. Haz clic en "Conectar Cuenta" para continuar.</p>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-black">
@@ -539,7 +609,26 @@ export default function TikTokAdsPage() {
               </div>
             </div>
 
-            <div className="mt-6 space-y-4">
+            {/* ── Option 1: OAuth (recommended) ── */}
+            <div className="mt-6 space-y-3">
+              <div className="rounded-xl bg-gradient-to-r from-gray-900 to-gray-800 p-5">
+                <p className="text-xs font-bold text-white/80 uppercase tracking-wider">Recomendado</p>
+                <p className="mt-1 text-sm text-white">Conecta automáticamente con un clic. Se abrirá TikTok para autorizar tu cuenta.</p>
+                <a
+                  href={typeof window !== "undefined" ? getOAuthUrl() : "#"}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-gray-900 transition-colors hover:bg-gray-100"
+                >
+                  <Zap size={16} /> Conectar con TikTok
+                </a>
+              </div>
+
+              <div className="flex items-center gap-3 px-2">
+                <div className="h-px flex-1 bg-gray-200" />
+                <span className="text-[10px] font-semibold text-gray-400 uppercase">o ingresa manualmente</span>
+                <div className="h-px flex-1 bg-gray-200" />
+              </div>
+
+              {/* ── Option 2: Manual ── */}
               <div>
                 <label className="block text-xs font-semibold text-indexa-gray-dark">Advertiser ID *</label>
                 <input
@@ -549,6 +638,9 @@ export default function TikTokAdsPage() {
                   placeholder="Ej: 7123456789012345678"
                   className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
                 />
+                <p className="mt-1 text-[10px] text-gray-400">
+                  Encuéntralo en <a href="https://ads.tiktok.com/" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline font-medium">ads.tiktok.com</a> → esquina superior derecha → tu ID numérico
+                </p>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-indexa-gray-dark">Access Token *</label>
@@ -559,6 +651,9 @@ export default function TikTokAdsPage() {
                   placeholder="Token de la Marketing API"
                   className="mt-1 w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
                 />
+                <p className="mt-1 text-[10px] text-gray-400">
+                  Genera uno en <a href="https://business-api.tiktok.com/portal/tools/accessToken" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline font-medium">Portal de Herramientas → Access Token</a>
+                </p>
               </div>
 
               {connectionError && (
@@ -570,7 +665,7 @@ export default function TikTokAdsPage() {
 
               <button
                 onClick={handleConnect}
-                disabled={connecting}
+                disabled={connecting || !advertiserId.trim() || !accessToken.trim()}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-black px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
               >
                 {connecting ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} />}
@@ -588,15 +683,39 @@ export default function TikTokAdsPage() {
               </div>
             </div>
 
-            <div className="mt-4 rounded-xl bg-gray-50 px-4 py-3">
-              <h4 className="text-xs font-bold text-indexa-gray-dark">¿Cómo obtener las credenciales?</h4>
-              <ol className="mt-2 space-y-1 text-[11px] text-gray-500 list-decimal pl-4">
-                <li>Ve a <a href="https://ads.tiktok.com/marketing_api/apps/" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline">TikTok Marketing API</a></li>
-                <li>Crea una app o usa una existente</li>
-                <li>Copia el <strong>Advertiser ID</strong> desde TikTok Ads Manager</li>
-                <li>Genera un <strong>Access Token</strong> con todos los scopes</li>
-              </ol>
-            </div>
+            {/* Help section (collapsible) */}
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="mt-4 flex w-full items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-left hover:bg-gray-100 transition-colors"
+            >
+              <h4 className="text-xs font-bold text-indexa-gray-dark">¿Necesitas ayuda?</h4>
+              <ChevronRight size={14} className={`text-gray-400 transition-transform ${showAdvanced ? "rotate-90" : ""}`} />
+            </button>
+            {showAdvanced && (
+              <div className="mt-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 space-y-3">
+                <div>
+                  <p className="text-[11px] font-bold text-indexa-gray-dark">1. Obtener tu Advertiser ID</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    Abre <a href="https://ads.tiktok.com/" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline font-medium">ads.tiktok.com</a> → 
+                    Inicia sesión → El número que aparece en la esquina superior derecha debajo de tu nombre es tu Advertiser ID.
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-indexa-gray-dark">2. Obtener tu Access Token</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    Ve a <a href="https://business-api.tiktok.com/portal/tools/accessToken" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline font-medium">business-api.tiktok.com/portal/tools/accessToken</a> → 
+                    Selecciona tu app → Genera un token con todos los permisos.
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-bold text-indexa-gray-dark">3. ¿No tienes una app?</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    Crea una en <a href="https://business-api.tiktok.com/portal/apps/" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline font-medium">business-api.tiktok.com/portal/apps</a> → 
+                    "Create App" → Tipo: "Business" → Completa la info y espera aprobación.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1268,5 +1387,13 @@ export default function TikTokAdsPage() {
         <span className="text-xs text-gray-400">API v1.3</span>
       </div>
     </div>
+  );
+}
+
+export default function TikTokAdsPage() {
+  return (
+    <Suspense fallback={<div className="flex h-40 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-indexa-blue" /></div>}>
+      <TikTokAdsContent />
+    </Suspense>
   );
 }
