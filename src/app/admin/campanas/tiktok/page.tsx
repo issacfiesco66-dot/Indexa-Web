@@ -196,6 +196,7 @@ function TikTokAdsContent() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [oauthExchanging, setOauthExchanging] = useState(false);
   const [oauthSuccess, setOauthSuccess] = useState(false);
+  const [authCodeInput, setAuthCodeInput] = useState("");
 
   // ── Tab ────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<TikTokTab>("resumen");
@@ -243,39 +244,39 @@ function TikTokAdsContent() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiHistory, setAiHistory] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
 
-  // ── OAuth auto-exchange ──────────────────────────────────────────
+  // ── Exchange auth_code for token ─────────────────────────────────
+  const exchangeAuthCode = useCallback(async (code: string) => {
+    if (!code.trim() || oauthExchanging) return;
+    setOauthExchanging(true);
+    setConnectionError("");
+    try {
+      const res = await fetch(`/api/tiktok-ads/oauth?auth_code=${encodeURIComponent(code.trim())}`);
+      const data = await res.json();
+      if (data?.data?.access_token) {
+        setAccessToken(data.data.access_token);
+        const advIds = data.data.advertiser_ids;
+        if (Array.isArray(advIds) && advIds.length > 0) {
+          setAdvertiserId(String(advIds[0]));
+        }
+        setOauthSuccess(true);
+        setAuthCodeInput("");
+      } else {
+        setConnectionError(data?.message || data?.error || "No se pudo obtener el token. Intenta de nuevo.");
+      }
+    } catch {
+      setConnectionError("Error de conexión al intercambiar el código.");
+    } finally {
+      setOauthExchanging(false);
+    }
+  }, [oauthExchanging]);
+
+  // Auto-exchange if auth_code comes in URL (from redirect)
   useEffect(() => {
     const authCode = searchParams.get("auth_code");
-    if (!authCode || oauthExchanging || oauthSuccess || connected) return;
-
-    (async () => {
-      setOauthExchanging(true);
-      setConnectionError("");
-      try {
-        const res = await fetch(`/api/tiktok-ads/oauth?auth_code=${encodeURIComponent(authCode)}`);
-        const data = await res.json();
-
-        if (data?.data?.access_token) {
-          setAccessToken(data.data.access_token);
-          const advIds = data.data.advertiser_ids;
-          if (Array.isArray(advIds) && advIds.length > 0) {
-            setAdvertiserId(String(advIds[0]));
-          }
-          setOauthSuccess(true);
-          // Clean URL
-          router.replace("/admin/campanas/tiktok", { scroll: false });
-        } else {
-          setConnectionError(
-            data?.message || data?.error || "No se pudo obtener el token. Intenta de nuevo."
-          );
-        }
-      } catch {
-        setConnectionError("Error de conexión al intercambiar el código OAuth.");
-      } finally {
-        setOauthExchanging(false);
-      }
-    })();
-  }, [searchParams, oauthExchanging, oauthSuccess, connected, router]);
+    if (!authCode || oauthSuccess || connected) return;
+    exchangeAuthCode(authCode);
+    router.replace("/admin/campanas/tiktok", { scroll: false });
+  }, [searchParams, oauthSuccess, connected, exchangeAuthCode, router]);
 
   // ── Auth token ─────────────────────────────────────────────────
   const getToken = useCallback(async () => {
@@ -557,13 +558,8 @@ function TikTokAdsContent() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // ── Not connected ──────────────────────────────────────────────
-  // ── OAuth URL builder ────────────────────────────────────────────
-  const TIKTOK_APP_ID = "7619166839642865681";
-  const getOAuthUrl = useCallback(() => {
-    const redirectUri = `${window.location.origin}/admin/campanas/tiktok`;
-    return `https://business-api.tiktok.com/portal/auth?app_id=${TIKTOK_APP_ID}&state=indexa&redirect_uri=${encodeURIComponent(redirectUri)}`;
-  }, []);
+  // ── OAuth URL (uses redirect_uri registered in TikTok app) ─────
+  const TIKTOK_OAUTH_URL = "https://business-api.tiktok.com/portal/auth?app_id=7619166839642865681&state=indexa&redirect_uri=https%3A%2F%2Ftecnicoscertificados.com%2F";
 
   if (!connected) {
     return (
@@ -609,17 +605,56 @@ function TikTokAdsContent() {
               </div>
             </div>
 
-            {/* ── Option 1: OAuth (recommended) ── */}
+            {/* ── Option 1: OAuth (3-step) ── */}
             <div className="mt-6 space-y-3">
-              <div className="rounded-xl bg-gradient-to-r from-gray-900 to-gray-800 p-5">
-                <p className="text-xs font-bold text-white/80 uppercase tracking-wider">Recomendado</p>
-                <p className="mt-1 text-sm text-white">Conecta automáticamente con un clic. Se abrirá TikTok para autorizar tu cuenta.</p>
-                <a
-                  href={typeof window !== "undefined" ? getOAuthUrl() : "#"}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-gray-900 transition-colors hover:bg-gray-100"
-                >
-                  <Zap size={16} /> Conectar con TikTok
-                </a>
+              <div className="rounded-xl bg-gradient-to-r from-gray-900 to-gray-800 p-5 space-y-3">
+                <p className="text-xs font-bold text-white/80 uppercase tracking-wider">Conexión rápida (3 pasos)</p>
+
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px] font-bold text-white">1</span>
+                    <div className="flex-1">
+                      <p className="text-xs text-white/90">Haz clic para autorizar en TikTok:</p>
+                      <a
+                        href={TIKTOK_OAUTH_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-1.5 flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-xs font-bold text-gray-900 transition-colors hover:bg-gray-100"
+                      >
+                        <ExternalLink size={14} /> Abrir TikTok para autorizar
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px] font-bold text-white">2</span>
+                    <p className="text-xs text-white/90">Después de autorizar, TikTok te redirige a una página. Copia el código <code className="rounded bg-white/20 px-1 py-0.5 text-[10px]">auth_code</code> de la URL.</p>
+                  </div>
+
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-[10px] font-bold text-white">3</span>
+                    <div className="flex-1">
+                      <p className="text-xs text-white/90">Pégalo aquí:</p>
+                      <div className="mt-1.5 flex gap-1.5">
+                        <input
+                          type="text"
+                          value={authCodeInput}
+                          onChange={(e) => setAuthCodeInput(e.target.value)}
+                          placeholder="Pega el auth_code aquí"
+                          className="flex-1 rounded-lg bg-white/10 border border-white/20 px-3 py-2 text-xs text-white placeholder:text-white/40 outline-none focus:border-white/50"
+                        />
+                        <button
+                          onClick={() => exchangeAuthCode(authCodeInput)}
+                          disabled={oauthExchanging || !authCodeInput.trim()}
+                          className="flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-xs font-bold text-gray-900 hover:bg-gray-100 disabled:opacity-50 shrink-0"
+                        >
+                          {oauthExchanging ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                          Obtener Token
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center gap-3 px-2">
