@@ -704,6 +704,221 @@ export async function createAdGroup(
 }
 
 /**
+ * Update an existing ad group (targeting, budget, schedule, etc.).
+ */
+export async function updateAdGroup(
+  creds: TikTokCredentials,
+  params: {
+    adgroupId: string;
+    adgroupName?: string;
+    budget?: number;
+    budgetMode?: "BUDGET_MODE_DAY" | "BUDGET_MODE_TOTAL";
+    location_ids?: string[];
+    ageGroups?: string[];
+    gender?: string;
+    operationStatus?: "ENABLE" | "DISABLE";
+    scheduleStartTime?: string;
+    scheduleEndTime?: string;
+    interestCategoryIds?: string[];
+  }
+): Promise<{ adgroupId: string }> {
+  const body: Record<string, unknown> = {
+    advertiser_id: creds.advertiserId,
+    adgroup_id: params.adgroupId,
+  };
+
+  if (params.adgroupName) body.adgroup_name = params.adgroupName;
+  if (params.budget !== undefined) body.budget = params.budget;
+  if (params.budgetMode) body.budget_mode = params.budgetMode;
+  if (params.location_ids && params.location_ids.length > 0) body.location_ids = params.location_ids;
+  if (params.ageGroups && params.ageGroups.length > 0) body.age_groups = params.ageGroups;
+  if (params.gender) body.gender = params.gender;
+  if (params.operationStatus) body.operation_status = params.operationStatus;
+  if (params.scheduleStartTime) body.schedule_start_time = params.scheduleStartTime;
+  if (params.scheduleEndTime) body.schedule_end_time = params.scheduleEndTime;
+  if (params.interestCategoryIds && params.interestCategoryIds.length > 0) {
+    body.interest_category_ids = params.interestCategoryIds;
+  }
+
+  await tiktokFetch<{ adgroup_id: string }>(
+    "/adgroup/update/",
+    creds.accessToken,
+    { method: "POST", body }
+  );
+
+  return { adgroupId: params.adgroupId };
+}
+
+/**
+ * Upload an image from URL for use in ads.
+ */
+export async function uploadImageByUrl(
+  creds: TikTokCredentials,
+  imageUrl: string,
+  fileName?: string
+): Promise<{ imageId: string; imageUrl: string; width: number; height: number }> {
+  const body: Record<string, unknown> = {
+    advertiser_id: creds.advertiserId,
+    image_url: imageUrl,
+    upload_type: "UPLOAD_BY_URL",
+  };
+  if (fileName) body.file_name = fileName;
+
+  const response = await tiktokFetch<{
+    id: string;
+    image_url: string;
+    width: number;
+    height: number;
+  }>("/file/image/ad/upload/", creds.accessToken, { method: "POST", body });
+
+  return {
+    imageId: response.data.id,
+    imageUrl: response.data.image_url,
+    width: response.data.width,
+    height: response.data.height,
+  };
+}
+
+/**
+ * Upload a video from URL for use in ads.
+ */
+export async function uploadVideoByUrl(
+  creds: TikTokCredentials,
+  videoUrl: string,
+  fileName?: string
+): Promise<{ videoId: string }> {
+  const body: Record<string, unknown> = {
+    advertiser_id: creds.advertiserId,
+    video_url: videoUrl,
+    upload_type: "UPLOAD_BY_URL",
+  };
+  if (fileName) body.file_name = fileName;
+
+  const response = await tiktokFetch<{ video_id: string }>(
+    "/file/video/ad/upload/",
+    creds.accessToken,
+    { method: "POST", body }
+  );
+
+  return { videoId: response.data.video_id };
+}
+
+/**
+ * Create an ad within an ad group.
+ */
+export async function createAd(
+  creds: TikTokCredentials,
+  params: {
+    adgroupId: string;
+    adName: string;
+    adText: string;
+    imageId?: string;
+    videoId?: string;
+    callToAction?: string;
+    landingPageUrl?: string;
+    identityId?: string;
+    identityType?: string;
+  }
+): Promise<{ adId: string }> {
+  const creative: Record<string, unknown> = {
+    ad_name: params.adName,
+    ad_text: params.adText,
+    call_to_action: params.callToAction || "LEARN_MORE",
+  };
+
+  if (params.landingPageUrl) creative.landing_page_url = params.landingPageUrl;
+  if (params.imageId) creative.image_ids = [params.imageId];
+  if (params.videoId) creative.video_id = params.videoId;
+  if (params.identityId) creative.identity_id = params.identityId;
+  if (params.identityType) creative.identity_type = params.identityType;
+
+  const body: Record<string, unknown> = {
+    advertiser_id: creds.advertiserId,
+    adgroup_id: params.adgroupId,
+    creatives: [creative],
+  };
+
+  const response = await tiktokFetch<{ ad_ids: string[] }>(
+    "/ad/create/",
+    creds.accessToken,
+    { method: "POST", body }
+  );
+
+  return { adId: (response.data.ad_ids || [])[0] || "unknown" };
+}
+
+/**
+ * Search for targeting location IDs by keyword.
+ */
+export async function searchLocations(
+  creds: TikTokCredentials,
+  keyword: string,
+  level?: string
+): Promise<Array<{ locationId: string; name: string; level: string; parentId?: string }>> {
+  const params: Record<string, string | number> = {
+    advertiser_id: creds.advertiserId,
+    language: "es",
+  };
+
+  const body: Record<string, unknown> = {
+    advertiser_id: creds.advertiserId,
+    keyword,
+    language: "es",
+  };
+  if (level) body.level = level;
+
+  const response = await tiktokFetch<{
+    list: Array<{
+      location_id: string;
+      name: string;
+      level: string;
+      parent_id?: string;
+    }>;
+  }>("/tool/targeting/search/", creds.accessToken, {
+    method: "POST",
+    body,
+  });
+
+  return (response.data.list || []).map((l) => ({
+    locationId: l.location_id,
+    name: l.name,
+    level: l.level,
+    parentId: l.parent_id,
+  }));
+}
+
+/**
+ * Get interest/behavior categories for targeting.
+ */
+export async function getInterestCategories(
+  creds: TikTokCredentials,
+  version = 2
+): Promise<Array<{ id: string; name: string; level: number; parentId?: string }>> {
+  const response = await tiktokFetch<{
+    list: Array<{
+      interest_category_id: string;
+      interest_category_name: string;
+      level: number;
+      parent_id?: string;
+    }>;
+  }>("/tool/interest_category/", creds.accessToken, {
+    method: "GET",
+    params: {
+      advertiser_id: creds.advertiserId,
+      version,
+      language: "es",
+    },
+  });
+
+  return (response.data.list || []).map((c) => ({
+    id: c.interest_category_id,
+    name: c.interest_category_name,
+    level: c.level,
+    parentId: c.parent_id,
+  }));
+}
+
+/**
  * Get account transactions.
  */
 export async function getTransactions(

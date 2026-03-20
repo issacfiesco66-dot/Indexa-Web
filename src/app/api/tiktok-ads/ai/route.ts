@@ -12,8 +12,14 @@ import {
   getPixels,
   createCampaign,
   createAdGroup,
+  updateAdGroup,
   updateCampaignStatus,
   updateCampaignBudget,
+  uploadImageByUrl,
+  uploadVideoByUrl,
+  createAd,
+  searchLocations,
+  getInterestCategories,
   type TikTokCredentials,
 } from "@/lib/tiktokAdsClient";
 
@@ -29,14 +35,28 @@ SIEMPRE responde en español. Sé conciso, útil y basado en datos.
 Cuando el usuario pregunte por campañas o métricas, obtén los datos frescos con las herramientas disponibles.
 Cuando tomes acciones, siempre confirma qué hiciste y el resultado.
 Formato de números: $1,234.56 para dinero, 2.5% para porcentajes, 10,000 para impresiones.
-IMPORTANTE: create_campaign_draft crea campaña + ad group en estado PAUSADO. El usuario debe subir el creativo (video/imagen) manualmente desde TikTok Ads Manager.
+IMPORTANTE: Tienes herramientas completas para gestionar TODO el flujo de campañas:
+- Crear campañas, ad groups y anuncios
+- Configurar segmentación (ubicación, edad, género, intereses)
+- Subir imágenes y videos desde URLs
+- Buscar ubicaciones para targeting (ej: "Querétaro", "CDMX")
+
+FLUJO COMPLETO para crear una campaña:
+1. Usar search_locations para encontrar IDs de ubicaciones
+2. Crear campaña con create_campaign_draft
+3. Crear ad groups adicionales con create_adgroup (con targeting completo)
+4. Subir imágenes/videos con upload_image o upload_video
+5. Crear anuncios con create_ad
+
 TikTok usa presupuesto en la moneda de la cuenta (generalmente USD). Si el usuario dice pesos, convierte a USD usando ~17 MXN = 1 USD como referencia.
 MÍNIMOS DE PRESUPUESTO DIARIO DE TIKTOK:
 - Campaña: $50 USD/día mínimo
 - Ad Group: $20 USD/día mínimo
 Si el usuario quiere gastar menos de $50 USD/día, explícale que TikTok exige ese mínimo a nivel campaña. A nivel ad group el mínimo es $20 USD/día.
 NO inventes mínimos diferentes. NUNCA digas que el mínimo es $500 USD — eso es FALSO.
-Los objective_type válidos para TikTok son: TRAFFIC, CONVERSIONS, APP_INSTALL, REACH, VIDEO_VIEWS, LEAD_GENERATION, ENGAGEMENT, CATALOG_SALES.`;
+Cuando el usuario pida crear una campaña completa, NO digas que no puedes. USA las herramientas disponibles para hacer todo lo que pida.
+Los objective_type válidos para TikTok son: TRAFFIC, CONVERSIONS, APP_INSTALL, REACH, VIDEO_VIEWS, LEAD_GENERATION, ENGAGEMENT, CATALOG_SALES.
+Los call_to_action válidos: LEARN_MORE, SIGN_UP, DOWNLOAD, SHOP_NOW, CONTACT_US, APPLY_NOW, GET_QUOTE, BOOK_NOW, SUBSCRIBE, ORDER_NOW.`;
 
 // ── Tool definitions ─────────────────────────────────────────────────
 const tools = [
@@ -134,7 +154,7 @@ const tools = [
   },
   {
     name: "create_campaign_draft",
-    description: "Crea un borrador de campaña con un ad group. Queda PAUSADA sin creativo (el usuario sube el video/imagen desde TikTok Ads Manager).",
+    description: "Crea un borrador de campaña con un ad group básico. Queda PAUSADA. Luego puedes crear ad groups adicionales y anuncios.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -155,6 +175,125 @@ const tools = [
         },
       },
       required: ["name", "objective", "daily_budget_usd"],
+    },
+  },
+  {
+    name: "create_adgroup",
+    description: "Crea un ad group adicional dentro de una campaña existente, con segmentación completa (ubicación, edad, género). Usa search_locations primero para obtener los location_ids.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        campaign_id: { type: "string", description: "ID de la campaña donde crear el ad group" },
+        name: { type: "string", description: "Nombre del ad group" },
+        daily_budget_usd: { type: "number", description: "Presupuesto diario en USD (mínimo $20)" },
+        optimization_goal: {
+          type: "string",
+          enum: ["CLICK", "IMPRESSION", "REACH", "VIDEO_VIEW", "CONVERSION", "LEAD_GENERATION"],
+          description: "Meta de optimización",
+        },
+        location_ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "IDs de ubicaciones para targeting (usa search_locations para encontrarlos)",
+        },
+        age_groups: {
+          type: "array",
+          items: { type: "string", enum: ["AGE_13_17", "AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_100"] },
+          description: "Rangos de edad para targeting",
+        },
+        gender: {
+          type: "string",
+          enum: ["GENDER_MALE", "GENDER_FEMALE", "GENDER_UNLIMITED"],
+          description: "Género para targeting (default: GENDER_UNLIMITED)",
+        },
+      },
+      required: ["campaign_id", "name", "daily_budget_usd"],
+    },
+  },
+  {
+    name: "update_adgroup",
+    description: "Actualiza un ad group existente: targeting, presupuesto, nombre, estado",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        adgroup_id: { type: "string", description: "ID del ad group a actualizar" },
+        name: { type: "string", description: "Nuevo nombre (opcional)" },
+        daily_budget_usd: { type: "number", description: "Nuevo presupuesto diario en USD (opcional)" },
+        location_ids: {
+          type: "array",
+          items: { type: "string" },
+          description: "Nuevos IDs de ubicaciones (opcional)",
+        },
+        age_groups: {
+          type: "array",
+          items: { type: "string" },
+          description: "Nuevos rangos de edad (opcional)",
+        },
+        gender: { type: "string", description: "Nuevo género targeting (opcional)" },
+        status: { type: "string", enum: ["ENABLE", "DISABLE"], description: "Activar o pausar (opcional)" },
+      },
+      required: ["adgroup_id"],
+    },
+  },
+  {
+    name: "search_locations",
+    description: "Busca ubicaciones para targeting por nombre (ej: 'Querétaro', 'Ciudad de México', 'Jalisco'). Devuelve location_ids necesarios para crear ad groups con segmentación geográfica.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        keyword: { type: "string", description: "Nombre de la ciudad, estado o país a buscar" },
+      },
+      required: ["keyword"],
+    },
+  },
+  {
+    name: "get_interest_categories",
+    description: "Obtiene las categorías de intereses disponibles para targeting en ad groups",
+    input_schema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "upload_image",
+    description: "Sube una imagen desde una URL pública para usarla en anuncios. Devuelve el image_id necesario para create_ad.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        image_url: { type: "string", description: "URL pública de la imagen (JPG, PNG)" },
+        file_name: { type: "string", description: "Nombre del archivo (opcional)" },
+      },
+      required: ["image_url"],
+    },
+  },
+  {
+    name: "upload_video",
+    description: "Sube un video desde una URL pública para usarlo en anuncios. Devuelve el video_id necesario para create_ad.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        video_url: { type: "string", description: "URL pública del video (MP4)" },
+        file_name: { type: "string", description: "Nombre del archivo (opcional)" },
+      },
+      required: ["video_url"],
+    },
+  },
+  {
+    name: "create_ad",
+    description: "Crea un anuncio dentro de un ad group. Necesita image_id (de upload_image) o video_id (de upload_video). Incluye texto, CTA y landing page.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        adgroup_id: { type: "string", description: "ID del ad group donde crear el anuncio" },
+        ad_name: { type: "string", description: "Nombre del anuncio" },
+        ad_text: { type: "string", description: "Texto del anuncio (máx 100 caracteres)" },
+        image_id: { type: "string", description: "ID de imagen subida (de upload_image)" },
+        video_id: { type: "string", description: "ID de video subido (de upload_video)" },
+        landing_page_url: { type: "string", description: "URL de destino del anuncio" },
+        call_to_action: {
+          type: "string",
+          enum: ["LEARN_MORE", "SIGN_UP", "DOWNLOAD", "SHOP_NOW", "CONTACT_US", "APPLY_NOW", "GET_QUOTE", "BOOK_NOW", "SUBSCRIBE", "ORDER_NOW"],
+          description: "Botón de acción (default: LEARN_MORE)",
+        },
+      },
+      required: ["adgroup_id", "ad_name", "ad_text"],
     },
   },
 ];
@@ -291,6 +430,92 @@ async function executeTool(
         });
       }
 
+      case "create_adgroup": {
+        const campaignId = input.campaign_id as string;
+        const agName = input.name as string;
+        const dailyBudget = (input.daily_budget_usd as number) || 20;
+        const optGoal = (input.optimization_goal as string) || "CLICK";
+
+        if (dailyBudget < 20) {
+          return JSON.stringify({ success: false, error: `Presupuesto $${dailyBudget} USD menor al mínimo de $20 USD/día para ad groups.` });
+        }
+
+        const { adgroupId } = await createAdGroup(creds, {
+          campaignId,
+          adgroupName: agName,
+          budget: dailyBudget,
+          budgetMode: "BUDGET_MODE_DAY",
+          optimizationGoal: optGoal,
+          location_ids: (input.location_ids as string[]) || undefined,
+          ageGroups: (input.age_groups as string[]) || undefined,
+          gender: (input.gender as string) || undefined,
+        });
+
+        return JSON.stringify({
+          success: true,
+          adgroupId,
+          note: `Ad group "${agName}" creado en campaña ${campaignId}. ID: ${adgroupId}. Presupuesto: $${dailyBudget} USD/día.`,
+        });
+      }
+
+      case "update_adgroup": {
+        const agId = input.adgroup_id as string;
+        const updateParams: Record<string, unknown> = { adgroupId: agId };
+
+        if (input.name) updateParams.adgroupName = input.name;
+        if (input.daily_budget_usd) updateParams.budget = input.daily_budget_usd;
+        if (input.daily_budget_usd) updateParams.budgetMode = "BUDGET_MODE_DAY";
+        if (input.location_ids) updateParams.location_ids = input.location_ids;
+        if (input.age_groups) updateParams.ageGroups = input.age_groups;
+        if (input.gender) updateParams.gender = input.gender;
+        if (input.status) updateParams.operationStatus = input.status;
+
+        await updateAdGroup(creds, updateParams as Parameters<typeof updateAdGroup>[1]);
+        return JSON.stringify({ success: true, note: `Ad group ${agId} actualizado exitosamente.` });
+      }
+
+      case "search_locations": {
+        const keyword = input.keyword as string;
+        const locations = await searchLocations(creds, keyword);
+        if (locations.length === 0) return `No se encontraron ubicaciones para "${keyword}". Intenta con otro nombre.`;
+        return JSON.stringify(locations, null, 2);
+      }
+
+      case "get_interest_categories": {
+        const categories = await getInterestCategories(creds);
+        if (categories.length === 0) return "No hay categorías de intereses disponibles.";
+        // Return top-level categories only to avoid huge response
+        const topLevel = categories.filter((c) => c.level === 1);
+        return JSON.stringify(topLevel.length > 0 ? topLevel : categories.slice(0, 50), null, 2);
+      }
+
+      case "upload_image": {
+        const imageUrl = input.image_url as string;
+        const fileName = input.file_name as string | undefined;
+        const result = await uploadImageByUrl(creds, imageUrl, fileName);
+        return JSON.stringify({ success: true, ...result, note: `Imagen subida. Usa image_id: "${result.imageId}" en create_ad.` });
+      }
+
+      case "upload_video": {
+        const videoUrl = input.video_url as string;
+        const fileName = input.file_name as string | undefined;
+        const result = await uploadVideoByUrl(creds, videoUrl, fileName);
+        return JSON.stringify({ success: true, ...result, note: `Video subido. Usa video_id: "${result.videoId}" en create_ad.` });
+      }
+
+      case "create_ad": {
+        const adResult = await createAd(creds, {
+          adgroupId: input.adgroup_id as string,
+          adName: input.ad_name as string,
+          adText: input.ad_text as string,
+          imageId: (input.image_id as string) || undefined,
+          videoId: (input.video_id as string) || undefined,
+          landingPageUrl: (input.landing_page_url as string) || undefined,
+          callToAction: (input.call_to_action as string) || "LEARN_MORE",
+        });
+        return JSON.stringify({ success: true, adId: adResult.adId, note: `Anuncio "${input.ad_name}" creado. Ad ID: ${adResult.adId}.` });
+      }
+
       default:
         return `Herramienta desconocida: ${name}`;
     }
@@ -342,8 +567,8 @@ export async function POST(request: NextRequest) {
       { role: "user", content: message },
     ];
 
-    // Agentic loop — up to 5 rounds
-    for (let round = 0; round < 5; round++) {
+    // Agentic loop — up to 10 rounds for complex multi-tool operations
+    for (let round = 0; round < 10; round++) {
       console.log(`[tiktok-ads/ai] round ${round}, calling Claude`);
 
       const claudeRes = await fetch(ANTHROPIC_URL, {
@@ -355,7 +580,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           model: CLAUDE_MODEL,
-          max_tokens: 1024,
+          max_tokens: 2048,
           system: SYSTEM_PROMPT,
           tools,
           messages: claudeMessages,
