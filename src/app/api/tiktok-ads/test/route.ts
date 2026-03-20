@@ -26,34 +26,40 @@ export async function GET(request: Request) {
   };
 
   try {
-    // Step 1: Always list available advertisers (POST with JSON body)
-    const advRes = await fetch(
+    // Approach 1: GET with query params (no trailing slash)
+    const qs = `app_id=${APP_ID}&secret=${SECRET}&access_token=${accessToken}`;
+    const advRes1 = await fetch(
+      `https://business-api.tiktok.com/open_api/v1.3/oauth2/advertiser/get?${qs}`,
+      { method: "GET" }
+    );
+    diagnostics.approach1_get = await advRes1.json();
+
+    // Approach 2: POST with JSON body
+    const advRes2 = await fetch(
       `https://business-api.tiktok.com/open_api/v1.3/oauth2/advertiser/get/`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          app_id: APP_ID,
-          secret: SECRET,
-          access_token: accessToken,
-        }),
+        body: JSON.stringify({ app_id: APP_ID, secret: SECRET, access_token: accessToken }),
       }
     );
-    const advData = await advRes.json();
-    diagnostics.advertisers = advData;
+    diagnostics.approach2_post = await advRes2.json();
 
-    // Step 2: If advertiserId provided, also test advertiser info
+    // Approach 3: GET with Access-Token header
+    const advRes3 = await fetch(
+      `https://business-api.tiktok.com/open_api/v1.3/oauth2/advertiser/get/?app_id=${APP_ID}&secret=${SECRET}`,
+      { method: "GET", headers: { "Access-Token": accessToken } }
+    );
+    diagnostics.approach3_header = await advRes3.json();
+
+    // If advertiserId provided, test advertiser info
     if (advertiserId) {
       diagnostics.advertiserId = advertiserId;
       const infoRes = await fetch(
         `https://business-api.tiktok.com/open_api/v1.3/advertiser/info/?advertiser_ids=["${advertiserId}"]`,
-        {
-          method: "GET",
-          headers: { "Access-Token": accessToken, "Content-Type": "application/json" },
-        }
+        { method: "GET", headers: { "Access-Token": accessToken, "Content-Type": "application/json" } }
       );
-      const infoData = await infoRes.json();
-      diagnostics.advertiserInfo = infoData;
+      diagnostics.advertiserInfo = await infoRes.json();
     }
 
     diagnostics.step = "complete";
