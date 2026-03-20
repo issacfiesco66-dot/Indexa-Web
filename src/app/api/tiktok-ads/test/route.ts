@@ -26,10 +26,18 @@ export async function GET(request: Request) {
   };
 
   try {
-    // Step 1: Always list available advertisers
+    // Step 1: Always list available advertisers (POST with JSON body)
     const advRes = await fetch(
-      `https://business-api.tiktok.com/open_api/v1.3/oauth2/advertiser/get/?app_id=${APP_ID}&secret=${SECRET}&access_token=${accessToken}`,
-      { method: "GET", headers: { "Content-Type": "application/json" } }
+      `https://business-api.tiktok.com/open_api/v1.3/oauth2/advertiser/get/`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          app_id: APP_ID,
+          secret: SECRET,
+          access_token: accessToken,
+        }),
+      }
     );
     const advData = await advRes.json();
     diagnostics.advertisers = advData;
