@@ -75,6 +75,23 @@ Propón los 3 ángulos Hook-Body-CTA en tu respuesta para que el usuario sepa qu
 2. Social Proof/Autoridad — confianza y certificaciones
 3. Urgencia/Oferta — beneficio inmediato
 
+═══ OPTIMIZACIÓN DE CAMPAÑAS ═══
+Cuando el usuario diga "optimiza mi campaña" o "analiza el rendimiento":
+1. Usa list_campaigns para encontrar la campaña
+2. Usa optimize_campaign con el campaign_id
+
+optimize_campaign analiza automáticamente:
+- Ranking de Ad Groups por performance score (CTR × 40% + Conversión × 40% + Alcance × 20%)
+- Identifica ganador y perdedor
+- Da insights (CTR excelente/aceptable/bajo)
+- Recomienda acciones concretas
+
+Si el usuario dice "optimiza automáticamente" o "ajusta presupuestos":
+- Usa auto_adjust: true → pausa el peor AG y sube presupuesto al mejor (+30%)
+
+Si la campaña no tiene datos aún (< 48h activa):
+- Explica que necesita más tiempo y sugiere esperar 3-5 días
+
 ═══ FORMATO DE RESPUESTA ═══
 Al crear, muestra resumen técnico completo:
 📋 Campaign: nombre, ID, objetivo, presupuesto, moneda
@@ -379,6 +396,20 @@ const tools = [
         },
       },
       required: ["business_name", "business_description", "location_keyword", "objective", "daily_budget", "age_groups_narrow", "age_groups_broad"],
+    },
+  },
+  {
+    name: "optimize_campaign",
+    description: "Analiza el rendimiento de una campaña y sus ad groups. Compara métricas (CTR, CPC, gasto, conversiones), identifica ganadores y perdedores, pausa los peores, sube presupuesto a los mejores, y genera un reporte de optimización con recomendaciones de copy.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        campaign_id: { type: "string", description: "ID de la campaña a optimizar" },
+        days: { type: "number", description: "Días de datos a analizar (default: 7, max: 30)" },
+        auto_adjust: { type: "boolean", description: "Si true, pausa perdedores y sube presupuesto a ganadores automáticamente. Si false, solo reporta. Default: false" },
+        budget_boost_pct: { type: "number", description: "Porcentaje de aumento de presupuesto para ganadores (default: 30 = +30%)" },
+      },
+      required: ["campaign_id"],
     },
   },
 ];
@@ -765,6 +796,179 @@ async function executeTool(
           steps,
           errors: errors.length > 0 ? errors : undefined,
           nextStep: ag1Id ? `Usa generate_ad_image para crear imagen, luego create_ad con adgroup_id "${ag1Id}" para crear el anuncio.` : "Los ad groups fallaron. Revisa los errores.",
+        });
+      }
+
+      case "optimize_campaign": {
+        const campaignId = input.campaign_id as string;
+        const days = Math.min(Math.max((input.days as number) || 7, 1), 30);
+        const autoAdjust = (input.auto_adjust as boolean) || false;
+        const boostPct = (input.budget_boost_pct as number) || 30;
+
+        // Get account info for currency
+        let currency = "MXN";
+        try {
+          const info = await getAdvertiserInfo(creds);
+          currency = (info as unknown as Record<string, unknown>).currency as string || "MXN";
+        } catch { /* use default */ }
+
+        // Get ad groups for this campaign
+        const { adGroups } = await getAdGroups(creds, campaignId);
+        if (adGroups.length === 0) {
+          return JSON.stringify({ success: false, error: "No hay ad groups en esta campaña. No hay nada que optimizar." });
+        }
+
+        // Get reporting data
+        const end = new Date();
+        const start = new Date();
+        start.setDate(start.getDate() - days);
+        const startStr = start.toISOString().split("T")[0];
+        const endStr = end.toISOString().split("T")[0];
+
+        let reportData: unknown[] = [];
+        try {
+          const report = await getReporting(creds, {
+            startDate: startStr,
+            endDate: endStr,
+            reportType: "BASIC",
+            dimensions: ["adgroup_id"],
+            metrics: ["spend", "impressions", "clicks", "ctr", "cpc", "cpm", "conversion", "cost_per_conversion", "reach"],
+          });
+          reportData = (report as unknown as { list: unknown[] }).list || [];
+        } catch {
+          reportData = [];
+        }
+
+        // Build performance map
+        type AgMetrics = {
+          id: string; name: string; status: string; budget: number;
+          spend: number; impressions: number; clicks: number; ctr: number;
+          cpc: number; conversions: number; costPerConversion: number; reach: number;
+          score: number;
+        };
+
+        const agMetrics: AgMetrics[] = adGroups.map((ag) => {
+          const metrics = reportData.find((r: unknown) =>
+            (r as Record<string, unknown>).dimensions?.adgroup_id === ag.adGroupId
+          ) as Record<string, Record<string, string>> | undefined;
+
+          const m = metrics?.metrics || {};
+          const spend = parseFloat(m.spend || "0");
+          const impressions = parseInt(m.impressions || "0");
+          const clicks = parseInt(m.clicks || "0");
+          const ctr = parseFloat(m.ctr || "0");
+          const cpc = parseFloat(m.cpc || "0");
+          const conversions = parseInt(m.conversion || "0");
+          const costPerConversion = parseFloat(m.cost_per_conversion || "0");
+          const reach = parseInt(m.reach || "0");
+
+          // Performance score: higher is better
+          // Weighted: CTR (40%) + conversion rate (40%) + reach efficiency (20%)
+          const convRate = clicks > 0 ? (conversions / clicks) * 100 : 0;
+          const reachEff = spend > 0 ? reach / spend : 0;
+          const score = (ctr * 40) + (convRate * 40) + (reachEff * 20);
+
+          return {
+            id: ag.adGroupId, name: ag.adGroupName, status: ag.operationStatus || "UNKNOWN",
+            budget: ag.budget || 0, spend, impressions, clicks, ctr, cpc,
+            conversions, costPerConversion, reach, score,
+          };
+        });
+
+        // Sort by score (best first)
+        agMetrics.sort((a, b) => b.score - a.score);
+
+        const winner = agMetrics[0];
+        const loser = agMetrics[agMetrics.length - 1];
+        const hasData = agMetrics.some((ag) => ag.impressions > 0);
+
+        // Build report
+        const report: Record<string, unknown> = {
+          period: `${startStr} → ${endStr} (${days} días)`,
+          currency,
+          totalSpend: agMetrics.reduce((sum, ag) => sum + ag.spend, 0),
+          totalClicks: agMetrics.reduce((sum, ag) => sum + ag.clicks, 0),
+          totalConversions: agMetrics.reduce((sum, ag) => sum + ag.conversions, 0),
+          totalImpressions: agMetrics.reduce((sum, ag) => sum + ag.impressions, 0),
+          adGroupRanking: agMetrics.map((ag, i) => ({
+            rank: i + 1,
+            name: ag.name,
+            id: ag.id,
+            status: ag.status,
+            budget: `$${ag.budget} ${currency}/día`,
+            spend: `$${ag.spend.toFixed(2)}`,
+            impressions: ag.impressions,
+            clicks: ag.clicks,
+            ctr: `${ag.ctr.toFixed(2)}%`,
+            cpc: `$${ag.cpc.toFixed(2)}`,
+            conversions: ag.conversions,
+            costPerConversion: ag.costPerConversion > 0 ? `$${ag.costPerConversion.toFixed(2)}` : "N/A",
+            reach: ag.reach,
+            performanceScore: ag.score.toFixed(1),
+          })),
+        };
+
+        const actions: string[] = [];
+
+        if (!hasData) {
+          report.insight = "No hay datos suficientes aún. Las campañas necesitan al menos 48-72 horas activas para generar métricas significativas.";
+          report.recommendation = "Activa la campaña y espera 3-5 días antes de optimizar.";
+        } else {
+          // Insights
+          report.winner = { name: winner.name, id: winner.id, reason: `Mejor CTR (${winner.ctr.toFixed(2)}%) y score (${winner.score.toFixed(1)})` };
+          report.loser = { name: loser.name, id: loser.id, reason: `Peor score (${loser.score.toFixed(1)})${loser.ctr === 0 ? " — sin clics" : ""}` };
+
+          // Determine dominant pattern
+          const avgCtr = agMetrics.reduce((s, a) => s + a.ctr, 0) / agMetrics.length;
+          const avgCpc = agMetrics.reduce((s, a) => s + a.cpc, 0) / agMetrics.length;
+
+          if (avgCtr > 2) {
+            report.insight = `CTR promedio de ${avgCtr.toFixed(2)}% es EXCELENTE. Los creativos están funcionando bien.`;
+          } else if (avgCtr > 0.8) {
+            report.insight = `CTR promedio de ${avgCtr.toFixed(2)}% es ACEPTABLE. Hay oportunidad de mejorar creativos.`;
+          } else {
+            report.insight = `CTR promedio de ${avgCtr.toFixed(2)}% es BAJO. Necesitas cambiar creativos (hooks más fuertes) o ajustar targeting.`;
+          }
+
+          report.recommendations = [];
+          if (winner.score > loser.score * 2) {
+            (report.recommendations as string[]).push(`🏆 "${winner.name}" supera ampliamente a "${loser.name}". Redirige presupuesto al ganador.`);
+          }
+          if (avgCpc > 5 && currency === "MXN") {
+            (report.recommendations as string[]).push(`💰 CPC promedio alto ($${avgCpc.toFixed(2)}). Considera cambiar a bid LOWEST_COST o mejorar la relevancia del anuncio.`);
+          }
+
+          // Auto-adjust if requested
+          if (autoAdjust && agMetrics.length >= 2 && winner.id !== loser.id) {
+            // Pause loser
+            try {
+              await updateAdGroup(creds, { adgroupId: loser.id, operationStatus: "DISABLE" } as Parameters<typeof updateAdGroup>[1]);
+              actions.push(`⏸️ PAUSADO: "${loser.name}" (peor rendimiento, score ${loser.score.toFixed(1)})`);
+            } catch (e) {
+              actions.push(`❌ Error pausando "${loser.name}": ${e instanceof Error ? e.message : String(e)}`);
+            }
+
+            // Boost winner budget
+            const newBudget = Math.round(winner.budget * (1 + boostPct / 100));
+            try {
+              await updateAdGroup(creds, { adgroupId: winner.id, budget: newBudget, budgetMode: "BUDGET_MODE_DAY" } as Parameters<typeof updateAdGroup>[1]);
+              actions.push(`📈 BOOST: "${winner.name}" presupuesto $${winner.budget} → $${newBudget} ${currency}/día (+${boostPct}%)`);
+            } catch (e) {
+              actions.push(`❌ Error ajustando presupuesto de "${winner.name}": ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
+        }
+
+        return JSON.stringify({
+          success: true,
+          report,
+          actionsApplied: actions.length > 0 ? actions : undefined,
+          autoAdjust,
+          hookSuggestions: hasData ? [
+            `Hook ganador (basado en ${winner.name}): Mantén el ángulo de "${winner.name.includes("Interest") ? "intereses directos" : winner.name.includes("Broad") ? "audiencia amplia" : "exploración general"}"`,
+            "Nuevo hook sugerido: Prueba con urgencia — '¿Necesitas servicio HOY?' + CTA BOOK_NOW",
+            "Nuevo hook sugerido: Prueba con precio — 'Diagnóstico desde $X' + CTA GET_QUOTE",
+          ] : undefined,
         });
       }
 
