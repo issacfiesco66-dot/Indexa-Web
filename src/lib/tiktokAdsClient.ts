@@ -869,43 +869,66 @@ export async function createAd(
 export async function searchLocations(
   creds: TikTokCredentials,
   keyword: string,
-  level?: string
+  objectiveType?: string
 ): Promise<Array<{ locationId: string; name: string; level: string; parentId?: string }>> {
   const params: Record<string, string | number> = {
     advertiser_id: creds.advertiserId,
+    placements: '["PLACEMENT_TIKTOK"]',
     language: "es",
   };
-  if (level) params.level = level;
+  if (objectiveType) params.objective_type = objectiveType;
 
-  console.log(`[searchLocations] Searching for "${keyword}" with params:`, params);
+  console.log(`[searchLocations] GET /tool/region/ for "${keyword}" with params:`, JSON.stringify(params));
 
-  const response = await tiktokFetch<{
-    list: Array<{
-      location_id: string;
-      name: string;
-      level: string;
-      parent_id?: string;
-    }>;
-  }>("/tool/region/", creds.accessToken, {
-    method: "GET",
-    params,
-  });
+  try {
+    const response = await tiktokFetch<{
+      list: Array<{
+        location_id: string;
+        name: string;
+        level: string;
+        parent_id?: string;
+      }>;
+    }>("/tool/region/", creds.accessToken, {
+      method: "GET",
+      params,
+    });
 
-  const allLocations = (response.data.list || []).map((l) => ({
-    locationId: l.location_id,
-    name: l.name,
-    level: l.level,
-    parentId: l.parent_id,
-  }));
+    const allLocations = (response.data.list || []).map((l) => ({
+      locationId: l.location_id,
+      name: l.name,
+      level: l.level,
+      parentId: l.parent_id,
+    }));
 
-  // Filter by keyword client-side (case-insensitive)
-  const kw = keyword.toLowerCase();
-  const filtered = allLocations.filter((loc) => loc.name.toLowerCase().includes(kw));
+    // Filter by keyword client-side (case-insensitive)
+    const kw = keyword.toLowerCase();
+    const filtered = allLocations.filter((loc) => loc.name.toLowerCase().includes(kw));
 
-  console.log(`[searchLocations] Found ${allLocations.length} total, ${filtered.length} matching "${keyword}"`);
+    console.log(`[searchLocations] Found ${allLocations.length} total, ${filtered.length} matching "${keyword}"`);
 
-  return filtered.length > 0 ? filtered : allLocations.slice(0, 5);
+    return filtered.length > 0 ? filtered : allLocations.slice(0, 5);
+  } catch (e) {
+    console.error(`[searchLocations] API failed, using hardcoded fallback:`, e instanceof Error ? e.message : String(e));
+    // Hardcoded fallback: known TikTok location IDs for Mexico
+    return MEXICO_FALLBACK_LOCATIONS.filter((loc) =>
+      loc.name.toLowerCase().includes(keyword.toLowerCase())
+    );
+  }
 }
+
+// Hardcoded TikTok location IDs for Mexico (fallback when API fails)
+const MEXICO_FALLBACK_LOCATIONS = [
+  { locationId: "6252001", name: "México", level: "country", parentId: undefined },
+  { locationId: "4014338", name: "Querétaro", level: "province", parentId: "6252001" },
+  { locationId: "3530597", name: "Ciudad de México", level: "province", parentId: "6252001" },
+  { locationId: "3995465", name: "Monterrey", level: "city", parentId: "6252001" },
+  { locationId: "4005539", name: "Guadalajara", level: "city", parentId: "6252001" },
+  { locationId: "3521081", name: "Puebla", level: "province", parentId: "6252001" },
+  { locationId: "3514783", name: "Veracruz", level: "province", parentId: "6252001" },
+  { locationId: "3979844", name: "Cancún", level: "city", parentId: "6252001" },
+  { locationId: "3520339", name: "Jalisco", level: "province", parentId: "6252001" },
+  { locationId: "3523349", name: "Nuevo León", level: "province", parentId: "6252001" },
+];
 
 /**
  * Get interest/behavior categories for targeting.

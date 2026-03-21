@@ -572,22 +572,28 @@ async function executeTool(
           steps.push(`⚠️ No se pudo obtener info de cuenta, asumiendo ${currency}`);
         }
 
-        // Step 2: Search locations (NON-BLOCKING — ad groups create even if this fails)
+        // Step 2: Search locations — with fallback to Mexico country ID
         let locationIds: string[] = [];
         let locationName = locationKw;
         try {
-          const locations = await searchLocations(creds, locationKw);
+          const locations = await searchLocations(creds, locationKw, objective);
           if (locations.length > 0) {
             locationIds = [locations[0].locationId];
             locationName = locations[0].name;
             steps.push(`✅ Ubicación: ${locationName} (ID: ${locationIds[0]})`);
           } else {
-            steps.push(`⚠️ No se encontró "${locationKw}" — ad groups se crearán SIN geo-targeting (país completo)`);
+            // Fallback: use Mexico country-level ID
+            locationIds = ["6252001"];
+            locationName = "México (país completo)";
+            steps.push(`⚠️ No se encontró "${locationKw}" — usando México país completo (ID: 6252001)`);
           }
         } catch (e) {
           const locErr = e instanceof Error ? e.message : String(e);
-          console.error(`[create_full_campaign] Location search failed (non-blocking):`, locErr);
-          steps.push(`⚠️ Búsqueda de ubicación falló — ad groups se crearán SIN geo-targeting (país completo)`);
+          console.error(`[create_full_campaign] Location search failed:`, locErr);
+          // Absolute fallback: Mexico country-level
+          locationIds = ["6252001"];
+          locationName = "México (país completo)";
+          steps.push(`⚠️ Búsqueda falló — usando México país completo (ID: 6252001)`);
         }
 
         // Step 3: Generate campaign name
