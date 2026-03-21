@@ -916,18 +916,18 @@ export async function searchLocations(
   }
 }
 
-// Hardcoded TikTok location IDs for Mexico (fallback when API fails)
+// Hardcoded TikTok location IDs for Mexico (GeoNames IDs — 6252001=US, 3996063=Mexico!)
 const MEXICO_FALLBACK_LOCATIONS = [
-  { locationId: "6252001", name: "México", level: "country", parentId: undefined },
-  { locationId: "4014338", name: "Querétaro", level: "province", parentId: "6252001" },
-  { locationId: "3530597", name: "Ciudad de México", level: "province", parentId: "6252001" },
-  { locationId: "3995465", name: "Monterrey", level: "city", parentId: "6252001" },
-  { locationId: "4005539", name: "Guadalajara", level: "city", parentId: "6252001" },
-  { locationId: "3521081", name: "Puebla", level: "province", parentId: "6252001" },
-  { locationId: "3514783", name: "Veracruz", level: "province", parentId: "6252001" },
-  { locationId: "3979844", name: "Cancún", level: "city", parentId: "6252001" },
-  { locationId: "3520339", name: "Jalisco", level: "province", parentId: "6252001" },
-  { locationId: "3523349", name: "Nuevo León", level: "province", parentId: "6252001" },
+  { locationId: "3996063", name: "México", level: "country", parentId: undefined },
+  { locationId: "4014338", name: "Querétaro", level: "province", parentId: "3996063" },
+  { locationId: "3530597", name: "Ciudad de México", level: "province", parentId: "3996063" },
+  { locationId: "3995465", name: "Monterrey", level: "city", parentId: "3996063" },
+  { locationId: "4005539", name: "Guadalajara", level: "city", parentId: "3996063" },
+  { locationId: "3521081", name: "Puebla", level: "province", parentId: "3996063" },
+  { locationId: "3514783", name: "Veracruz", level: "province", parentId: "3996063" },
+  { locationId: "3531673", name: "Cancún", level: "city", parentId: "3996063" },
+  { locationId: "3520339", name: "Jalisco", level: "province", parentId: "3996063" },
+  { locationId: "3523349", name: "Nuevo León", level: "province", parentId: "3996063" },
 ];
 
 /**

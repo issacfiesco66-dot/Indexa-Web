@@ -572,60 +572,85 @@ async function executeTool(
           steps.push(`⚠️ No se pudo obtener info de cuenta, asumiendo ${currency}`);
         }
 
-        // Step 2: Search locations — raw fetch with multiple endpoint attempts
+        // Step 2: Search locations — try TikTok API, fallback to known GeoNames IDs
         let locationIds: string[] = [];
         let locationName = locationKw;
         const locationDebug: string[] = [];
 
-        // Attempt A: GET /tool/region/ with placements as JSON array string
+        // Known GeoNames IDs used by TikTok (6252001=US, 3996063=Mexico)
+        const MEXICO_LOCATIONS: Record<string, { id: string; name: string }> = {
+          "méxico": { id: "3996063", name: "México" },
+          "mexico": { id: "3996063", name: "México" },
+          "querétaro": { id: "4014338", name: "Querétaro" },
+          "queretaro": { id: "4014338", name: "Querétaro" },
+          "cdmx": { id: "3530597", name: "Ciudad de México" },
+          "ciudad de méxico": { id: "3530597", name: "Ciudad de México" },
+          "monterrey": { id: "3995465", name: "Monterrey" },
+          "guadalajara": { id: "4005539", name: "Guadalajara" },
+          "puebla": { id: "3521081", name: "Puebla" },
+          "cancún": { id: "3531673", name: "Cancún" },
+          "cancun": { id: "3531673", name: "Cancún" },
+          "tijuana": { id: "3981609", name: "Tijuana" },
+          "león": { id: "4005270", name: "León" },
+          "leon": { id: "4005270", name: "León" },
+          "mérida": { id: "3523183", name: "Mérida" },
+          "merida": { id: "3523183", name: "Mérida" },
+        };
+
+        // Try TikTok API first
         const apiBase = "https://business-api.tiktok.com/open_api/v1.3";
         const apiHeaders = { "Access-Token": creds.accessToken, "Content-Type": "application/json" };
 
-        const endpoints = [
-          { label: "GET /tool/region/ (placements JSON)", url: `${apiBase}/tool/region/?advertiser_id=${creds.advertiserId}&placements=%5B%22PLACEMENT_TIKTOK%22%5D&language=es` },
-          { label: "GET /tool/region/ (no placements)", url: `${apiBase}/tool/region/?advertiser_id=${creds.advertiserId}&language=es` },
-          { label: "POST /tool/region/", url: `${apiBase}/tool/region/`, post: JSON.stringify({ advertiser_id: creds.advertiserId, placements: ["PLACEMENT_TIKTOK"], language: "es" }) },
+        const regionEndpoints = [
+          { label: "GET /tool/region/ (placements)", url: `${apiBase}/tool/region/?advertiser_id=${creds.advertiserId}&placements=%5B%22PLACEMENT_TIKTOK%22%5D&language=es` },
+          { label: "GET /tool/region/ (bare)", url: `${apiBase}/tool/region/?advertiser_id=${creds.advertiserId}&language=es` },
         ];
 
-        for (const ep of endpoints) {
-          if (locationIds.length > 0) break; // already found
+        for (const ep of regionEndpoints) {
+          if (locationIds.length > 0) break;
           try {
-            const fetchOpts: RequestInit = { method: ep.post ? "POST" : "GET", headers: apiHeaders };
-            if (ep.post) fetchOpts.body = ep.post;
-            const rawRes = await fetch(ep.url, fetchOpts);
+            const rawRes = await fetch(ep.url, { headers: apiHeaders });
             const rawData = await rawRes.json();
-            locationDebug.push(`${ep.label}: code=${rawData.code}, msg=${rawData.message}, list_length=${rawData.data?.list?.length || 0}`);
+            locationDebug.push(`${ep.label}: code=${rawData.code}, msg=${rawData.message}, list=${rawData.data?.list?.length || 0}`);
 
             if (rawData.code === 0 && rawData.data?.list?.length > 0) {
-              // Search for keyword match
               const kw = locationKw.toLowerCase();
               const allLocs = rawData.data.list as Array<{ location_id: string; name: string; level: string }>;
               const match = allLocs.find((l: { name: string }) => l.name.toLowerCase().includes(kw));
               if (match) {
                 locationIds = [match.location_id];
                 locationName = match.name;
-                steps.push(`✅ Ubicación: ${locationName} (ID: ${locationIds[0]}) via ${ep.label}`);
+                steps.push(`✅ Ubicación: ${locationName} (ID: ${locationIds[0]}) via API`);
               } else {
-                // Use first country-level entry or first entry
-                const countryEntry = allLocs.find((l: { level: string }) => l.level === "COUNTRY") || allLocs[0];
-                locationIds = [countryEntry.location_id];
-                locationName = countryEntry.name + " (primera coincidencia)";
-                steps.push(`⚠️ No encontré "${locationKw}", usando ${locationName} (ID: ${locationIds[0]})`);
+                // Use first country-level entry
+                const country = allLocs.find((l: { level: string }) => l.level === "COUNTRY") || allLocs[0];
+                locationIds = [country.location_id];
+                locationName = country.name;
+                steps.push(`⚠️ "${locationKw}" no encontrado en API, usando ${locationName} (ID: ${locationIds[0]})`);
               }
-              // Log first 5 entries for debugging
               const sample = allLocs.slice(0, 5).map((l: { location_id: string; name: string; level: string }) => `${l.name}=${l.location_id}(${l.level})`);
-              locationDebug.push(`Sample locations: ${sample.join(", ")}`);
+              locationDebug.push(`Sample: ${sample.join(", ")}`);
             }
           } catch (e) {
-            locationDebug.push(`${ep.label}: FETCH ERROR: ${e instanceof Error ? e.message : String(e)}`);
+            locationDebug.push(`${ep.label}: ERROR: ${e instanceof Error ? e.message : String(e)}`);
           }
         }
 
-        // If all endpoints failed, report the debug info as error
+        // Fallback: use known GeoNames IDs for Mexico if API failed
         if (locationIds.length === 0) {
-          errors.push(`LOCATION SEARCH FAILED (all endpoints). Debug: ${locationDebug.join(" | ")}`);
-          // Cannot create ad groups without location_ids
-          steps.push(`❌ No se pudieron obtener location_ids de TikTok. Debug: ${locationDebug.join(" | ")}`);
+          const kwLower = locationKw.toLowerCase();
+          const knownLoc = MEXICO_LOCATIONS[kwLower];
+          if (knownLoc) {
+            locationIds = [knownLoc.id];
+            locationName = knownLoc.name;
+            steps.push(`⚠️ API falló, usando ID conocido: ${locationName} (${knownLoc.id})`);
+          } else {
+            // Default to Mexico country
+            locationIds = ["3996063"];
+            locationName = "México (país)";
+            steps.push(`⚠️ API falló y "${locationKw}" no está en fallback, usando México país (3996063)`);
+          }
+          locationDebug.push(`Fallback used: ${locationName}=${locationIds[0]}`);
         }
 
         // Step 3: Generate campaign name
@@ -647,19 +672,7 @@ async function executeTool(
           return JSON.stringify({ success: false, error: `Error creando campaña: ${e instanceof Error ? e.message : String(e)}`, steps });
         }
 
-        // Step 5: Create 3 Ad Groups — SKIP if no location_ids (TikTok requires them)
-        if (locationIds.length === 0) {
-          return JSON.stringify({
-            success: false,
-            campaign: { id: campaignId, name: campaignName, objective, status: "PAUSADA" },
-            adGroups: "SKIPPED — no location_ids available",
-            locationDebug,
-            steps,
-            errors,
-            nextStep: "La búsqueda de ubicaciones falló. Comparte los errores de arriba para que pueda arreglarlo.",
-          });
-        }
-
+        // Step 5: Create 3 Ad Groups
         const minAgBudget = currency === "MXN" ? 200 : 20;
         const agBudget = Math.max(Math.floor(totalBudget / 3), minAgBudget);
         const optGoalMap: Record<string, string> = {
