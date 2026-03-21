@@ -20,12 +20,14 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const advertiserId = searchParams.get("advertiserId");
-  const accessToken = searchParams.get("accessToken");
   const adgroupId = searchParams.get("adgroupId") || undefined;
 
+  // Credentials must come from headers (never from URL query params)
+  const advertiserId = request.headers.get("x-tiktok-advertiser-id");
+  const accessToken = request.headers.get("x-tiktok-access-token");
+
   if (!advertiserId || !accessToken) {
-    return NextResponse.json({ error: "Faltan credenciales" }, { status: 400 });
+    return NextResponse.json({ error: "Faltan credenciales (headers requeridos: x-tiktok-advertiser-id, x-tiktok-access-token)" }, { status: 400 });
   }
 
   try {
