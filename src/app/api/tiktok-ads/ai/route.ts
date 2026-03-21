@@ -572,7 +572,7 @@ async function executeTool(
           steps.push(`⚠️ No se pudo obtener info de cuenta, asumiendo ${currency}`);
         }
 
-        // Step 2: Search locations
+        // Step 2: Search locations (NON-BLOCKING — ad groups create even if this fails)
         let locationIds: string[] = [];
         let locationName = locationKw;
         try {
@@ -582,10 +582,12 @@ async function executeTool(
             locationName = locations[0].name;
             steps.push(`✅ Ubicación: ${locationName} (ID: ${locationIds[0]})`);
           } else {
-            steps.push(`⚠️ No se encontró "${locationKw}", los ad groups se crearán sin geo-targeting específico`);
+            steps.push(`⚠️ No se encontró "${locationKw}" — ad groups se crearán SIN geo-targeting (país completo)`);
           }
         } catch (e) {
-          errors.push(`Búsqueda de ubicación: ${e instanceof Error ? e.message : String(e)}`);
+          const locErr = e instanceof Error ? e.message : String(e);
+          console.error(`[create_full_campaign] Location search failed (non-blocking):`, locErr);
+          steps.push(`⚠️ Búsqueda de ubicación falló — ad groups se crearán SIN geo-targeting (país completo)`);
         }
 
         // Step 3: Generate campaign name

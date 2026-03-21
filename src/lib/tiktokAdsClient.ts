@@ -875,13 +875,9 @@ export async function searchLocations(
     advertiser_id: creds.advertiserId,
     language: "es",
   };
+  if (level) params.level = level;
 
-  const body: Record<string, unknown> = {
-    advertiser_id: creds.advertiserId,
-    keyword,
-    language: "es",
-  };
-  if (level) body.level = level;
+  console.log(`[searchLocations] Searching for "${keyword}" with params:`, params);
 
   const response = await tiktokFetch<{
     list: Array<{
@@ -890,17 +886,25 @@ export async function searchLocations(
       level: string;
       parent_id?: string;
     }>;
-  }>("/tool/targeting/search/", creds.accessToken, {
-    method: "POST",
-    body,
+  }>("/tool/region/", creds.accessToken, {
+    method: "GET",
+    params,
   });
 
-  return (response.data.list || []).map((l) => ({
+  const allLocations = (response.data.list || []).map((l) => ({
     locationId: l.location_id,
     name: l.name,
     level: l.level,
     parentId: l.parent_id,
   }));
+
+  // Filter by keyword client-side (case-insensitive)
+  const kw = keyword.toLowerCase();
+  const filtered = allLocations.filter((loc) => loc.name.toLowerCase().includes(kw));
+
+  console.log(`[searchLocations] Found ${allLocations.length} total, ${filtered.length} matching "${keyword}"`);
+
+  return filtered.length > 0 ? filtered : allLocations.slice(0, 5);
 }
 
 /**
