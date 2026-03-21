@@ -572,28 +572,60 @@ async function executeTool(
           steps.push(`⚠️ No se pudo obtener info de cuenta, asumiendo ${currency}`);
         }
 
-        // Step 2: Search locations — with fallback to Mexico country ID
+        // Step 2: Search locations — raw fetch with multiple endpoint attempts
         let locationIds: string[] = [];
         let locationName = locationKw;
-        try {
-          const locations = await searchLocations(creds, locationKw, objective);
-          if (locations.length > 0) {
-            locationIds = [locations[0].locationId];
-            locationName = locations[0].name;
-            steps.push(`✅ Ubicación: ${locationName} (ID: ${locationIds[0]})`);
-          } else {
-            // Fallback: use Mexico country-level ID
-            locationIds = ["6252001"];
-            locationName = "México (país completo)";
-            steps.push(`⚠️ No se encontró "${locationKw}" — usando México país completo (ID: 6252001)`);
+        const locationDebug: string[] = [];
+
+        // Attempt A: GET /tool/region/ with placements as JSON array string
+        const apiBase = "https://business-api.tiktok.com/open_api/v1.3";
+        const apiHeaders = { "Access-Token": creds.accessToken, "Content-Type": "application/json" };
+
+        const endpoints = [
+          { label: "GET /tool/region/ (placements JSON)", url: `${apiBase}/tool/region/?advertiser_id=${creds.advertiserId}&placements=%5B%22PLACEMENT_TIKTOK%22%5D&language=es` },
+          { label: "GET /tool/region/ (no placements)", url: `${apiBase}/tool/region/?advertiser_id=${creds.advertiserId}&language=es` },
+          { label: "POST /tool/region/", url: `${apiBase}/tool/region/`, post: JSON.stringify({ advertiser_id: creds.advertiserId, placements: ["PLACEMENT_TIKTOK"], language: "es" }) },
+        ];
+
+        for (const ep of endpoints) {
+          if (locationIds.length > 0) break; // already found
+          try {
+            const fetchOpts: RequestInit = { method: ep.post ? "POST" : "GET", headers: apiHeaders };
+            if (ep.post) fetchOpts.body = ep.post;
+            const rawRes = await fetch(ep.url, fetchOpts);
+            const rawData = await rawRes.json();
+            locationDebug.push(`${ep.label}: code=${rawData.code}, msg=${rawData.message}, list_length=${rawData.data?.list?.length || 0}`);
+
+            if (rawData.code === 0 && rawData.data?.list?.length > 0) {
+              // Search for keyword match
+              const kw = locationKw.toLowerCase();
+              const allLocs = rawData.data.list as Array<{ location_id: string; name: string; level: string }>;
+              const match = allLocs.find((l: { name: string }) => l.name.toLowerCase().includes(kw));
+              if (match) {
+                locationIds = [match.location_id];
+                locationName = match.name;
+                steps.push(`✅ Ubicación: ${locationName} (ID: ${locationIds[0]}) via ${ep.label}`);
+              } else {
+                // Use first country-level entry or first entry
+                const countryEntry = allLocs.find((l: { level: string }) => l.level === "COUNTRY") || allLocs[0];
+                locationIds = [countryEntry.location_id];
+                locationName = countryEntry.name + " (primera coincidencia)";
+                steps.push(`⚠️ No encontré "${locationKw}", usando ${locationName} (ID: ${locationIds[0]})`);
+              }
+              // Log first 5 entries for debugging
+              const sample = allLocs.slice(0, 5).map((l: { location_id: string; name: string; level: string }) => `${l.name}=${l.location_id}(${l.level})`);
+              locationDebug.push(`Sample locations: ${sample.join(", ")}`);
+            }
+          } catch (e) {
+            locationDebug.push(`${ep.label}: FETCH ERROR: ${e instanceof Error ? e.message : String(e)}`);
           }
-        } catch (e) {
-          const locErr = e instanceof Error ? e.message : String(e);
-          console.error(`[create_full_campaign] Location search failed:`, locErr);
-          // Absolute fallback: Mexico country-level
-          locationIds = ["6252001"];
-          locationName = "México (país completo)";
-          steps.push(`⚠️ Búsqueda falló — usando México país completo (ID: 6252001)`);
+        }
+
+        // If all endpoints failed, report the debug info as error
+        if (locationIds.length === 0) {
+          errors.push(`LOCATION SEARCH FAILED (all endpoints). Debug: ${locationDebug.join(" | ")}`);
+          // Cannot create ad groups without location_ids
+          steps.push(`❌ No se pudieron obtener location_ids de TikTok. Debug: ${locationDebug.join(" | ")}`);
         }
 
         // Step 3: Generate campaign name
@@ -615,7 +647,19 @@ async function executeTool(
           return JSON.stringify({ success: false, error: `Error creando campaña: ${e instanceof Error ? e.message : String(e)}`, steps });
         }
 
-        // Step 5: Create 3 Ad Groups — budget split evenly, min $200 MXN or $20 USD per AG
+        // Step 5: Create 3 Ad Groups — SKIP if no location_ids (TikTok requires them)
+        if (locationIds.length === 0) {
+          return JSON.stringify({
+            success: false,
+            campaign: { id: campaignId, name: campaignName, objective, status: "PAUSADA" },
+            adGroups: "SKIPPED — no location_ids available",
+            locationDebug,
+            steps,
+            errors,
+            nextStep: "La búsqueda de ubicaciones falló. Comparte los errores de arriba para que pueda arreglarlo.",
+          });
+        }
+
         const minAgBudget = currency === "MXN" ? 200 : 20;
         const agBudget = Math.max(Math.floor(totalBudget / 3), minAgBudget);
         const optGoalMap: Record<string, string> = {
@@ -714,6 +758,7 @@ async function executeTool(
           },
           steps,
           errors: errors.length > 0 ? errors : undefined,
+          locationDebug: locationDebug.length > 0 ? locationDebug : undefined,
           nextStep: ag1Id ? `Usa generate_ad_image para crear imagen, luego create_ad con adgroup_id "${ag1Id}" para crear el anuncio.` : "Los ad groups fallaron. Revisa los errores.",
         });
       }
