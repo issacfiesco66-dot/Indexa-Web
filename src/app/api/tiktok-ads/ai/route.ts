@@ -29,9 +29,33 @@ import {
 
 export const maxDuration = 120;
 
-const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
+// IP-level guard (coarse) + per-user guard (fine-grained)
+const ipLimiter = createRateLimiter({ windowMs: 60_000, max: 30 });
+const userLimiter = createRateLimiter({ windowMs: 60_000, max: 10 }); // 10 req/min per Firebase user
+
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const CLAUDE_MODEL = "claude-sonnet-4-20250514";
+
+// Heavy model for creative/strategic tasks; light model for simple read/classify tasks
+const CLAUDE_MODEL_HEAVY = "claude-sonnet-4-20250514";
+const CLAUDE_MODEL_LIGHT = "claude-haiku-4-5-20251001";
+
+const LIGHT_TOOLS = new Set([
+  "get_account_info",
+  "get_balance",
+  "list_campaigns",
+  "list_adgroups",
+  "list_ads",
+  "list_audiences",
+  "list_pixels",
+  "search_locations",
+  "get_interest_categories",
+]);
+
+/** Returns the appropriate model based on the last tool Claude requested. */
+function pickModel(lastToolName: string | null): string {
+  if (lastToolName && LIGHT_TOOLS.has(lastToolName)) return CLAUDE_MODEL_LIGHT;
+  return CLAUDE_MODEL_HEAVY;
+}
 
 const SYSTEM_PROMPT = `Eres un Senior Ads Solution Architect & Media Buyer para TikTok Ads API. SIEMPRE responde en español.
 
@@ -1047,7 +1071,7 @@ async function executeTool(
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-    if (!limiter.check(ip)) {
+    if (!ipLimiter.check(ip)) {
       return NextResponse.json({ error: "Demasiadas solicitudes. Intenta en un minuto." }, { status: 429 });
     }
 
@@ -1057,6 +1081,11 @@ export async function POST(request: NextRequest) {
 
     const user = await verifyIdToken(fbToken);
     if (!user) return NextResponse.json({ error: "Token inválido." }, { status: 401 });
+
+    // Per-user rate limit (prevents a single account from exhausting AI credits)
+    if (!userLimiter.check(user.uid)) {
+      return NextResponse.json({ error: "Límite de uso por cuenta alcanzado. Espera 1 minuto." }, { status: 429 });
+    }
 
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
     if (!anthropicKey) {
@@ -1091,6 +1120,7 @@ export async function POST(request: NextRequest) {
     const DEADLINE_MS = 40_000; // 50s, leaving 10s buffer for maxDuration=60
 
     let lastText = "";
+    let lastToolUsed: string | null = null;
 
     // Agentic loop — up to 8 rounds with time budget
     for (let round = 0; round < 8; round++) {
@@ -1101,7 +1131,8 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      console.log(`[tiktok-ads/ai] round ${round}, elapsed ${elapsed}ms, calling Claude`);
+      const model = pickModel(lastToolUsed);
+      console.log(`[tiktok-ads/ai] round ${round}, model=${model}, elapsed ${elapsed}ms`);
 
       const claudeRes = await fetch(ANTHROPIC_URL, {
         method: "POST",
@@ -1111,7 +1142,7 @@ export async function POST(request: NextRequest) {
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: CLAUDE_MODEL,
+          model,
           max_tokens: 1536,
           system: SYSTEM_PROMPT,
           tools,
@@ -1173,6 +1204,7 @@ export async function POST(request: NextRequest) {
             continue;
           }
           console.log(`[tiktok-ads/ai] executing tool: ${block.name} (${toolElapsed}ms)`);
+          lastToolUsed = block.name;
           const result = await executeTool(block.name, block.input, creds);
           toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
         }

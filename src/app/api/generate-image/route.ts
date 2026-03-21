@@ -29,10 +29,15 @@ export async function POST(request: NextRequest) {
 
   // ── Body ──────────────────────────────────────────────────────
   const body = await request.json();
-  const { apiKey, prompt, aspectRatio } = body;
+  const { prompt, aspectRatio } = body;
 
-  if (!apiKey || !prompt) {
-    return NextResponse.json({ error: "Faltan parámetros (apiKey, prompt)." }, { status: 400 });
+  if (!prompt) {
+    return NextResponse.json({ error: "Falta el parámetro: prompt." }, { status: 400 });
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: "GEMINI_API_KEY no configurada en el servidor." }, { status: 503 });
   }
 
   try {
@@ -47,8 +52,6 @@ export async function POST(request: NextRequest) {
         responseModalities: ["TEXT", "IMAGE"],
       },
     };
-
-    console.log("[generate-image] Calling Gemini with model: gemini-2.5-flash-image");
 
     const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
       method: "POST",

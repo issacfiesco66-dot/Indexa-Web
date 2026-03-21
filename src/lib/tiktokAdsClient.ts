@@ -4,6 +4,8 @@
  * via TikTok Business API v1.3.
  */
 
+import { getCircuitBreaker } from "@/lib/circuitBreaker";
+
 const TIKTOK_API_BASE = "https://business-api.tiktok.com/open_api/v1.3";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -1023,9 +1025,18 @@ export async function createAd(
     creatives: [creative],
   };
 
-  console.log(`[createAd] Request body:`, JSON.stringify(body, null, 2));
+  console.log(`[createAd] Submitting ad "${params.adName}" to adgroup ${params.adgroupId}`);
 
-  // Step 5: Retry logic — up to 3 attempts with 10s delay for image access errors
+  // Step 5: Circuit Breaker + retry logic for image access errors only
+  const cb = getCircuitBreaker(`tiktok:createAd:${creds.advertiserId}`, {
+    failureThreshold: 3,
+    cooldownMs: 30_000,
+  });
+
+  if (!cb.allowRequest()) {
+    throw new Error("[createAd] Circuit OPEN — TikTok ad creation is temporarily suspended. Retry in 30s.");
+  }
+
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 10_000;
 
@@ -1036,25 +1047,26 @@ export async function createAd(
         creds.accessToken,
         { method: "POST", body }
       );
+      cb.recordSuccess();
       return { adId: (response.data.ad_ids || [])[0] || "unknown" };
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       const isImageError = errMsg.toLowerCase().includes("unable to access image")
-        || errMsg.toLowerCase().includes("image")
         || errMsg.includes("40002");
 
       if (isImageError && attempt < MAX_RETRIES) {
-        console.warn(`[createAd] Attempt ${attempt}/${MAX_RETRIES} failed (image error): ${errMsg}. Waiting ${RETRY_DELAY_MS / 1000}s before retry...`);
+        console.warn(`[createAd] Attempt ${attempt}/${MAX_RETRIES} — image not ready, waiting ${RETRY_DELAY_MS / 1000}s...`);
         await sleep(RETRY_DELAY_MS);
         continue;
       }
 
-      // Final attempt or non-image error — throw
+      // Non-image error or final attempt — record failure and throw
+      cb.recordFailure();
       throw e;
     }
   }
 
-  // Should never reach here
+  cb.recordFailure();
   throw new Error("[createAd] Max retries exceeded");
 }
 
