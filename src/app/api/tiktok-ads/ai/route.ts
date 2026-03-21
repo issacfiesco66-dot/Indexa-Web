@@ -203,64 +203,6 @@ const tools = [
     },
   },
   {
-    name: "create_campaign_draft",
-    description: "Crea un borrador de campaña con un ad group básico. Queda PAUSADA. Luego puedes crear ad groups adicionales y anuncios.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        name: { type: "string", description: "Nombre de la campaña" },
-        objective: {
-          type: "string",
-          enum: ["TRAFFIC", "CONVERSIONS", "REACH", "VIDEO_VIEWS", "LEAD_GENERATION", "ENGAGEMENT"],
-          description: "Objetivo de la campaña",
-        },
-        daily_budget: {
-          type: "number",
-          description: "Presupuesto diario en la MONEDA DE LA CUENTA (usa get_account_info para saber si es MXN, USD, etc). Mínimos: $500 MXN/día o $50 USD/día.",
-        },
-        optimization_goal: {
-          type: "string",
-          enum: ["CLICK", "IMPRESSION", "REACH", "VIDEO_VIEW", "CONVERSION", "LEAD_GENERATION"],
-          description: "Meta de optimización del ad group (default: CLICK)",
-        },
-      },
-      required: ["name", "objective", "daily_budget"],
-    },
-  },
-  {
-    name: "create_adgroup",
-    description: "Crea un ad group adicional dentro de una campaña existente, con segmentación completa (ubicación, edad, género). Usa search_locations primero para obtener los location_ids.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        campaign_id: { type: "string", description: "ID de la campaña donde crear el ad group" },
-        name: { type: "string", description: "Nombre del ad group" },
-        daily_budget: { type: "number", description: "Presupuesto diario en la moneda de la cuenta (mínimo $200 MXN o $20 USD)" },
-        optimization_goal: {
-          type: "string",
-          enum: ["CLICK", "IMPRESSION", "REACH", "VIDEO_VIEW", "CONVERSION", "LEAD_GENERATION"],
-          description: "Meta de optimización",
-        },
-        location_ids: {
-          type: "array",
-          items: { type: "string" },
-          description: "IDs de ubicaciones para targeting (usa search_locations para encontrarlos)",
-        },
-        age_groups: {
-          type: "array",
-          items: { type: "string", enum: ["AGE_13_17", "AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_100"] },
-          description: "Rangos de edad para targeting",
-        },
-        gender: {
-          type: "string",
-          enum: ["GENDER_MALE", "GENDER_FEMALE", "GENDER_UNLIMITED"],
-          description: "Género para targeting (default: GENDER_UNLIMITED)",
-        },
-      },
-      required: ["campaign_id", "name", "daily_budget"],
-    },
-  },
-  {
     name: "update_adgroup",
     description: "Actualiza un ad group existente: targeting, presupuesto, nombre, estado",
     input_schema: {
@@ -510,59 +452,6 @@ async function executeTool(
         const budget = input.budget as number;
         await updateCampaignBudget(creds, campaignId, budget);
         return `Presupuesto de campaña ${campaignId} actualizado a ${budget}.`;
-      }
-
-      case "create_campaign_draft": {
-        const campaignName = input.name as string;
-        const objective = (input.objective as string) || "TRAFFIC";
-        const dailyBudget = (input.daily_budget as number) || 500;
-        const optimizationGoal = (input.optimization_goal as string) || "CLICK";
-
-        const { campaignId } = await createCampaign(creds, {
-          campaignName,
-          objectiveType: objective,
-          budgetMode: "BUDGET_MODE_DAY",
-          budget: dailyBudget,
-        });
-
-        const { adgroupId } = await createAdGroup(creds, {
-          campaignId,
-          adgroupName: `${campaignName} - Ad Group`,
-          budget: dailyBudget,
-          budgetMode: "BUDGET_MODE_DAY",
-          optimizationGoal,
-        });
-
-        return JSON.stringify({
-          success: true,
-          campaignId,
-          adgroupId,
-          note: `Campaña "${campaignName}" creada (PAUSADA). Presupuesto: $${dailyBudget}/día. Campaign ID: ${campaignId}, Ad Group ID: ${adgroupId}. Usa update_adgroup para configurar targeting.`,
-        });
-      }
-
-      case "create_adgroup": {
-        const campaignId = input.campaign_id as string;
-        const agName = input.name as string;
-        const dailyBudget = (input.daily_budget as number) || 200;
-        const optGoal = (input.optimization_goal as string) || "CLICK";
-
-        const { adgroupId } = await createAdGroup(creds, {
-          campaignId,
-          adgroupName: agName,
-          budget: dailyBudget,
-          budgetMode: "BUDGET_MODE_DAY",
-          optimizationGoal: optGoal,
-          location_ids: (input.location_ids as string[]) || undefined,
-          ageGroups: (input.age_groups as string[]) || undefined,
-          gender: (input.gender as string) || undefined,
-        });
-
-        return JSON.stringify({
-          success: true,
-          adgroupId,
-          note: `Ad group "${agName}" creado en campaña ${campaignId}. ID: ${adgroupId}. Presupuesto: $${dailyBudget}/día.`,
-        });
       }
 
       case "update_adgroup": {

@@ -660,6 +660,14 @@ export async function createAdGroup(
     scheduleStartTime?: string;
   }
 ): Promise<{ adgroupId: string }> {
+  // Always set schedule_start_time (TikTok requires it even with SCHEDULE_FROM_NOW)
+  const scheduleTime = params.scheduleStartTime || (() => {
+    const d = new Date(Date.now() + 30 * 60 * 1000); // +30 min from now
+    return d.toISOString().replace("T", " ").substring(0, 19);
+  })();
+
+  const placementType = params.placementType || "PLACEMENT_TYPE_NORMAL";
+
   const body: Record<string, unknown> = {
     advertiser_id: creds.advertiserId,
     campaign_id: params.campaignId,
@@ -669,16 +677,18 @@ export async function createAdGroup(
     optimization_goal: params.optimizationGoal,
     billing_event: params.billingEvent || "OCPM",
     bid_type: params.bidType || "BID_TYPE_NO_BID",
-    placement_type: params.placementType || "PLACEMENT_TYPE_NORMAL",
+    placement_type: placementType,
     operation_status: "DISABLE",
     schedule_type: "SCHEDULE_FROM_NOW",
+    schedule_start_time: scheduleTime,
   };
 
-  // Add schedule_start_time if provided, otherwise use current time + 1 hour
-  if (params.scheduleStartTime) {
-    body.schedule_start_time = params.scheduleStartTime;
+  // PLACEMENT_TYPE_NORMAL requires explicit placements array
+  if (placementType === "PLACEMENT_TYPE_NORMAL") {
+    body.placements = ["PLACEMENT_TIKTOK"];
   }
 
+  // Location is required — use provided IDs or omit (TikTok will use account default)
   if (params.location_ids && params.location_ids.length > 0) {
     body.location_ids = params.location_ids;
   }
