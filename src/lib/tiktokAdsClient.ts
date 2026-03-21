@@ -904,9 +904,58 @@ export async function getOrCreateIdentity(
 }
 
 /**
+ * Verify image status and ownership before using in ads.
+ * GET /file/image/ad/info/
+ */
+export async function getImageInfo(
+  creds: TikTokCredentials,
+  imageIds: string[]
+): Promise<Array<{ id: string; url: string; width: number; height: number; format: string; signature?: string }>> {
+  const params: Record<string, string | number> = {
+    advertiser_id: creds.advertiserId,
+    image_ids: JSON.stringify(imageIds),
+  };
+
+  console.log(`[getImageInfo] GET /file/image/ad/info/ for images: ${imageIds.join(", ")}`);
+
+  try {
+    const response = await tiktokFetch<{
+      list: Array<{
+        id: string;
+        image_url: string;
+        width: number;
+        height: number;
+        format: string;
+        signature?: string;
+      }>;
+    }>("/file/image/ad/info/", creds.accessToken, { method: "GET", params });
+
+    const list = response.data.list || [];
+    console.log(`[getImageInfo] Found ${list.length} images`);
+    return list.map((img) => ({
+      id: img.id,
+      url: img.image_url,
+      width: img.width,
+      height: img.height,
+      format: img.format,
+      signature: img.signature,
+    }));
+  } catch (e) {
+    console.error(`[getImageInfo] Error:`, e instanceof Error ? e.message : String(e));
+    return [];
+  }
+}
+
+// Helper: sleep for N milliseconds
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Create an ad within an ad group.
  * TikTok API v1.3 requires: ad_format, identity_type + identity_id
- * This function auto-fetches identity_id if not provided.
+ * Auto-fetches identity_id if not provided.
+ * Includes retry logic with delay for "Unable to access image" errors.
  */
 export async function createAd(
   creds: TikTokCredentials,
@@ -925,10 +974,22 @@ export async function createAd(
     adFormat?: string;
   }
 ): Promise<{ adId: string }> {
-  // Determine ad_format based on provided creative
+  // Step 1: Verify image ownership if imageId is provided
+  if (params.imageId) {
+    console.log(`[createAd] Verifying image ${params.imageId} ownership...`);
+    const imgInfo = await getImageInfo(creds, [params.imageId]);
+    if (imgInfo.length > 0) {
+      console.log(`[createAd] Image verified: ${imgInfo[0].id} (${imgInfo[0].width}x${imgInfo[0].height} ${imgInfo[0].format})`);
+    } else {
+      console.warn(`[createAd] Image ${params.imageId} not found via /file/image/ad/info/ — will attempt ad creation anyway`);
+    }
+  }
+
+  // Step 2: Determine ad_format
   const adFormat = params.adFormat
     || (params.videoId ? "SINGLE_VIDEO" : "SINGLE_IMAGE");
 
+  // Step 3: Build creative payload
   const creative: Record<string, unknown> = {
     ad_name: params.adName,
     ad_text: params.adText,
@@ -936,12 +997,11 @@ export async function createAd(
     call_to_action: params.callToAction || "LEARN_MORE",
   };
 
-  // Identity: REQUIRED in v1.3. Auto-fetch if not provided.
+  // Step 4: Identity — REQUIRED in v1.3. Auto-fetch if not provided.
   let identityId = params.identityId;
   let identityType = params.identityType;
 
   if (!identityId) {
-    // Auto-fetch or create identity
     const identity = await getOrCreateIdentity(creds, params.displayName || "Business");
     identityId = identity.identityId;
     identityType = identity.identityType;
@@ -950,7 +1010,6 @@ export async function createAd(
   creative.identity_id = identityId;
   creative.identity_type = identityType || "CUSTOMIZED_USER";
 
-  // Also set display_name if provided (for CUSTOMIZED_USER)
   if (params.displayName) creative.display_name = params.displayName;
   if (params.profileImageId) creative.profile_image_id = params.profileImageId;
 
@@ -966,13 +1025,37 @@ export async function createAd(
 
   console.log(`[createAd] Request body:`, JSON.stringify(body, null, 2));
 
-  const response = await tiktokFetch<{ ad_ids: string[] }>(
-    "/ad/create/",
-    creds.accessToken,
-    { method: "POST", body }
-  );
+  // Step 5: Retry logic — up to 3 attempts with 10s delay for image access errors
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 10_000;
 
-  return { adId: (response.data.ad_ids || [])[0] || "unknown" };
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await tiktokFetch<{ ad_ids: string[] }>(
+        "/ad/create/",
+        creds.accessToken,
+        { method: "POST", body }
+      );
+      return { adId: (response.data.ad_ids || [])[0] || "unknown" };
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      const isImageError = errMsg.toLowerCase().includes("unable to access image")
+        || errMsg.toLowerCase().includes("image")
+        || errMsg.includes("40002");
+
+      if (isImageError && attempt < MAX_RETRIES) {
+        console.warn(`[createAd] Attempt ${attempt}/${MAX_RETRIES} failed (image error): ${errMsg}. Waiting ${RETRY_DELAY_MS / 1000}s before retry...`);
+        await sleep(RETRY_DELAY_MS);
+        continue;
+      }
+
+      // Final attempt or non-image error — throw
+      throw e;
+    }
+  }
+
+  // Should never reach here
+  throw new Error("[createAd] Max retries exceeded");
 }
 
 /**

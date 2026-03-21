@@ -20,13 +20,14 @@ import {
   uploadVideoByUrl,
   createAd,
   getOrCreateIdentity,
+  getImageInfo,
   searchLocations,
   getInterestCategories,
   type TikTokCredentials,
   type TikTokReportRow,
 } from "@/lib/tiktokAdsClient";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
@@ -602,21 +603,44 @@ async function executeTool(
         }>;
 
         const results: Array<{ adName: string; success: boolean; adId?: string; error?: string }> = [];
+        const debugInfo: string[] = [];
 
-        // Pre-fetch identity once for all ads
+        // Step A: Pre-verify all images exist and are accessible
+        const allImageIds = adsInput.map((a) => a.image_id).filter(Boolean) as string[];
+        if (allImageIds.length > 0) {
+          try {
+            const imgInfoList = await getImageInfo(creds, allImageIds);
+            const foundIds = imgInfoList.map((i) => i.id);
+            debugInfo.push(`Image verification: ${imgInfoList.length}/${allImageIds.length} found. IDs: ${foundIds.join(", ")}`);
+            for (const img of imgInfoList) {
+              debugInfo.push(`  ${img.id}: ${img.width}x${img.height} ${img.format}`);
+            }
+            const missing = allImageIds.filter((id) => !foundIds.includes(id));
+            if (missing.length > 0) {
+              debugInfo.push(`⚠️ Missing images: ${missing.join(", ")}`);
+            }
+          } catch (e) {
+            debugInfo.push(`Image verification failed: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+
+        // Step B: Pre-fetch identity once for all ads
         let identityId: string | undefined;
         let identityType: string | undefined;
         try {
           const identity = await getOrCreateIdentity(creds, displayName);
           identityId = identity.identityId;
           identityType = identity.identityType;
+          debugInfo.push(`Identity: ${identityId} (${identityType})`);
         } catch (e) {
           return JSON.stringify({
             success: false,
             error: `No se pudo obtener identity_id: ${e instanceof Error ? e.message : String(e)}. Vincula un perfil de TikTok en Ads Manager.`,
+            debugInfo,
           });
         }
 
+        // Step C: Create each ad (createAd has built-in retry with 10s delay)
         for (const ad of adsInput) {
           try {
             const result = await createAd(creds, {
@@ -645,6 +669,7 @@ async function executeTool(
           totalAds: adsInput.length,
           successCount,
           results,
+          debugInfo,
         });
       }
 
