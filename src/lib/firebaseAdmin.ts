@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getAuth, type Auth } from "firebase-admin/auth";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
@@ -41,6 +42,7 @@ function getAdminApp(): App {
 }
 
 let adminDb: Firestore | undefined;
+let adminAuthInstance: Auth | undefined;
 
 export function getAdminDb(): Firestore {
   if (!adminDb) {
@@ -48,4 +50,12 @@ export function getAdminDb(): Firestore {
     adminDb = getFirestore(app);
   }
   return adminDb;
+}
+
+export function getAdminAuth(): Auth {
+  if (!adminAuthInstance) {
+    const app = getAdminApp();
+    adminAuthInstance = getAuth(app);
+  }
+  return adminAuthInstance;
 }

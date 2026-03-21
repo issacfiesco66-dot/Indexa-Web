@@ -1,68 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAdmin } from "@/lib/verifyAuth";
-import { addDocument, readDoc, updateDoc, queryCollection, createDoc } from "@/lib/firestoreRest";
+import { getAdminDb, getAdminAuth } from "@/lib/firebaseAdmin";
+import { normalizeRole } from "@/types/tenant";
 
-const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+// ── Helper: verify admin via Admin SDK ─────────────────────────────
+async function verifyAdminToken(token: string): Promise<string | null> {
+  try {
+    const decoded = await getAdminAuth().verifyIdToken(token);
+    const uid = decoded.uid;
+    const userDoc = await getAdminDb().collection("usuarios").doc(uid).get();
+    if (!userDoc.exists) return null;
+    const role = normalizeRole(userDoc.data()?.role);
+    return role === "superadmin" ? uid : null;
+  } catch {
+    return null;
+  }
+}
 
 // ── GET: List all agencies ───────────────────────────────────────────
 export async function GET(request: NextRequest) {
   const token = request.headers.get("Authorization")?.replace("Bearer ", "");
-  if (!token || !(await verifyAdmin(token))) {
+  if (!token || !(await verifyAdminToken(token))) {
     return NextResponse.json({ success: false, message: "No autorizado." }, { status: 403 });
   }
 
   try {
-    // Firestore REST runQuery — get all agencias
-    const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-    const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+    const db = getAdminDb();
+    const snapshot = await db.collection("agencias").limit(100).get();
 
-    const res = await fetch(`${BASE_URL}:runQuery?key=${API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: "agencias" }],
-          limit: 100,
+    const agencias = snapshot.docs.map((doc) => {
+      const d = doc.data();
+      return {
+        id: doc.id,
+        uid: d.uid ?? "",
+        nombreComercial: d.nombreComercial ?? "",
+        branding: {
+          logoUrl: d.branding?.logoUrl ?? "",
+          colorPrincipal: d.branding?.colorPrincipal ?? "#002366",
         },
-      }),
-      cache: "no-store",
+        planConfig: {
+          maxSitios: d.planConfig?.maxSitios ?? 10,
+          status: d.planConfig?.status ?? "activo",
+        },
+      };
     });
-
-    if (!res.ok) {
-      return NextResponse.json({ success: false, message: "Error consultando agencias." }, { status: 500 });
-    }
-
-    const results: { document?: { name: string; fields: Record<string, unknown> } }[] = await res.json();
-
-    const agencias = results
-      .filter((r) => r.document)
-      .map((r) => {
-        const doc = r.document!;
-        const id = doc.name.split("/").pop() ?? "";
-        const f = doc.fields as Record<string, Record<string, unknown>>;
-        return {
-          id,
-          uid: f.uid?.stringValue ?? "",
-          nombreComercial: f.nombreComercial?.stringValue ?? "",
-          branding: {
-            logoUrl: (f.branding?.mapValue as Record<string, unknown>)?.fields
-              ? ((f.branding.mapValue as Record<string, Record<string, Record<string, string>>>).fields.logoUrl?.stringValue ?? "")
-              : "",
-            colorPrincipal: (f.branding?.mapValue as Record<string, unknown>)?.fields
-              ? ((f.branding.mapValue as Record<string, Record<string, Record<string, string>>>).fields.colorPrincipal?.stringValue ?? "#002366")
-              : "#002366",
-          },
-          planConfig: {
-            maxSitios: f.planConfig?.mapValue
-              ? Number((f.planConfig.mapValue as Record<string, Record<string, Record<string, string>>>).fields?.maxSitios?.integerValue ?? 10)
-              : 10,
-            status: f.planConfig?.mapValue
-              ? ((f.planConfig.mapValue as Record<string, Record<string, Record<string, string>>>).fields?.status?.stringValue ?? "activo")
-              : "activo",
-          },
-        };
-      });
 
     return NextResponse.json({ success: true, agencias });
   } catch (err) {
@@ -74,7 +54,7 @@ export async function GET(request: NextRequest) {
 // ── POST: Create a new agency ────────────────────────────────────────
 export async function POST(request: NextRequest) {
   const token = request.headers.get("Authorization")?.replace("Bearer ", "");
-  if (!token || !(await verifyAdmin(token))) {
+  if (!token || !(await verifyAdminToken(token))) {
     return NextResponse.json({ success: false, message: "No autorizado." }, { status: 403 });
   }
 
@@ -86,30 +66,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Faltan campos: email, password, nombreComercial." }, { status: 400 });
     }
 
-    // 1. Create Firebase Auth user
-    const signupRes = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, returnSecureToken: false }),
-      }
-    );
+    const auth = getAdminAuth();
+    const db = getAdminDb();
 
-    if (!signupRes.ok) {
-      const err = await signupRes.json();
-      const code = err?.error?.message || "UNKNOWN";
-      if (code === "EMAIL_EXISTS") {
+    // 1. Create Firebase Auth user via Admin SDK
+    let uid: string;
+    try {
+      const userRecord = await auth.createUser({
+        email,
+        password,
+        displayName: nombreComercial,
+      });
+      uid = userRecord.uid;
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code || "UNKNOWN";
+      if (code === "auth/email-already-exists") {
         return NextResponse.json({ success: false, message: "Este email ya tiene una cuenta." }, { status: 409 });
       }
       return NextResponse.json({ success: false, message: `Error creando usuario: ${code}` }, { status: 400 });
     }
 
-    const signupData = await signupRes.json();
-    const uid = signupData.localId;
-
     // 2. Create agencia document
-    const agenciaId = await addDocument("agencias", {
+    const agenciaRef = await db.collection("agencias").add({
       uid,
       nombreComercial,
       branding: {
@@ -124,7 +102,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 3. Create usuario document (keyed by uid)
-    await createDoc("usuarios", uid, {
+    await db.collection("usuarios").doc(uid).set({
       role: "agency",
       email,
       displayName: nombreComercial,
@@ -134,7 +112,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: `Agencia "${nombreComercial}" creada.`,
-      data: { agenciaId, uid },
+      data: { agenciaId: agenciaRef.id, uid },
     });
   } catch (err) {
     console.error("Error creating agencia:", err);
@@ -145,7 +123,7 @@ export async function POST(request: NextRequest) {
 // ── PATCH: Update agency (suspend, change plan, etc.) ────────────────
 export async function PATCH(request: NextRequest) {
   const token = request.headers.get("Authorization")?.replace("Bearer ", "");
-  if (!token || !(await verifyAdmin(token))) {
+  if (!token || !(await verifyAdminToken(token))) {
     return NextResponse.json({ success: false, message: "No autorizado." }, { status: 403 });
   }
 
@@ -157,41 +135,38 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ success: false, message: "agenciaId requerido." }, { status: 400 });
     }
 
-    const agencia = await readDoc("agencias", agenciaId);
-    if (!agencia) {
+    const db = getAdminDb();
+    const agenciaRef = db.collection("agencias").doc(agenciaId);
+    const agenciaDoc = await agenciaRef.get();
+
+    if (!agenciaDoc.exists) {
       return NextResponse.json({ success: false, message: "Agencia no encontrada." }, { status: 404 });
     }
 
     if (action === "suspend") {
-      await updateDoc("agencias", agenciaId, {
-        "planConfig.status": "suspendido",
-      }, token);
+      await agenciaRef.update({ "planConfig.status": "suspendido" });
 
-      // Optionally set all agency sites to maintenance
-      const sites = await queryCollection("sitios", "agencyId", agenciaId, 200);
-      for (const site of sites) {
-        await updateDoc("sitios", site.id, { statusPago: "suspendido" }, token);
-      }
+      // Suspend all agency sites
+      const sitesSnapshot = await db.collection("sitios").where("agencyId", "==", agenciaId).get();
+      const batch = db.batch();
+      sitesSnapshot.docs.forEach((doc) => {
+        batch.update(doc.ref, { statusPago: "suspendido" });
+      });
+      await batch.commit();
 
       return NextResponse.json({
         success: true,
-        message: `Agencia suspendida. ${sites.length} sitio(s) marcados como suspendidos.`,
+        message: `Agencia suspendida. ${sitesSnapshot.size} sitio(s) marcados como suspendidos.`,
       });
     }
 
     if (action === "activate") {
-      await updateDoc("agencias", agenciaId, {
-        "planConfig.status": "activo",
-      }, token);
-
+      await agenciaRef.update({ "planConfig.status": "activo" });
       return NextResponse.json({ success: true, message: "Agencia reactivada." });
     }
 
     if (action === "update-plan" && typeof maxSitios === "number") {
-      await updateDoc("agencias", agenciaId, {
-        "planConfig.maxSitios": maxSitios,
-      }, token);
-
+      await agenciaRef.update({ "planConfig.maxSitios": maxSitios });
       return NextResponse.json({ success: true, message: `Plan actualizado a ${maxSitios} sitios.` });
     }
 
