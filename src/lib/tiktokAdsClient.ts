@@ -820,8 +820,93 @@ export async function uploadVideoByUrl(
 }
 
 /**
+ * Get list of identities under an ad account.
+ * TikTok API v1.3: GET /identity/get/
+ */
+export async function getIdentities(
+  creds: TikTokCredentials,
+  identityType?: string
+): Promise<Array<{ identity_id: string; identity_type: string; display_name?: string }>> {
+  const params: Record<string, string | number> = {
+    advertiser_id: creds.advertiserId,
+  };
+  if (identityType) params.identity_type = identityType;
+
+  console.log(`[getIdentities] GET /identity/get/ for advertiser ${creds.advertiserId}`);
+
+  try {
+    const response = await tiktokFetch<{
+      identity_list: Array<{
+        identity_id: string;
+        identity_type: string;
+        display_name?: string;
+      }>;
+    }>("/identity/get/", creds.accessToken, { method: "GET", params });
+
+    const list = response.data.identity_list || [];
+    console.log(`[getIdentities] Found ${list.length} identities`);
+    return list;
+  } catch (e) {
+    console.error(`[getIdentities] Error:`, e instanceof Error ? e.message : String(e));
+    return [];
+  }
+}
+
+/**
+ * Create a CUSTOMIZED_USER identity for the ad account.
+ * TikTok API v1.3: POST /identity/create/
+ */
+export async function createCustomIdentity(
+  creds: TikTokCredentials,
+  displayName: string,
+  profileImageId?: string
+): Promise<{ identity_id: string; identity_type: string }> {
+  const body: Record<string, unknown> = {
+    advertiser_id: creds.advertiserId,
+    display_name: displayName,
+  };
+  if (profileImageId) body.image_uri = profileImageId;
+
+  console.log(`[createCustomIdentity] POST /identity/create/ display_name="${displayName}"`);
+
+  const response = await tiktokFetch<{
+    identity_id: string;
+    identity_type: string;
+  }>("/identity/create/", creds.accessToken, { method: "POST", body });
+
+  console.log(`[createCustomIdentity] Created identity_id: ${response.data.identity_id}`);
+  return {
+    identity_id: response.data.identity_id,
+    identity_type: response.data.identity_type || "CUSTOMIZED_USER",
+  };
+}
+
+/**
+ * Get or create an identity for ad creation.
+ * First tries to fetch existing identities, if none found creates a CUSTOMIZED_USER.
+ */
+export async function getOrCreateIdentity(
+  creds: TikTokCredentials,
+  displayName: string
+): Promise<{ identityId: string; identityType: string }> {
+  // 1. Try to get existing identities
+  const existing = await getIdentities(creds);
+  if (existing.length > 0) {
+    const best = existing[0];
+    console.log(`[getOrCreateIdentity] Using existing identity: ${best.identity_id} (${best.identity_type})`);
+    return { identityId: best.identity_id, identityType: best.identity_type };
+  }
+
+  // 2. No identities found — create a CUSTOMIZED_USER
+  console.log(`[getOrCreateIdentity] No identities found, creating CUSTOMIZED_USER...`);
+  const created = await createCustomIdentity(creds, displayName);
+  return { identityId: created.identity_id, identityType: created.identity_type };
+}
+
+/**
  * Create an ad within an ad group.
- * TikTok API v1.3 requires: ad_format, identity_type + identity_id/display_name
+ * TikTok API v1.3 requires: ad_format, identity_type + identity_id
+ * This function auto-fetches identity_id if not provided.
  */
 export async function createAd(
   creds: TikTokCredentials,
@@ -851,16 +936,23 @@ export async function createAd(
     call_to_action: params.callToAction || "LEARN_MORE",
   };
 
-  // Identity: required in v1.3. Use provided identity or CUSTOMIZED_USER with display_name
-  if (params.identityId) {
-    creative.identity_id = params.identityId;
-    creative.identity_type = params.identityType || "CUSTOMIZED_USER";
-  } else if (params.displayName) {
-    creative.identity_type = "CUSTOMIZED_USER";
-    creative.display_name = params.displayName;
-    if (params.profileImageId) creative.profile_image_id = params.profileImageId;
+  // Identity: REQUIRED in v1.3. Auto-fetch if not provided.
+  let identityId = params.identityId;
+  let identityType = params.identityType;
+
+  if (!identityId) {
+    // Auto-fetch or create identity
+    const identity = await getOrCreateIdentity(creds, params.displayName || "Business");
+    identityId = identity.identityId;
+    identityType = identity.identityType;
   }
-  // If neither provided, let TikTok decide (may fail on v1.3)
+
+  creative.identity_id = identityId;
+  creative.identity_type = identityType || "CUSTOMIZED_USER";
+
+  // Also set display_name if provided (for CUSTOMIZED_USER)
+  if (params.displayName) creative.display_name = params.displayName;
+  if (params.profileImageId) creative.profile_image_id = params.profileImageId;
 
   if (params.landingPageUrl) creative.landing_page_url = params.landingPageUrl;
   if (params.imageId) creative.image_ids = [params.imageId];

@@ -19,6 +19,7 @@ import {
   uploadImageByUrl,
   uploadVideoByUrl,
   createAd,
+  getOrCreateIdentity,
   searchLocations,
   getInterestCategories,
   type TikTokCredentials,
@@ -356,6 +357,35 @@ const tools = [
     },
   },
   {
+    name: "batch_create_ads",
+    description: "Crea múltiples anuncios en una campaña existente. Auto-obtiene identity_id de TikTok. Vincula cada imagen/video a su ad group correspondiente. Ideal para reintentar creación de anuncios con image_ids ya existentes.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        campaign_id: { type: "string", description: "ID de la campaña" },
+        display_name: { type: "string", description: "Nombre del negocio (aparece en el anuncio)" },
+        ads: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              adgroup_id: { type: "string", description: "ID del ad group" },
+              ad_name: { type: "string", description: "Nombre del anuncio (único)" },
+              ad_text: { type: "string", description: "Texto del anuncio" },
+              image_id: { type: "string", description: "ID de imagen ya subida" },
+              video_id: { type: "string", description: "ID de video ya subido" },
+              call_to_action: { type: "string", description: "CTA: LEARN_MORE, CONTACT_US, etc." },
+              landing_page_url: { type: "string", description: "URL de destino" },
+            },
+            required: ["adgroup_id", "ad_name", "ad_text"],
+          },
+          description: "Array de anuncios a crear",
+        },
+      },
+      required: ["campaign_id", "display_name", "ads"],
+    },
+  },
+  {
     name: "optimize_campaign",
     description: "Analiza el rendimiento de una campaña y sus ad groups. Compara métricas (CTR, CPC, gasto, conversiones), identifica ganadores y perdedores, pausa los peores, sube presupuesto a los mejores, y genera un reporte de optimización con recomendaciones de copy.",
     input_schema: {
@@ -557,6 +587,65 @@ async function executeTool(
           displayName: (input.display_name as string) || undefined,
         });
         return JSON.stringify({ success: true, adId: adResult.adId, note: `Anuncio "${input.ad_name}" creado. Ad ID: ${adResult.adId}.` });
+      }
+
+      case "batch_create_ads": {
+        const displayName = input.display_name as string;
+        const adsInput = input.ads as Array<{
+          adgroup_id: string;
+          ad_name: string;
+          ad_text: string;
+          image_id?: string;
+          video_id?: string;
+          call_to_action?: string;
+          landing_page_url?: string;
+        }>;
+
+        const results: Array<{ adName: string; success: boolean; adId?: string; error?: string }> = [];
+
+        // Pre-fetch identity once for all ads
+        let identityId: string | undefined;
+        let identityType: string | undefined;
+        try {
+          const identity = await getOrCreateIdentity(creds, displayName);
+          identityId = identity.identityId;
+          identityType = identity.identityType;
+        } catch (e) {
+          return JSON.stringify({
+            success: false,
+            error: `No se pudo obtener identity_id: ${e instanceof Error ? e.message : String(e)}. Vincula un perfil de TikTok en Ads Manager.`,
+          });
+        }
+
+        for (const ad of adsInput) {
+          try {
+            const result = await createAd(creds, {
+              adgroupId: ad.adgroup_id,
+              adName: ad.ad_name,
+              adText: ad.ad_text,
+              imageId: ad.image_id || undefined,
+              videoId: ad.video_id || undefined,
+              callToAction: ad.call_to_action || "CONTACT_US",
+              landingPageUrl: ad.landing_page_url || undefined,
+              displayName,
+              identityId,
+              identityType,
+            });
+            results.push({ adName: ad.ad_name, success: true, adId: result.adId });
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            results.push({ adName: ad.ad_name, success: false, error: msg });
+          }
+        }
+
+        const successCount = results.filter((r) => r.success).length;
+        return JSON.stringify({
+          success: successCount > 0,
+          identityUsed: { identityId, identityType },
+          totalAds: adsInput.length,
+          successCount,
+          results,
+        });
       }
 
       case "create_full_campaign": {
