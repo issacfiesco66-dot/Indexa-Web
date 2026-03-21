@@ -821,6 +821,7 @@ export async function uploadVideoByUrl(
 
 /**
  * Create an ad within an ad group.
+ * TikTok API v1.3 requires: ad_format, identity_type + identity_id/display_name
  */
 export async function createAd(
   creds: TikTokCredentials,
@@ -834,25 +835,44 @@ export async function createAd(
     landingPageUrl?: string;
     identityId?: string;
     identityType?: string;
+    displayName?: string;
+    profileImageId?: string;
+    adFormat?: string;
   }
 ): Promise<{ adId: string }> {
+  // Determine ad_format based on provided creative
+  const adFormat = params.adFormat
+    || (params.videoId ? "SINGLE_VIDEO" : "SINGLE_IMAGE");
+
   const creative: Record<string, unknown> = {
     ad_name: params.adName,
     ad_text: params.adText,
+    ad_format: adFormat,
     call_to_action: params.callToAction || "LEARN_MORE",
   };
+
+  // Identity: required in v1.3. Use provided identity or CUSTOMIZED_USER with display_name
+  if (params.identityId) {
+    creative.identity_id = params.identityId;
+    creative.identity_type = params.identityType || "CUSTOMIZED_USER";
+  } else if (params.displayName) {
+    creative.identity_type = "CUSTOMIZED_USER";
+    creative.display_name = params.displayName;
+    if (params.profileImageId) creative.profile_image_id = params.profileImageId;
+  }
+  // If neither provided, let TikTok decide (may fail on v1.3)
 
   if (params.landingPageUrl) creative.landing_page_url = params.landingPageUrl;
   if (params.imageId) creative.image_ids = [params.imageId];
   if (params.videoId) creative.video_id = params.videoId;
-  if (params.identityId) creative.identity_id = params.identityId;
-  if (params.identityType) creative.identity_type = params.identityType;
 
   const body: Record<string, unknown> = {
     advertiser_id: creds.advertiserId,
     adgroup_id: params.adgroupId,
     creatives: [creative],
   };
+
+  console.log(`[createAd] Request body:`, JSON.stringify(body, null, 2));
 
   const response = await tiktokFetch<{ ad_ids: string[] }>(
     "/ad/create/",

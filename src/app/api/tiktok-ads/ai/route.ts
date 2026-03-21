@@ -67,7 +67,7 @@ Todos con: placement solo TikTok (sin Pangle), bid Lowest Cost, estado PAUSADO.
 - operation_status: SIEMPRE DISABLE en creación inicial
 - Naming: MX_[OBJETIVO]_[Negocio]_[Mes][Año]
 
-═══ CREATIVOS ═══
+═══ CREATIVOS Y ANUNCIOS ═══
 Después de crear la campaña, NO llames generate_ad_image en la misma petición (causa timeout).
 En tu respuesta:
 1. Muestra el resumen de la campaña creada
@@ -75,6 +75,13 @@ En tu respuesta:
 3. Pregunta: "¿Quieres que genere las imágenes publicitarias con IA?"
 
 Cuando el usuario confirme, ENTONCES genera las imágenes y crea los anuncios.
+
+IMPORTANTE PARA CREAR ANUNCIOS (create_ad):
+- SIEMPRE incluye display_name (nombre del negocio, máx 40 chars). Es OBLIGATORIO en TikTok v1.3.
+- SIEMPRE incluye image_id (de generate_ad_image) o video_id (de upload_video).
+- ad_name debe ser ÚNICO por cada anuncio.
+- CTA "Contactar" = "CONTACT_US" (no existe "CONTACT_NOW").
+- La imagen debe ser 1024x1792 (vertical 9:16 para TikTok).
 
 IMPORTANTE: Usa MÁXIMO 1 herramienta por petición del usuario. create_full_campaign ya es muy pesada.
 NUNCA encadenes create_full_campaign + generate_ad_image + create_ad en la misma petición.
@@ -291,23 +298,24 @@ const tools = [
   },
   {
     name: "create_ad",
-    description: "Crea un anuncio dentro de un ad group. Necesita image_id (de generate_ad_image o upload_image) o video_id (de upload_video). Incluye texto, CTA y landing page.",
+    description: "Crea un anuncio dentro de un ad group. Necesita image_id (de generate_ad_image o upload_image) o video_id (de upload_video). IMPORTANTE: TikTok v1.3 requiere display_name (nombre del negocio que aparece en el anuncio).",
     input_schema: {
       type: "object" as const,
       properties: {
         adgroup_id: { type: "string", description: "ID del ad group donde crear el anuncio" },
-        ad_name: { type: "string", description: "Nombre del anuncio" },
+        ad_name: { type: "string", description: "Nombre del anuncio (debe ser único)" },
         ad_text: { type: "string", description: "Texto del anuncio (máx 100 caracteres)" },
-        image_id: { type: "string", description: "ID de imagen subida (de upload_image)" },
+        image_id: { type: "string", description: "ID de imagen subida (de generate_ad_image o upload_image)" },
         video_id: { type: "string", description: "ID de video subido (de upload_video)" },
         landing_page_url: { type: "string", description: "URL de destino del anuncio" },
+        display_name: { type: "string", description: "Nombre del negocio mostrado en el anuncio (REQUERIDO por TikTok v1.3, máx 40 chars)" },
         call_to_action: {
           type: "string",
-          enum: ["LEARN_MORE", "SIGN_UP", "DOWNLOAD", "SHOP_NOW", "CONTACT_US", "APPLY_NOW", "GET_QUOTE", "BOOK_NOW", "SUBSCRIBE", "ORDER_NOW"],
+          enum: ["LEARN_MORE", "SIGN_UP", "DOWNLOAD", "SHOP_NOW", "CONTACT_US", "APPLY_NOW", "GET_QUOTE", "BOOK_NOW", "SUBSCRIBE", "ORDER_NOW", "GET_SHOWTIMES", "LISTEN_NOW", "VIEW_NOW", "INSTALL_NOW"],
           description: "Botón de acción (default: LEARN_MORE)",
         },
       },
-      required: ["adgroup_id", "ad_name", "ad_text"],
+      required: ["adgroup_id", "ad_name", "ad_text", "display_name"],
     },
   },
   {
@@ -546,6 +554,7 @@ async function executeTool(
           videoId: (input.video_id as string) || undefined,
           landingPageUrl: (input.landing_page_url as string) || undefined,
           callToAction: (input.call_to_action as string) || "LEARN_MORE",
+          displayName: (input.display_name as string) || undefined,
         });
         return JSON.stringify({ success: true, adId: adResult.adId, note: `Anuncio "${input.ad_name}" creado. Ad ID: ${adResult.adId}.` });
       }
