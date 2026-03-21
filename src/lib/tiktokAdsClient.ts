@@ -251,6 +251,8 @@ async function tiktokFetch<T>(
   const data = await res.json();
 
   if (data.code !== 0) {
+    // Log full error response for debugging
+    console.error(`[TikTok API ERROR] ${endpoint}:`, JSON.stringify(data, null, 2));
     throw new Error(`TikTok API error ${data.code} en ${endpoint}: ${data.message}`);
   }
 
@@ -651,6 +653,7 @@ export async function createAdGroup(
     budget: number;
     budgetMode: "BUDGET_MODE_DAY" | "BUDGET_MODE_TOTAL";
     optimizationGoal: string;
+    promotionType?: string;
     billingEvent?: string;
     bidType?: string;
     placementType?: string;
@@ -677,18 +680,24 @@ export async function createAdGroup(
     optimization_goal: params.optimizationGoal,
     billing_event: params.billingEvent || "OCPM",
     bid_type: params.bidType || "BID_TYPE_NO_BID",
+    pacing: "PACING_MODE_SMOOTH",
     placement_type: placementType,
     operation_status: "DISABLE",
     schedule_type: "SCHEDULE_FROM_NOW",
     schedule_start_time: scheduleTime,
   };
 
+  // promotion_type is required in TikTok API v1.3
+  if (params.promotionType) {
+    body.promotion_type = params.promotionType;
+  }
+
   // PLACEMENT_TYPE_NORMAL requires explicit placements array
   if (placementType === "PLACEMENT_TYPE_NORMAL") {
     body.placements = ["PLACEMENT_TIKTOK"];
   }
 
-  // Location is required — use provided IDs or omit (TikTok will use account default)
+  // Location targeting
   if (params.location_ids && params.location_ids.length > 0) {
     body.location_ids = params.location_ids;
   }
@@ -698,6 +707,8 @@ export async function createAdGroup(
   if (params.gender) {
     body.gender = params.gender;
   }
+
+  console.log(`[createAdGroup] Request body:`, JSON.stringify(body, null, 2));
 
   const response = await tiktokFetch<{ adgroup_id: string }>(
     "/adgroup/create/",

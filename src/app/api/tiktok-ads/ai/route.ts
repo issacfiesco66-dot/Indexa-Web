@@ -105,6 +105,9 @@ Al crear, muestra resumen técnico completo:
 🔒 Estado: PAUSADA
 💡 Siguiente paso: generar creativos con generate_ad_image
 
+CRÍTICO: Si hay errores, muestra el mensaje EXACTO del error de TikTok tal cual aparece en el campo "errors".
+NO resumas ni ocultes los errores. Copia el texto COMPLETO del error para que el desarrollador pueda depurar.
+
 Formato: $1,234.56 dinero, 2.5% porcentajes.
 CTAs válidos: LEARN_MORE, SIGN_UP, DOWNLOAD, SHOP_NOW, CONTACT_US, APPLY_NOW, GET_QUOTE, BOOK_NOW, SUBSCRIBE, ORDER_NOW.`;
 
@@ -617,42 +620,59 @@ async function executeTool(
         };
         const optGoal = optGoalMap[objective] || "CLICK";
 
+        // Map objective to promotion_type (required by TikTok API v1.3)
+        const promoTypeMap: Record<string, string> = {
+          TRAFFIC: "WEBSITE",
+          CONVERSIONS: "WEBSITE",
+          LEAD_GENERATION: "LEAD_GENERATION",
+          REACH: "WEBSITE",
+          VIDEO_VIEWS: "WEBSITE",
+          ENGAGEMENT: "WEBSITE",
+        };
+        const promotionType = promoTypeMap[objective] || "WEBSITE";
+
+        // Common AG params
+        const agBase = {
+          campaignId,
+          budget: agBudget,
+          budgetMode: "BUDGET_MODE_DAY" as const,
+          optimizationGoal: optGoal,
+          promotionType,
+          location_ids: locationIds.length > 0 ? locationIds : undefined,
+        };
+
         // AG1: Interest Stack
         let ag1Id = "";
         try {
           const ag1 = await createAdGroup(creds, {
-            campaignId,
+            ...agBase,
             adgroupName: `${bizName} - Interest Stack`,
-            budget: agBudget,
-            budgetMode: "BUDGET_MODE_DAY",
-            optimizationGoal: optGoal,
-            location_ids: locationIds.length > 0 ? locationIds : undefined,
             ageGroups: ageNarrow,
             gender,
           });
           ag1Id = ag1.adgroupId;
           steps.push(`✅ AG1 Interest Stack (ID: ${ag1Id}) — $${agBudget}/día — Edad: ${ageNarrow.join(", ")} — ${locationName}`);
         } catch (e) {
-          errors.push(`AG1: ${e instanceof Error ? e.message : String(e)}`);
+          const msg = e instanceof Error ? e.message : String(e);
+          errors.push(`AG1 ERROR: ${msg}`);
+          console.error(`[create_full_campaign] AG1 failed:`, msg);
         }
 
         // AG2: Broad/Algoritmo
         let ag2Id = "";
         try {
           const ag2 = await createAdGroup(creds, {
-            campaignId,
+            ...agBase,
             adgroupName: `${bizName} - Broad`,
-            budget: agBudget,
-            budgetMode: "BUDGET_MODE_DAY",
-            optimizationGoal: optGoal,
-            location_ids: locationIds.length > 0 ? locationIds : undefined,
             ageGroups: ageBroad,
             gender,
           });
           ag2Id = ag2.adgroupId;
           steps.push(`✅ AG2 Broad (ID: ${ag2Id}) — $${agBudget}/día — Edad: ${ageBroad.join(", ")} — ${locationName}`);
         } catch (e) {
-          errors.push(`AG2: ${e instanceof Error ? e.message : String(e)}`);
+          const msg = e instanceof Error ? e.message : String(e);
+          errors.push(`AG2 ERROR: ${msg}`);
+          console.error(`[create_full_campaign] AG2 failed:`, msg);
         }
 
         // AG3: Amplio General
@@ -660,19 +680,17 @@ async function executeTool(
         const ageAll = ["AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_100"];
         try {
           const ag3 = await createAdGroup(creds, {
-            campaignId,
+            ...agBase,
             adgroupName: `${bizName} - Amplio General`,
-            budget: agBudget,
-            budgetMode: "BUDGET_MODE_DAY",
-            optimizationGoal: optGoal,
-            location_ids: locationIds.length > 0 ? locationIds : undefined,
             ageGroups: ageAll,
             gender: "GENDER_UNLIMITED",
           });
           ag3Id = ag3.adgroupId;
           steps.push(`✅ AG3 Amplio (ID: ${ag3Id}) — $${agBudget}/día — Edad: 18-55+ — ${locationName}`);
         } catch (e) {
-          errors.push(`AG3: ${e instanceof Error ? e.message : String(e)}`);
+          const msg = e instanceof Error ? e.message : String(e);
+          errors.push(`AG3 ERROR: ${msg}`);
+          console.error(`[create_full_campaign] AG3 failed:`, msg);
         }
 
         const agCount = [ag1Id, ag2Id, ag3Id].filter(Boolean).length;
