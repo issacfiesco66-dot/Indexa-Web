@@ -4,7 +4,7 @@ import { doc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "@/lib/firebaseConfig";
 import type { SitioData } from "@/types/lead";
-import { Loader2, Plus, Trash2, FileImage, Upload, Images } from "lucide-react";
+import { Loader2, Plus, Trash2, FileImage, Upload, Images, AlertCircle } from "lucide-react";
 
 interface Props { sitio: SitioData; sitioId: string; setSitio: React.Dispatch<React.SetStateAction<SitioData>>; }
 
@@ -12,70 +12,145 @@ export default function ContenidoTab({ sitio, sitioId, setSitio }: Props) {
   const [uH, setUH] = useState(false);
   const [uG, setUG] = useState(false);
   const [ns, setNs] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const hRef = useRef<HTMLInputElement>(null);
   const gRef = useRef<HTMLInputElement>(null);
   const ic = "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20";
 
   const heroUp = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f || !storage || !sitioId || !db) return;
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!storage || !db) {
+      setError("Error de configuración: Firebase Storage no está disponible. Contacta soporte.");
+      console.error("ContenidoTab: storage =", storage, "db =", db);
+      return;
+    }
+    if (!sitioId) {
+      setError("No se encontró el ID del sitio.");
+      return;
+    }
+    setError(null);
     setUH(true);
     try {
-      const r = ref(storage, `sitios/${sitioId}/hero-${Date.now()}`);
+      const path = `sitios/${sitioId}/hero-${Date.now()}`;
+      console.log("[ContenidoTab] Uploading hero to:", path);
+      const r = ref(storage, path);
       await uploadBytes(r, f);
+      console.log("[ContenidoTab] Hero upload complete, getting URL...");
       const u = await getDownloadURL(r);
+      console.log("[ContenidoTab] Hero URL:", u);
       await updateDoc(doc(db, "sitios", sitioId), { heroImageUrl: u });
       setSitio(p => ({ ...p, heroImageUrl: u }));
-    } catch (err) { console.error("Hero err:", err); }
-    finally { setUH(false); if (hRef.current) hRef.current.value = ""; }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Hero upload error:", msg, err);
+      setError(`Error al subir imagen de portada: ${msg}`);
+    } finally {
+      setUH(false);
+      if (hRef.current) hRef.current.value = "";
+    }
   };
 
   const heroRm = async () => {
     if (!db || !sitioId) return;
-    await updateDoc(doc(db, "sitios", sitioId), { heroImageUrl: "" });
-    setSitio(p => ({ ...p, heroImageUrl: "" }));
+    setError(null);
+    try {
+      await updateDoc(doc(db, "sitios", sitioId), { heroImageUrl: "" });
+      setSitio(p => ({ ...p, heroImageUrl: "" }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Error al eliminar imagen: ${msg}`);
+    }
   };
 
   const galUp = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const fs = e.target.files; if (!fs || !fs.length || !storage || !sitioId || !db) return;
+    const fs = e.target.files;
+    if (!fs || !fs.length) return;
+    if (!storage || !db) {
+      setError("Error de configuración: Firebase Storage no está disponible. Contacta soporte.");
+      console.error("ContenidoTab: storage =", storage, "db =", db);
+      return;
+    }
+    if (!sitioId) {
+      setError("No se encontró el ID del sitio.");
+      return;
+    }
+    setError(null);
     setUG(true);
     try {
       const urls: string[] = [];
       for (let i = 0; i < fs.length; i++) {
-        const r = ref(storage, `sitios/${sitioId}/gal-${Date.now()}-${i}`);
+        const path = `sitios/${sitioId}/gal-${Date.now()}-${i}`;
+        console.log(`[ContenidoTab] Uploading gallery ${i + 1}/${fs.length} to:`, path);
+        const r = ref(storage, path);
         await uploadBytes(r, fs[i]);
         urls.push(await getDownloadURL(r));
       }
+      console.log("[ContenidoTab] Gallery upload complete, URLs:", urls.length);
       const up = [...sitio.galeria, ...urls];
       await updateDoc(doc(db, "sitios", sitioId), { galeria: up });
       setSitio(p => ({ ...p, galeria: up }));
-    } catch (err) { console.error("Gallery err:", err); }
-    finally { setUG(false); if (gRef.current) gRef.current.value = ""; }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Gallery upload error:", msg, err);
+      setError(`Error al subir imágenes: ${msg}`);
+    } finally {
+      setUG(false);
+      if (gRef.current) gRef.current.value = "";
+    }
   };
 
   const galRm = async (i: number) => {
     if (!db || !sitioId) return;
-    const up = sitio.galeria.filter((_, x) => x !== i);
-    await updateDoc(doc(db, "sitios", sitioId), { galeria: up });
-    setSitio(p => ({ ...p, galeria: up }));
+    setError(null);
+    try {
+      const up = sitio.galeria.filter((_, x) => x !== i);
+      await updateDoc(doc(db, "sitios", sitioId), { galeria: up });
+      setSitio(p => ({ ...p, galeria: up }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Error al eliminar imagen: ${msg}`);
+    }
   };
 
   const svcAdd = async () => {
     const n = ns.trim(); if (!n || !db || !sitioId) return;
-    const up = [...sitio.servicios, n];
-    await updateDoc(doc(db, "sitios", sitioId), { servicios: up });
-    setSitio(p => ({ ...p, servicios: up }));
-    setNs("");
+    setError(null);
+    try {
+      const up = [...sitio.servicios, n];
+      await updateDoc(doc(db, "sitios", sitioId), { servicios: up });
+      setSitio(p => ({ ...p, servicios: up }));
+      setNs("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Error al agregar servicio: ${msg}`);
+    }
   };
 
   const svcRm = async (i: number) => {
     if (!db || !sitioId) return;
-    const up = sitio.servicios.filter((_, x) => x !== i);
-    await updateDoc(doc(db, "sitios", sitioId), { servicios: up });
-    setSitio(p => ({ ...p, servicios: up }));
+    setError(null);
+    try {
+      const up = sitio.servicios.filter((_, x) => x !== i);
+      await updateDoc(doc(db, "sitios", sitioId), { servicios: up });
+      setSitio(p => ({ ...p, servicios: up }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Error al eliminar servicio: ${msg}`);
+    }
   };
 
   return (
     <div className="space-y-8">
+      {error && (
+        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+          <div>
+            <p>{error}</p>
+            <button onClick={() => setError(null)} className="mt-1 text-xs font-semibold text-red-500 hover:text-red-700">Cerrar</button>
+          </div>
+        </div>
+      )}
       <div>
         <label className="block text-sm font-semibold text-indexa-gray-dark">
           <FileImage size={14} className="mr-1.5 inline-block" /> Imagen de portada (Header)
