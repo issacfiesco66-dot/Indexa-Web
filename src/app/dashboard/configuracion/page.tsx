@@ -63,6 +63,8 @@ function docToPartial(data: DocumentData): Partial<SitioData> {
     direccion: data.direccion ?? "",
     colorPrincipal: data.colorPrincipal ?? "#002366",
     logoUrl: data.logoUrl ?? "",
+    heroImageUrl: data.heroImageUrl ?? "",
+    galeria: (data.galeria as string[]) ?? [],
     servicios: data.servicios ?? [],
     templateId: data.templateId ?? "modern",
     statusPago: data.statusPago ?? "demo",

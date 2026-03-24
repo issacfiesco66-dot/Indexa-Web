@@ -41,15 +41,18 @@ import {
   Tag,
   Gift,
   Link2,
+  Briefcase,
 } from "lucide-react";
 import Link from "next/link";
 import AiMagicButton from "@/components/AiMagicButton";
+import ContenidoTab from "@/components/ContenidoTab";
 
 // ── Tabs ───────────────────────────────────────────────────────────
-type Tab = "general" | "contacto" | "visual";
+type Tab = "general" | "contenido" | "contacto" | "visual";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "general", label: "General", icon: Building2 },
+  { id: "contenido", label: "Contenido", icon: Briefcase },
   { id: "contacto", label: "Contacto", icon: Phone },
   { id: "visual", label: "Visual", icon: Palette },
 ];
@@ -159,6 +162,8 @@ const DEFAULT_SITIO: SitioData = {
   direccion: "",
   colorPrincipal: "#002366",
   logoUrl: "",
+  heroImageUrl: "",
+  galeria: [],
   servicios: [],
   vistas: 0,
   clicsWhatsApp: 0,
@@ -192,6 +197,8 @@ function docToSitio(data: DocumentData): SitioData {
     direccion: data.direccion ?? "",
     colorPrincipal: data.colorPrincipal ?? "#002366",
     logoUrl: data.logoUrl ?? "",
+    heroImageUrl: data.heroImageUrl ?? "",
+    galeria: (data.galeria as string[]) ?? [],
     servicios: data.servicios ?? [],
     vistas: data.vistas ?? 0,
     clicsWhatsApp: data.clicsWhatsApp ?? 0,
@@ -391,6 +398,9 @@ export default function ClientDashboardPage() {
         longitud: sitio.longitud,
         horarios: sitio.horarios,
         googleMapsUrl: sitio.googleMapsUrl,
+        heroImageUrl: sitio.heroImageUrl,
+        galeria: sitio.galeria,
+        servicios: sitio.servicios,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -1065,6 +1075,11 @@ export default function ClientDashboardPage() {
                   💡 Para obtener tus coordenadas: abre Google Maps, haz clic derecho en tu ubicación y copia los números.
                 </p>
               </div>
+            )}
+
+            {/* ── Contenido tab ─────────────────────────────────── */}
+            {activeTab === "contenido" && (
+              <ContenidoTab sitio={sitio} sitioId={sitioId} setSitio={setSitio} />
             )}
 
             {/* ── Contacto tab ────────────────────────────────────── */}

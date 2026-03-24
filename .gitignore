@@ -36,6 +36,10 @@ yarn-error.log*
 # Firebase service account key (NEVER commit)
 serviceAccountKey.json
 **/serviceAccountKey.json
+*firebase-adminsdk*.json
+
+# Claude worktrees
+.claude/
 
 # Python scraper outputs
 scripts/__pycache__/

@@ -54,6 +54,41 @@ function IndexaFooterCredit() {
   );
 }
 
+function GallerySection({ images, colorPrincipal, variant = "modern" }: { images: string[]; colorPrincipal: string; variant?: "modern" | "elegant" | "minimalist" }) {
+  if (!images || images.length === 0) return null;
+  const headingClass = variant === "elegant" ? "font-serif" : "";
+  const bgClass = variant === "minimalist" ? "border-b border-gray-200 bg-white" : variant === "elegant" ? "bg-stone-50" : "bg-gray-50";
+  return (
+    <section className={`${bgClass} py-16 sm:py-20`}>
+      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+        <div className="text-center">
+          {variant === "minimalist" ? (
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Nuestro trabajo</p>
+          ) : variant === "elegant" ? (
+            <>
+              <p className="font-serif text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: colorPrincipal }}>Portafolio</p>
+              <h2 className={`mt-3 ${headingClass} text-3xl font-semibold text-stone-900 sm:text-4xl`}>Nuestros Trabajos</h2>
+              <div className="mx-auto mt-4 h-px w-12" style={{ backgroundColor: colorPrincipal }} />
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-bold uppercase tracking-wider" style={{ color: colorPrincipal }}>Portafolio</p>
+              <h2 className="mt-2 text-2xl font-extrabold text-gray-900 sm:text-3xl">Nuestros Trabajos</h2>
+            </>
+          )}
+        </div>
+        <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {images.map((url, i) => (
+            <div key={i} className={`overflow-hidden ${variant === "minimalist" ? "" : "rounded-2xl"} ${variant === "elegant" ? "rounded-sm" : ""}`}>
+              <Image src={url} alt={`Trabajo ${i + 1}`} width={600} height={400} className="h-56 w-full object-cover transition-transform duration-300 hover:scale-105" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // 1. MODERN TEMPLATE
 //    Sans-serif, rounded-2xl, soft shadows, gradient buttons
@@ -85,8 +120,11 @@ export function ModernTemplate({ data, services, whatsAppUrl }: TemplateProps) {
         </nav>
       </header>
 
-      {/* Hero — brand color background with gradient orbs */}
+      {/* Hero — brand color background with gradient orbs, optional hero image */}
       <section className="relative overflow-hidden" style={{ backgroundColor: colorPrincipal }}>
+        {data.heroImageUrl && (
+          <Image src={data.heroImageUrl} alt={altHero} fill className="absolute inset-0 object-cover opacity-30" priority />
+        )}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-white blur-3xl" />
           <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-white blur-3xl" />
@@ -146,6 +184,9 @@ export function ModernTemplate({ data, services, whatsAppUrl }: TemplateProps) {
           </div>
         </div>
       </section>
+
+      {/* Gallery */}
+      <GallerySection images={data.galeria} colorPrincipal={colorPrincipal} variant="modern" />
 
       {/* Contact */}
       <section id="contacto" className="bg-gray-50 py-16 sm:py-20">
@@ -221,9 +262,12 @@ export function ElegantTemplate({ data, services, whatsAppUrl }: TemplateProps) 
         </nav>
       </header>
 
-      {/* Hero — white bg, subtle brand accent line */}
+      {/* Hero — white bg, subtle brand accent line, optional hero image */}
       <section className="relative bg-stone-50 py-24 sm:py-32 lg:py-40">
-        <div className="mx-auto max-w-4xl px-6 text-center">
+        {data.heroImageUrl && (
+          <Image src={data.heroImageUrl} alt={altHero} fill className="absolute inset-0 object-cover opacity-20" priority />
+        )}
+        <div className="relative mx-auto max-w-4xl px-6 text-center">
           <div className="mx-auto mb-8 h-px w-16" style={{ backgroundColor: colorPrincipal }} />
           {logoUrl && (
             <Image src={logoUrl} alt={altHero} width={80} height={80} className="mx-auto mb-10 h-16 w-16 rounded-sm object-contain sm:h-20 sm:w-20" priority />
@@ -287,6 +331,9 @@ export function ElegantTemplate({ data, services, whatsAppUrl }: TemplateProps) 
           </div>
         </div>
       </section>
+
+      {/* Gallery */}
+      <GallerySection images={data.galeria} colorPrincipal={colorPrincipal} variant="elegant" />
 
       {/* Contact */}
       <section id="contacto" className="bg-white py-20 sm:py-24">
@@ -366,9 +413,12 @@ export function MinimalistTemplate({ data, services, whatsAppUrl }: TemplateProp
         </nav>
       </header>
 
-      {/* Hero — white bg, strong typography, brand color as accent line */}
-      <section className="border-b border-gray-200 bg-white py-20 sm:py-28 lg:py-36">
-        <div className="mx-auto max-w-4xl px-6 text-center">
+      {/* Hero — white bg, strong typography, brand color as accent line, optional hero image */}
+      <section className="relative border-b border-gray-200 bg-white py-20 sm:py-28 lg:py-36">
+        {data.heroImageUrl && (
+          <Image src={data.heroImageUrl} alt={altHero} fill className="absolute inset-0 object-cover opacity-10" priority />
+        )}
+        <div className="relative mx-auto max-w-4xl px-6 text-center">
           {logoUrl && (
             <Image src={logoUrl} alt={altHero} width={64} height={64} className="mx-auto mb-8 h-14 w-14 object-contain sm:h-16 sm:w-16" priority />
           )}
@@ -424,6 +474,9 @@ export function MinimalistTemplate({ data, services, whatsAppUrl }: TemplateProp
           </div>
         </div>
       </section>
+
+      {/* Gallery */}
+      <GallerySection images={data.galeria} colorPrincipal={colorPrincipal} variant="minimalist" />
 
       {/* Contact */}
       <section id="contacto" className="bg-white py-16 sm:py-20">

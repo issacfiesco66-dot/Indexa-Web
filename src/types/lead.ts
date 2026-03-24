@@ -73,6 +73,8 @@ export interface SitioData {
   direccion: string;
   colorPrincipal: string;
   logoUrl: string;
+  heroImageUrl: string;
+  galeria: string[];
   servicios: string[];
   vistas: number;
   clicsWhatsApp: number;

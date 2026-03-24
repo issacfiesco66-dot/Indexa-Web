@@ -28,6 +28,8 @@ async function getSitioBySlug(slug: string): Promise<{ id: string; data: SitioDa
       direccion: (raw.direccion as string) ?? "",
       colorPrincipal: (raw.colorPrincipal as string) ?? "#002366",
       logoUrl: (raw.logoUrl as string) ?? "",
+      heroImageUrl: (raw.heroImageUrl as string) ?? "",
+      galeria: (raw.galeria as string[]) ?? [],
       servicios: (raw.servicios as string[]) ?? [],
       vistas: (raw.vistas as number) ?? 0,
       clicsWhatsApp: (raw.clicsWhatsApp as number) ?? 0,
