@@ -8,7 +8,8 @@ const inter = Inter({
   display: "swap",
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa-web-ten.vercel.app";
+const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa-web-ten.vercel.app";
+const SITE_URL = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

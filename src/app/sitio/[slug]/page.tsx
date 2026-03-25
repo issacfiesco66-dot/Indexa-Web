@@ -225,7 +225,8 @@ export default async function SitioPage({ params }: SitioPageProps) {
   // JSON-LD structured data for SEO
   const jsonLd = buildLocalBusinessJsonLd(data, slug);
 
-  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa-web-ten.vercel.app";
+  const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa-web-ten.vercel.app";
+  const SITE_URL = rawSiteUrl.startsWith("http") ? rawSiteUrl : `https://${rawSiteUrl}`;
 
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
