@@ -2,7 +2,7 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="relative overflow-hidden bg-[#050816] text-white">
+    <footer role="contentinfo" aria-label="Pie de página de INDEXA" className="relative overflow-hidden bg-[#050816] text-white">
       {/* Subtle gradient accent */}
       <div className="absolute top-0 left-1/2 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-indexa-orange/40 to-transparent" />
 

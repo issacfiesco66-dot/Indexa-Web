@@ -22,7 +22,6 @@ export default function ContenidoTab({ sitio, sitioId, setSitio }: Props) {
     if (!f) return;
     if (!storage || !db) {
       setError("Error de configuración: Firebase Storage no está disponible. Contacta soporte.");
-      console.error("ContenidoTab: storage =", storage, "db =", db);
       return;
     }
     if (!sitioId) {
@@ -33,17 +32,13 @@ export default function ContenidoTab({ sitio, sitioId, setSitio }: Props) {
     setUH(true);
     try {
       const path = `sitios/${sitioId}/hero-${Date.now()}`;
-      console.log("[ContenidoTab] Uploading hero to:", path);
       const r = ref(storage, path);
       await uploadBytes(r, f);
-      console.log("[ContenidoTab] Hero upload complete, getting URL...");
       const u = await getDownloadURL(r);
-      console.log("[ContenidoTab] Hero URL:", u);
       await updateDoc(doc(db, "sitios", sitioId), { heroImageUrl: u });
       setSitio(p => ({ ...p, heroImageUrl: u }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("Hero upload error:", msg, err);
       setError(`Error al subir imagen de portada: ${msg}`);
     } finally {
       setUH(false);
@@ -68,7 +63,6 @@ export default function ContenidoTab({ sitio, sitioId, setSitio }: Props) {
     if (!fs || !fs.length) return;
     if (!storage || !db) {
       setError("Error de configuración: Firebase Storage no está disponible. Contacta soporte.");
-      console.error("ContenidoTab: storage =", storage, "db =", db);
       return;
     }
     if (!sitioId) {
@@ -81,18 +75,15 @@ export default function ContenidoTab({ sitio, sitioId, setSitio }: Props) {
       const urls: string[] = [];
       for (let i = 0; i < fs.length; i++) {
         const path = `sitios/${sitioId}/gal-${Date.now()}-${i}`;
-        console.log(`[ContenidoTab] Uploading gallery ${i + 1}/${fs.length} to:`, path);
         const r = ref(storage, path);
         await uploadBytes(r, fs[i]);
         urls.push(await getDownloadURL(r));
       }
-      console.log("[ContenidoTab] Gallery upload complete, URLs:", urls.length);
       const up = [...sitio.galeria, ...urls];
       await updateDoc(doc(db, "sitios", sitioId), { galeria: up });
       setSitio(p => ({ ...p, galeria: up }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("Gallery upload error:", msg, err);
       setError(`Error al subir imágenes: ${msg}`);
     } finally {
       setUG(false);

@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    console.log("[generate-image] Calling Gemini with model: gemini-2.5-flash-image");
 
     const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
       method: "POST",
@@ -57,7 +56,6 @@ export async function POST(request: NextRequest) {
     });
 
     const rawText = await res.text();
-    console.log(`[generate-image] Gemini status: ${res.status}`);
 
     let data;
     try {

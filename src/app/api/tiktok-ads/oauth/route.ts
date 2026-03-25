@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 
 export const maxDuration = 30;
 
-const APP_ID = "7619166839642865681";
-const SECRET = process.env.TIKTOK_APP_SECRET || "4a7280426e5d254cf7e074a7b0c08958a84e551d";
+const APP_ID = process.env.TIKTOK_APP_ID || "7619166839642865681";
+const SECRET = process.env.TIKTOK_APP_SECRET;
+
+if (!SECRET) {
+  console.error("TIKTOK_APP_SECRET is not set");
+}
 
 async function exchangeCode(authCode: string) {
   const res = await fetch("https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/", {

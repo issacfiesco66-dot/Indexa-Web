@@ -427,11 +427,9 @@ export async function POST(request: NextRequest) {
     for (let round = 0; round < 8; round++) {
       const elapsed = Date.now() - startTime;
       if (elapsed > DEADLINE_MS) {
-        console.log(`[meta-ads/ai] time budget exceeded at round ${round} (${elapsed}ms)`);
         break;
       }
 
-      console.log(`[meta-ads/ai] round ${round}, elapsed ${elapsed}ms, calling Claude`);
 
       const claudeRes = await fetch(ANTHROPIC_URL, {
         method: "POST",
@@ -450,7 +448,6 @@ export async function POST(request: NextRequest) {
       });
 
       const claudeText = await claudeRes.text();
-      console.log(`[meta-ads/ai] Claude status: ${claudeRes.status}, elapsed ${Date.now() - startTime}ms`);
 
       if (!claudeRes.ok) {
         let errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${claudeText.slice(0, 300)}`;
@@ -501,7 +498,6 @@ export async function POST(request: NextRequest) {
             toolResults.push({ type: "tool_result", tool_use_id: block.id, content: "Tiempo agotado." });
             continue;
           }
-          console.log(`[meta-ads/ai] executing tool: ${block.name} (${toolElapsed}ms)`);
           const result = await executeTool(block.name, block.input, metaToken, adAccountId);
           toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
         }
@@ -510,7 +506,6 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      console.log(`[meta-ads/ai] unexpected stop_reason: ${response.stop_reason}`);
       break;
     }
 

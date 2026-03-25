@@ -1,6 +1,6 @@
 export default function Hero() {
   return (
-    <section className="relative min-h-screen overflow-hidden bg-[#050816]">
+    <section aria-label="Información principal de INDEXA" className="relative min-h-screen overflow-hidden bg-[#050816]">
       {/* Animated grid background */}
       <div className="absolute inset-0 opacity-[0.07]">
         <div

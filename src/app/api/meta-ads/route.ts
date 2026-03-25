@@ -349,7 +349,7 @@ export async function POST(request: NextRequest) {
       const budgetCents = String(Math.round(parseFloat(dailyBudget) * 100));
 
       // 1. Upload image
-      console.log(`[meta-ads] createCampaign step 1: uploading image (${imageBase64.length} chars)`);
+      // 1. Upload image
       const imageData = await metaPost(
         `${META_GRAPH_URL}/${actId}/adimages`,
         { bytes: imageBase64, access_token: metaToken },
@@ -366,7 +366,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 2. Create campaign
-      console.log(`[meta-ads] createCampaign step 2: creating campaign "${campaignName}"`);
+      // 2. Create campaign
       const campaignData = await metaPostJson(
         `${META_GRAPH_URL}/${actId}/campaigns`,
         {
@@ -392,7 +392,7 @@ export async function POST(request: NextRequest) {
       };
 
       // 4. Create ad set
-      console.log(`[meta-ads] createCampaign step 4: creating ad set, budget=${budgetCents} cents`);
+      // 4. Create ad set
       const adSetData = await metaPostJson(
         `${META_GRAPH_URL}/${actId}/adsets`,
         {
@@ -425,7 +425,7 @@ export async function POST(request: NextRequest) {
         },
       };
 
-      console.log(`[meta-ads] createCampaign step 5: creating ad creative`);
+      // 5. Create ad creative
       const creativeData = await metaPostJson(
         `${META_GRAPH_URL}/${actId}/adcreatives`,
         {
@@ -438,7 +438,7 @@ export async function POST(request: NextRequest) {
       const creativeId = creativeData.id;
 
       // 6. Create ad
-      console.log(`[meta-ads] createCampaign step 6: creating ad`);
+      // 6. Create ad
       const adData = await metaPostJson(
         `${META_GRAPH_URL}/${actId}/ads`,
         {

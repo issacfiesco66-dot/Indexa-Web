@@ -59,7 +59,9 @@ export default function Header() {
         <button
           onClick={() => setMenuOpen(!menuOpen)}
           className="flex flex-col gap-1.5 md:hidden"
-          aria-label="Toggle menu"
+          aria-label={menuOpen ? "Cerrar menú de navegación" : "Abrir menú de navegación"}
+          aria-expanded={menuOpen}
+          aria-controls="mobile-menu"
         >
           <span className={`block h-0.5 w-6 bg-white transition-transform ${menuOpen ? "translate-y-2 rotate-45" : ""}`} />
           <span className={`block h-0.5 w-6 bg-white transition-opacity ${menuOpen ? "opacity-0" : ""}`} />
@@ -68,7 +70,7 @@ export default function Header() {
       </nav>
 
       {menuOpen && (
-        <div className="border-t border-white/10 bg-[#0a0e27]/95 backdrop-blur-xl px-4 pb-4 md:hidden">
+        <div id="mobile-menu" role="navigation" aria-label="Menú principal" className="border-t border-white/10 bg-[#0a0e27]/95 backdrop-blur-xl px-4 pb-4 md:hidden">
           <div className="flex flex-col gap-3 pt-3">
             <a href="#soluciones" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Servicios</a>
             <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Cómo Funciona</a>

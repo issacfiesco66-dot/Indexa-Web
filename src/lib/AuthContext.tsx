@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (u) {
         const token = await u.getIdToken();
-        document.cookie = `firebaseAuthToken=${token}; path=/; max-age=${60 * 60}; SameSite=Lax`;
+        document.cookie = `firebaseAuthToken=${token}; path=/; max-age=${60 * 60}; SameSite=Strict; Secure`;
 
         if (db) {
           try {
@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               const data = snap.data();
               const normalized = normalizeRole(data.role);
               setRole(normalized);
-              document.cookie = `indexa_role=${normalized}; path=/; max-age=${60 * 60}; SameSite=Lax`;
+              document.cookie = `indexa_role=${normalized}; path=/; max-age=${60 * 60}; SameSite=Strict; Secure`;
 
               // Resolve agency branding from agencias collection
               let resolvedAgencyId: string | null = null;
@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setAgencyId(resolvedAgencyId);
             } else {
               setRole("client");
-              document.cookie = `indexa_role=client; path=/; max-age=${60 * 60}; SameSite=Lax`;
+              document.cookie = `indexa_role=client; path=/; max-age=${60 * 60}; SameSite=Strict; Secure`;
             }
           } catch {
             // Firestore may not be ready yet

@@ -1067,11 +1067,9 @@ export async function POST(request: NextRequest) {
       // Check time budget before starting a new round
       const elapsed = Date.now() - startTime;
       if (elapsed > DEADLINE_MS) {
-        console.log(`[tiktok-ads/ai] time budget exceeded at round ${round} (${elapsed}ms)`);
         break;
       }
 
-      console.log(`[tiktok-ads/ai] round ${round}, elapsed ${elapsed}ms, calling Claude`);
 
       const claudeRes = await fetch(ANTHROPIC_URL, {
         method: "POST",
@@ -1090,7 +1088,6 @@ export async function POST(request: NextRequest) {
       });
 
       const claudeText = await claudeRes.text();
-      console.log(`[tiktok-ads/ai] Claude status: ${claudeRes.status}, elapsed ${Date.now() - startTime}ms`);
 
       if (!claudeRes.ok) {
         let errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${claudeText.slice(0, 300)}`;
@@ -1138,11 +1135,9 @@ export async function POST(request: NextRequest) {
         for (const block of toolBlocks) {
           const toolElapsed = Date.now() - startTime;
           if (toolElapsed > DEADLINE_MS) {
-            console.log(`[tiktok-ads/ai] time budget hit during tool execution`);
             toolResults.push({ type: "tool_result", tool_use_id: block.id, content: "Tiempo agotado, no se pudo ejecutar esta herramienta." });
             continue;
           }
-          console.log(`[tiktok-ads/ai] executing tool: ${block.name} (${toolElapsed}ms)`);
           const result = await executeTool(block.name, block.input, creds);
           toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
         }
@@ -1151,7 +1146,6 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      console.log(`[tiktok-ads/ai] unexpected stop_reason: ${response.stop_reason}`);
       break;
     }
 

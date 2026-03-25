@@ -23,8 +23,45 @@ const MAINTENANCE_BYPASS_PREFIXES = [
 
 const PUBLIC_ADMIN_PATHS = ["/admin/login"];
 
+// API routes exempt from CSRF (webhooks need external access)
+const CSRF_EXEMPT_PREFIXES = [
+  "/api/webhooks",
+  "/api/cron",
+  "/api/prospectos/ingest",
+  "/api/contact",
+  "/api/bio-visit",
+];
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // ── 0. CSRF Protection — block cross-origin state-changing API requests ──
+  const method = request.method;
+  if (
+    pathname.startsWith("/api/") &&
+    ["POST", "PUT", "PATCH", "DELETE"].includes(method) &&
+    !CSRF_EXEMPT_PREFIXES.some((p) => pathname.startsWith(p))
+  ) {
+    const origin = request.headers.get("origin");
+    const host = request.headers.get("host");
+    if (origin && host) {
+      try {
+        const originHost = new URL(origin).host;
+        if (originHost !== host) {
+          return NextResponse.json(
+            { error: "Forbidden: cross-origin request" },
+            { status: 403 }
+          );
+        }
+      } catch {
+        // Invalid origin header — block
+        return NextResponse.json(
+          { error: "Forbidden: invalid origin" },
+          { status: 403 }
+        );
+      }
+    }
+  }
 
   const roleCookie = request.cookies.get("indexa_role")?.value || "";
   const authCookie =
