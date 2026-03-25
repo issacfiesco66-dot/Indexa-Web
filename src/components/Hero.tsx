@@ -37,9 +37,11 @@ export default function Hero() {
           inteligente
         </h1>
 
-        <p className="animate-fade-up-delay-2 mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-white/60 sm:text-xl">
-          Creamos tu sitio web profesional con IA, gestionamos tus campañas de
-          Meta Ads y te conectamos con clientes reales. Todo desde un solo panel.
+        <p className="hero-description animate-fade-up-delay-2 mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-white/60 sm:text-xl">
+          INDEXA es la plataforma en México que utiliza inteligencia artificial
+          para generar sitios web profesionales para PYMES en menos de 3 minutos.
+          Con SEO local automático, WhatsApp integrado y campañas de ads —
+          todo desde un solo panel.
         </p>
 
         {/* CTAs */}
@@ -61,11 +63,18 @@ export default function Hero() {
           </a>
         </div>
 
+        {/* Social proof link */}
+        <div className="animate-fade-up-delay-2 mt-6">
+          <a href="/casos-de-exito" className="text-sm font-medium text-indexa-orange/80 underline decoration-indexa-orange/30 underline-offset-4 hover:text-indexa-orange transition-colors">
+            Conoce nuestros casos de éxito
+          </a>
+        </div>
+
         {/* Stats bar */}
-        <div className="mt-20 grid w-full max-w-3xl grid-cols-3 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
+        <div className="mt-14 grid w-full max-w-3xl grid-cols-3 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
           {[
             { value: "500+", label: "Negocios activos" },
-            { value: "98%", label: "Clientes satisfechos" },
+            { value: "3 min", label: "Sitio web con IA" },
             { value: "24/7", label: "Soporte con IA" },
           ].map((stat) => (
             <div key={stat.label} className="px-6 py-5 text-center">

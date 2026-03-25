@@ -7,7 +7,7 @@ export default function Footer() {
       <div className="absolute top-0 left-1/2 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-indexa-orange/40 to-transparent" />
 
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-2">
@@ -28,6 +28,16 @@ export default function Footer() {
               <li><a href="#soluciones" className="text-sm text-white/50 hover:text-white transition-colors">Marketing Automatizado</a></li>
               <li><a href="#soluciones" className="text-sm text-white/50 hover:text-white transition-colors">SEO Inteligente</a></li>
               <li><a href="#precios" className="text-sm text-white/50 hover:text-white transition-colors">Precios</a></li>
+              <li><a href="/casos-de-exito" className="text-sm text-white/50 hover:text-white transition-colors">Casos de Éxito</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/30">Recursos</h4>
+            <ul className="mt-4 space-y-2.5">
+              <li><a href="/guia/presencia-digital-pymes" className="text-sm text-white/50 hover:text-white transition-colors">Guía: Presencia Digital</a></li>
+              <li><a href="/guia/seo-local-mexico" className="text-sm text-white/50 hover:text-white transition-colors">Guía: SEO Local México</a></li>
+              <li><a href="/guia/marketing-digital-pymes" className="text-sm text-white/50 hover:text-white transition-colors">Guía: Marketing Digital</a></li>
             </ul>
           </div>
 

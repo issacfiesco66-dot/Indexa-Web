@@ -1,0 +1,68 @@
+# INDEXA
+
+> Plataforma de presencia digital con inteligencia artificial para PYMES en México. Genera sitios web profesionales en minutos con SEO local automático, WhatsApp integrado y herramientas de marketing digital.
+
+## Qué es INDEXA
+
+INDEXA es una plataforma SaaS que permite a pequeños y medianos negocios en México crear su sitio web profesional utilizando inteligencia artificial. En menos de 3 minutos, cualquier emprendedor puede tener un sitio optimizado con:
+
+- Generación automática de contenido y diseño con IA
+- Optimización SEO local con Schema.org (LocalBusiness, FAQPage)
+- Botón de contacto directo por WhatsApp
+- Certificado SSL incluido
+- 3 plantillas profesionales (Modern, Elegant, Minimalist)
+
+## Planes y Precios
+
+- **Starter — $299 MXN/mes**: Sitio web generado con IA, botón de WhatsApp, SEO básico automático, 3 diseños profesionales, certificado SSL, soporte por email.
+- **Profesional — $599 MXN/mes**: Todo lo de Starter más panel de edición CMS, SEO local avanzado con Schema.org, estadísticas de visitas y clics, soporte prioritario por WhatsApp, asesoría para optimización.
+- **Enterprise — $1,299 MXN/mes**: Todo lo de Profesional más dominio personalizado, campañas de Meta Ads (Facebook/Instagram) y TikTok Ads, bio links para redes sociales, asesor dedicado.
+
+## Características Principales
+
+### Sitio Web con IA
+La inteligencia artificial de INDEXA genera un sitio web completo y profesional a partir del nombre del negocio, descripción y datos de contacto. No se requiere conocimiento técnico ni de programación.
+
+### SEO Local Automático
+Cada sitio incluye datos estructurados Schema.org (LocalBusiness) con nombre, dirección, coordenadas GPS, horarios, servicios y área de servicio. Esto mejora la visibilidad en Google Search, Google Maps y asistentes de voz.
+
+### WhatsApp Integrado
+Botón flotante de WhatsApp en cada sitio que conecta directamente al número del negocio con un mensaje personalizado. Tracking de clics incluido.
+
+### Marketing Digital
+Gestión de campañas publicitarias en Meta Ads (Facebook e Instagram) y TikTok Ads desde el panel de control. Creación de anuncios asistida por IA.
+
+### Analytics en Tiempo Real
+Panel de estadísticas con visitas al sitio, clics en WhatsApp, fuentes de tráfico y métricas de conversión.
+
+### Bio Links
+Página de enlaces tipo Linktree para compartir en redes sociales con tracking de visitas por fuente (Facebook, Instagram, TikTok, WhatsApp).
+
+## Tecnología
+
+- Framework: Next.js (App Router) con React
+- Base de datos: Firebase Firestore
+- Hosting: Vercel (serverless)
+- Pagos: Stripe
+- IA: OpenAI para generación de contenido
+- Imágenes: Optimización automática AVIF/WebP
+
+## Mercado Objetivo
+
+INDEXA está diseñado para PYMES en México y Latinoamérica que necesitan presencia digital profesional sin conocimiento técnico. Incluye negocios como: tiendas locales, restaurantes, talleres, consultorios, servicios profesionales y comercios independientes.
+
+## Recursos y Guías
+
+INDEXA publica guías prácticas para PYMES sobre presencia digital:
+
+- [Guía de Presencia Digital para PYMES](https://indexa.mx/guia/presencia-digital-pymes) — Paso a paso para llevar tu negocio a internet
+- [SEO Local en México](https://indexa.mx/guia/seo-local-mexico) — Cómo aparecer en Google y Google Maps con Schema.org
+- [Marketing Digital para PYMES](https://indexa.mx/guia/marketing-digital-pymes) — Meta Ads y TikTok Ads: cuánto invertir y cómo medir resultados
+- [Casos de Éxito](https://indexa.mx/casos-de-exito) — Historias reales de negocios que crecieron con INDEXA
+- [Directorio de Negocios](https://indexa.mx/directorio) — PYMES en México con presencia digital profesional
+
+## Contacto
+
+- Sitio web: https://indexa.mx
+- País: México
+- Idioma: Español

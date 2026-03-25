@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { queryCollection } from "@/lib/firestoreRest";
+import Link from "next/link";
+import { queryCollection, listCollectionFields } from "@/lib/firestoreRest";
 import type { SitioData } from "@/types/lead";
 import SitioTracker from "./SitioTracker";
 import WhatsAppButton from "./WhatsAppButton";
@@ -224,12 +225,29 @@ export default async function SitioPage({ params }: SitioPageProps) {
   // JSON-LD structured data for SEO
   const jsonLd = buildLocalBusinessJsonLd(data, slug);
 
+  const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa-web-ten.vercel.app";
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "INDEXA", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "Negocios", item: `${SITE_URL}/sitio` },
+      { "@type": "ListItem", position: 3, name: nombre },
+    ],
+  };
+
   return (
     <div className="min-h-screen bg-white" style={{ "--brand": colorPrincipal } as React.CSSProperties}>
       {/* JSON-LD LocalBusiness Schema */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      {/* JSON-LD BreadcrumbList Schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
       />
 
       <SitioTracker sitioId={id} slug={data.slug} />
@@ -250,6 +268,92 @@ export default async function SitioPage({ params }: SitioPageProps) {
       ) : (
         <ModernTemplate {...templateProps} />
       )}
+
+      {/* Cross-linking: related businesses in same city */}
+      <RelatedBusinesses currentSlug={slug} ciudad={data.ciudad} categoria={data.categoria} />
     </div>
+  );
+}
+
+// ── Related businesses by city/category ─────────────────────────────
+async function RelatedBusinesses({
+  currentSlug,
+  ciudad,
+  categoria,
+}: {
+  currentSlug: string;
+  ciudad: string;
+  categoria: string;
+}) {
+  if (!ciudad) return null;
+
+  let related: { id: string; data: Record<string, unknown> }[] = [];
+
+  try {
+    related = await listCollectionFields(
+      "sitios",
+      ["slug", "nombre", "categoria", "ciudad"],
+      20
+    );
+  } catch {
+    return null;
+  }
+
+  // Filter: same city, different slug, has a name
+  const sameCityBusinesses = related.filter(
+    (s) =>
+      s.data.slug &&
+      s.data.slug !== currentSlug &&
+      s.data.nombre &&
+      typeof s.data.ciudad === "string" &&
+      (s.data.ciudad as string).toLowerCase() === ciudad.toLowerCase()
+  );
+
+  // Prioritize same category, then others
+  const sameCategory = sameCityBusinesses.filter(
+    (s) => typeof s.data.categoria === "string" && s.data.categoria === categoria
+  );
+  const otherCategory = sameCityBusinesses.filter(
+    (s) => s.data.categoria !== categoria
+  );
+  const sorted = [...sameCategory, ...otherCategory].slice(0, 6);
+
+  if (sorted.length === 0) return null;
+
+  return (
+    <section className="border-t border-gray-100 bg-gray-50 px-4 py-12 sm:px-6">
+      <div className="mx-auto max-w-4xl">
+        <h2 className="text-center text-lg font-bold text-gray-800">
+          Más negocios en {ciudad}
+        </h2>
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {sorted.map((s) => {
+            const sNombre = s.data.nombre as string;
+            const sCategoria = s.data.categoria as string | undefined;
+            const sSlug = s.data.slug as string;
+            return (
+              <Link
+                key={s.id}
+                href={`/sitio/${sSlug}`}
+                className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+              >
+                <p className="text-sm font-bold text-gray-800">{sNombre}</p>
+                {sCategoria && (
+                  <p className="mt-0.5 text-xs text-gray-500">{sCategoria}</p>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+        <p className="mt-6 text-center">
+          <Link
+            href={`/directorio?ciudad=${encodeURIComponent(ciudad)}`}
+            className="text-sm font-medium text-indexa-orange hover:underline"
+          >
+            Ver todos los negocios en {ciudad}
+          </Link>
+        </p>
+      </div>
+    </section>
   );
 }

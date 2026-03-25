@@ -33,6 +33,32 @@ const FAQS: FAQItemData[] = [
     answer:
       "Todos los planes incluyen soporte. En Starter tienes soporte por email, en Profesional soporte prioritario, y en Enterprise un asesor dedicado. También puedes contactarnos directamente por WhatsApp en cualquier momento.",
   },
+  // ── Long-tail SEO + Featured Snippets + Voice Search ──────────────
+  {
+    question: "¿Cuánto cuesta crear una página web profesional para un negocio en México en 2026?",
+    answer:
+      "Con INDEXA, un sitio web profesional generado con inteligencia artificial cuesta desde $299 MXN/mes (plan Starter). Esto incluye diseño profesional, botón de WhatsApp, SEO básico y certificado SSL. En comparación, un desarrollador freelance cobra entre $5,000 y $15,000 MXN por un sitio similar sin mantenimiento ni SEO incluido. El plan Profesional a $599 MXN/mes agrega panel CMS, SEO avanzado con Schema.org y estadísticas de visitas.",
+  },
+  {
+    question: "¿Qué es Schema.org y por qué lo necesita mi negocio local?",
+    answer:
+      "Schema.org es un vocabulario de datos estructurados que ayuda a Google y otros buscadores a entender tu negocio: nombre, ubicación, servicios, horarios y más. INDEXA implementa automáticamente el marcado LocalBusiness en formato JSON-LD en cada sitio, lo que mejora tu aparición en resultados de búsqueda locales, Google Maps y asistentes de voz como Google Assistant y Siri.",
+  },
+  {
+    question: "¿Cómo me ayuda la inteligencia artificial a crear mi sitio web?",
+    answer:
+      "La IA de INDEXA analiza el nombre de tu negocio, tu descripción y tu categoría para generar automáticamente un sitio web completo: textos optimizados para SEO, estructura profesional, colores coherentes y secciones personalizadas. El proceso toma menos de 3 minutos y no requiere conocimiento técnico. Además, puedes editar cualquier sección desde el panel visual.",
+  },
+  {
+    question: "¿INDEXA funciona para cualquier tipo de negocio en México?",
+    answer:
+      "Sí. INDEXA está diseñado para PYMES de cualquier giro: restaurantes, tiendas, talleres mecánicos, consultorios médicos, estéticas, despachos contables, servicios de plomería, pastelerías y más. Cada sitio se adapta a tu categoría con SEO local optimizado para que tus clientes potenciales te encuentren en Google cuando buscan servicios en tu ciudad.",
+  },
+  {
+    question: "¿Qué ventaja tiene INDEXA sobre crear un sitio en Wix o WordPress?",
+    answer:
+      "INDEXA se diferencia en tres puntos clave: 1) Velocidad: tu sitio está listo en minutos, no en días. 2) SEO local automático: cada sitio incluye Schema.org LocalBusiness, meta-tags optimizados y estructura para Google Maps sin configuración manual. 3) WhatsApp nativo: botón de contacto directo integrado con tracking de conversiones. Además, no necesitas aprender a usar un editor complejo — la IA se encarga del diseño y el contenido.",
+  },
 ];
 
 // JSON-LD FAQPage schema for Google rich results

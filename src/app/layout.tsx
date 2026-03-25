@@ -53,6 +53,63 @@ export const metadata: Metadata = {
   },
 };
 
+// ── JSON-LD Organization + SoftwareApplication ─────────────────────
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "INDEXA",
+  url: SITE_URL,
+  logo: `${SITE_URL}/logo.png`,
+  description:
+    "Plataforma de presencia digital con inteligencia artificial para PYMES en México. Sitios web profesionales, SEO local automático y marketing digital.",
+  foundingDate: "2024",
+  areaServed: { "@type": "Country", name: "México" },
+  sameAs: [
+    "https://www.facebook.com/indexamx",
+    "https://www.instagram.com/indexamx",
+    "https://www.tiktok.com/@indexamx",
+  ],
+  contactPoint: {
+    "@type": "ContactPoint",
+    contactType: "customer service",
+    availableLanguage: "Spanish",
+  },
+};
+
+const softwareAppJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "INDEXA",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  url: SITE_URL,
+  description:
+    "Plataforma con IA que crea sitios web profesionales para PYMES en minutos, con SEO local automático y WhatsApp integrado.",
+  offers: {
+    "@type": "AggregateOffer",
+    lowPrice: "299",
+    highPrice: "1299",
+    priceCurrency: "MXN",
+    offerCount: "3",
+  },
+};
+
+const speakableJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  name: "INDEXA — Presencia Digital para tu Negocio",
+  speakable: {
+    "@type": "SpeakableSpecification",
+    cssSelector: [
+      "h1",
+      ".hero-description",
+      "#faq h2",
+      "#faq [data-faq-answer]",
+    ],
+  },
+  url: SITE_URL,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -60,6 +117,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareAppJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(speakableJsonLd) }}
+        />
+      </head>
       <body className={`${inter.variable} antialiased`}>
         {children}
       </body>
