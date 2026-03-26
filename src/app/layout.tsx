@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     canonical: SITE_URL,
   },
   verification: {
-    google: "ySNICtBVT3RJjS9Y_OgoX4Y2v5YBiP0VBh4vxCibdb8",
+    google: "y0BHgajYf3avZIOM05e8GMw8dulp2mr4bBGx6sA7Npc",
   },
 };
 
