@@ -69,6 +69,11 @@ export async function POST(request: NextRequest) {
     const auth = getAdminAuth();
     const db = getAdminDb();
 
+    // Validate password length before sending to Firebase
+    if (password.length < 6) {
+      return NextResponse.json({ success: false, message: "La contraseña debe tener al menos 6 caracteres." }, { status: 400 });
+    }
+
     // 1. Create Firebase Auth user via Admin SDK
     let uid: string;
     try {
@@ -80,10 +85,18 @@ export async function POST(request: NextRequest) {
       uid = userRecord.uid;
     } catch (err: unknown) {
       const code = (err as { code?: string }).code || "UNKNOWN";
+      const msg = (err as { message?: string }).message || "";
+      console.error("Firebase createUser error:", code, msg);
       if (code === "auth/email-already-exists") {
         return NextResponse.json({ success: false, message: "Este email ya tiene una cuenta." }, { status: 409 });
       }
-      return NextResponse.json({ success: false, message: `Error creando usuario: ${code}` }, { status: 400 });
+      if (code === "auth/invalid-email") {
+        return NextResponse.json({ success: false, message: "El email no es válido." }, { status: 400 });
+      }
+      if (code === "auth/invalid-password") {
+        return NextResponse.json({ success: false, message: "La contraseña debe tener al menos 6 caracteres." }, { status: 400 });
+      }
+      return NextResponse.json({ success: false, message: `Error creando usuario: ${code} — ${msg.slice(0, 120)}` }, { status: 400 });
     }
 
     // 2. Create agencia document
