@@ -26,7 +26,9 @@ import {
   Loader2,
   SearchX,
   Handshake,
+  X,
 } from "lucide-react";
+import { createFuseSearch, fuzzySearch, normalizePhone } from "@/lib/searchUtils";
 
 // ── Message templates ──────────────────────────────────────────────────
 type MessageType = "directo" | "educativo" | "gancho" | "agencia";
@@ -117,6 +119,7 @@ export default function MensajeriaPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [contactingId, setContactingId] = useState<string | null>(null);
 
   // ── Real-time listener: demo_generada + contactado statuses ─────────
@@ -173,17 +176,41 @@ export default function MensajeriaPage() {
     return Array.from(cats).sort();
   }, [prospectos]);
 
+  const cities = useMemo(() => {
+    const c = new Set(prospectos.map((p) => p.ciudad).filter(Boolean));
+    return Array.from(c).sort();
+  }, [prospectos]);
+
+  // Fuse.js search with phone normalization
+  const searchableProspectos = useMemo(
+    () => prospectos.map((p) => ({ ...p, _phoneNorm: normalizePhone(p.telefono || "") })),
+    [prospectos]
+  );
+
+  const fuseInstance = useMemo(
+    () =>
+      createFuseSearch(searchableProspectos, [
+        "nombre",
+        "telefono",
+        "_phoneNorm",
+        "email",
+        "ciudad",
+        "categoria",
+        "direccion",
+      ]),
+    [searchableProspectos]
+  );
+
   const filtered = useMemo(() => {
-    let list = prospectos;
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      list = list.filter((p) => p.nombre.toLowerCase().includes(q));
-    }
+    let list = fuzzySearch(fuseInstance, searchTerm, searchableProspectos);
     if (categoryFilter) {
       list = list.filter((p) => p.categoria === categoryFilter);
     }
+    if (statusFilter) {
+      list = list.filter((p) => p.status === statusFilter);
+    }
     return list;
-  }, [prospectos, searchTerm, categoryFilter]);
+  }, [fuseInstance, searchTerm, searchableProspectos, categoryFilter, statusFilter]);
 
   const stats = useMemo(() => {
     const total = prospectos.length;
@@ -289,11 +316,19 @@ export default function MensajeriaPage() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por nombre..."
-            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
+            placeholder="Buscar por nombre, teléfono, email, ciudad..."
+            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
-        <div className="relative sm:w-56">
+        <div className="relative sm:w-48">
           <Filter size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <select
             value={categoryFilter}
@@ -306,14 +341,36 @@ export default function MensajeriaPage() {
             ))}
           </select>
         </div>
+        <div className="relative sm:w-44">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full appearance-none rounded-xl border border-gray-200 bg-white py-2.5 pl-4 pr-8 text-sm text-indexa-gray-dark outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
+          >
+            <option value="">Todos los estados</option>
+            <option value="demo_generada">Demo Lista</option>
+            <option value="contactado_wa">WA Enviado</option>
+            <option value="contactado">Contactado</option>
+          </select>
+        </div>
       </div>
 
       {/* ── Results count ───────────────────────────────────────── */}
-      {(searchTerm || categoryFilter) && (
-        <p className="text-xs text-gray-400">
-          Mostrando {filtered.length} de {prospectos.length} prospectos
-          {categoryFilter && <> en <strong className="text-indexa-blue">{categoryFilter}</strong></>}
-        </p>
+      {(searchTerm || categoryFilter || statusFilter) && (
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-400">
+            Mostrando {filtered.length} de {prospectos.length} prospectos
+            {categoryFilter && <> en <strong className="text-indexa-blue">{categoryFilter}</strong></>}
+          </p>
+          {(searchTerm || categoryFilter || statusFilter) && (
+            <button
+              onClick={() => { setSearchTerm(""); setCategoryFilter(""); setStatusFilter(""); }}
+              className="text-xs font-medium text-indexa-orange hover:underline"
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
       )}
 
       {/* ── Empty state ─────────────────────────────────────────── */}
@@ -328,7 +385,7 @@ export default function MensajeriaPage() {
           <p className="mt-1 text-sm text-gray-400">
             {prospectos.length === 0
               ? "Ve a Prospección Fría, selecciona prospectos y genera demos primero."
-              : "Prueba con otro nombre o categoría."}
+              : "Prueba con otro nombre, teléfono o categoría."}
           </p>
         </div>
       ) : (

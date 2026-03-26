@@ -1177,9 +1177,22 @@ export default function ProspectosPage() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por nombre, teléfono, email, dirección..."
-            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
+            placeholder="Buscar por nombre, teléfono, email, ciudad, categoría..."
+            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+          )}
+          {searchTerm && (
+            <p className="mt-1.5 text-xs text-gray-400">
+              {filteredProspectos.length} resultado{filteredProspectos.length !== 1 ? "s" : ""} para &quot;{searchTerm}&quot;
+            </p>
+          )}
         </div>
       )}
 
