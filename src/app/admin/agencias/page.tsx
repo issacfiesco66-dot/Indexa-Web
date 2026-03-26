@@ -119,58 +119,71 @@ export default function AdminAgenciasPage() {
 
       {/* Create Form */}
       {showCreate && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <h3 className="text-lg font-bold text-gray-800 mb-4">Nueva Agencia</h3>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">Nombre Comercial *</label>
-              <input type="text" value={form.nombreComercial}
-                onChange={(e) => setForm({ ...form, nombreComercial: e.target.value })}
-                placeholder="Mi Agencia Digital" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">Email *</label>
-              <input type="email" value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="agencia@ejemplo.com" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">Contraseña *</label>
-              <input type="text" value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="Mínimo 6 caracteres" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">URL del Logo</label>
-              <input type="url" value={form.logoUrl}
-                onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
-                placeholder="https://..." className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">Color Principal</label>
-              <div className="flex gap-2">
-                <input type="color" value={form.colorPrincipal}
-                  onChange={(e) => setForm({ ...form, colorPrincipal: e.target.value })}
-                  className="h-[46px] w-14 cursor-pointer rounded-lg border border-gray-200" />
-                <input type="text" value={form.colorPrincipal}
-                  onChange={(e) => setForm({ ...form, colorPrincipal: e.target.value })}
-                  className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-mono" />
+
+          {/* Required fields */}
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Nombre Comercial *</label>
+                <input type="text" value={form.nombreComercial}
+                  onChange={(e) => setForm({ ...form, nombreComercial: e.target.value })}
+                  placeholder="Mi Agencia Digital"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Email *</label>
+                <input type="email" value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="agencia@ejemplo.com"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Contraseña *</label>
+                <input type="password" value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="Mínimo 6 caracteres"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20" />
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">Límite de Sitios</label>
-              <select value={form.maxSitios} onChange={(e) => setForm({ ...form, maxSitios: Number(e.target.value) })}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
-                <option value={10}>Starter — 10 sitios</option>
-                <option value={25}>Growth — 25 sitios</option>
-                <option value={50}>Pro — 50 sitios</option>
-                <option value={100}>Enterprise — 100 sitios</option>
-              </select>
+
+            {/* Optional fields */}
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">URL del Logo</label>
+                <input type="url" value={form.logoUrl}
+                  onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Color Principal</label>
+                <div className="flex gap-2">
+                  <input type="color" value={form.colorPrincipal}
+                    onChange={(e) => setForm({ ...form, colorPrincipal: e.target.value })}
+                    className="h-[38px] w-12 cursor-pointer rounded-lg border border-gray-200" />
+                  <input type="text" value={form.colorPrincipal}
+                    onChange={(e) => setForm({ ...form, colorPrincipal: e.target.value })}
+                    className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-mono outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Límite de Sitios</label>
+                <select value={form.maxSitios} onChange={(e) => setForm({ ...form, maxSitios: Number(e.target.value) })}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20">
+                  <option value={10}>Starter — 10 sitios</option>
+                  <option value={25}>Growth — 25 sitios</option>
+                  <option value={50}>Pro — 50 sitios</option>
+                  <option value={100}>Enterprise — 100 sitios</option>
+                </select>
+              </div>
             </div>
           </div>
+
           <div className="mt-4 flex gap-3">
             <button onClick={handleCreate} disabled={creating}
-              className="rounded-xl bg-indexa-blue px-6 py-2.5 text-sm font-bold text-white disabled:opacity-60">
+              className="rounded-xl bg-indexa-blue px-6 py-2.5 text-sm font-bold text-white transition-all hover:bg-indexa-blue/90 disabled:opacity-60">
               {creating ? "Creando..." : "Crear Agencia"}
             </button>
             <button onClick={() => setShowCreate(false)}
