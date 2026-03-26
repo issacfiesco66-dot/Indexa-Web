@@ -24,7 +24,6 @@ export default function ClientLoginPage() {
     if (loading || !user || !db) return;
 
     async function redirect() {
-      // Try up to 3 times to read role — Firestore can be slow after fresh login
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const snap = await getDoc(doc(db!, "usuarios", user!.uid));
@@ -40,7 +39,6 @@ export default function ClientLoginPage() {
           if (attempt < 2) await new Promise((r) => setTimeout(r, 500));
         }
       }
-      // All attempts failed — redirect to dashboard (loadData will handle admin check there)
       router.replace("/dashboard");
     }
 
@@ -53,7 +51,6 @@ export default function ClientLoginPage() {
     setSubmitting(true);
     try {
       await signIn(email, password);
-      // redirect handled by useEffect above
     } catch (err: unknown) {
       console.error("Firebase Auth Error:", err instanceof Error ? err.message : "unknown");
       const code = (err as { code?: string })?.code || "";
@@ -61,7 +58,7 @@ export default function ClientLoginPage() {
       if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
         setError("Credenciales inválidas. Verifica tu correo y contraseña.");
       } else if (code === "auth/operation-not-allowed") {
-        setError("El inicio de sesión por email no está habilitado. Actívalo en Firebase Console → Authentication → Sign-in method.");
+        setError("El inicio de sesión por email no está habilitado. Actívalo en Firebase Console.");
       } else if (code === "auth/too-many-requests") {
         setError("Demasiados intentos. Espera unos minutos e intenta de nuevo.");
       } else if (code === "auth/user-disabled") {
@@ -86,41 +83,57 @@ export default function ClientLoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#050816] px-4 relative overflow-hidden">
-      {/* Background orbs */}
-      <div className="absolute top-1/4 left-1/4 h-[400px] w-[400px] rounded-full bg-indexa-blue/20 blur-[120px] animate-pulse-glow" />
-      <div className="absolute bottom-1/4 right-1/4 h-[300px] w-[300px] rounded-full bg-indexa-orange/10 blur-[100px] animate-pulse-glow" style={{ animationDelay: '2s' }} />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050816] px-4">
+      {/* Animated grid background */}
+      <div className="absolute inset-0 opacity-[0.07]">
+        <div
+          className="absolute inset-0 animate-grid-move"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,102,0,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,102,0,0.3) 1px, transparent 1px)",
+            backgroundSize: "60px 60px",
+          }}
+        />
+      </div>
 
-      <div className="relative w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indexa-orange to-orange-400">
-            <span className="text-lg font-black text-white">IX</span>
-          </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">INDEXA</h1>
-          <p className="mt-2 text-sm text-white/50">Accede a tu panel de negocio</p>
+      {/* Gradient orbs */}
+      <div className="absolute top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-indexa-blue/20 blur-[120px] animate-pulse-glow" />
+      <div className="absolute bottom-1/4 right-1/4 h-[400px] w-[400px] rounded-full bg-indexa-orange/15 blur-[120px] animate-pulse-glow" style={{ animationDelay: "2s" }} />
+      <div className="absolute top-1/2 left-1/2 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-purple-500/10 blur-[100px] animate-pulse-glow" style={{ animationDelay: "4s" }} />
+
+      <div className="relative w-full max-w-sm animate-fade-up">
+        {/* Logo + Header */}
+        <div className="mb-8 text-center">
+          <Link href="/" className="inline-flex items-center gap-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indexa-orange to-orange-400 shadow-lg shadow-indexa-orange/25">
+              <span className="text-lg font-black text-white">IX</span>
+            </div>
+            <span className="text-2xl font-extrabold tracking-tight text-white">INDEXA</span>
+          </Link>
+          <p className="mt-3 text-sm text-white/50">Accede a tu panel de negocio</p>
         </div>
 
         {/* ── Password Reset Form ─────────────────────────────────── */}
         {showReset ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-            <h2 className="text-lg font-bold text-indexa-gray-dark">Recuperar Contraseña</h2>
-            <p className="mt-2 text-sm text-gray-500">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
+            <h2 className="text-lg font-bold text-white">Recuperar Contraseña</h2>
+            <p className="mt-2 text-sm text-white/50">
               Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.
             </p>
 
             {resetSent ? (
-              <div className="mt-6 rounded-lg bg-green-50 border border-green-200 p-4 text-sm text-green-700">
-                ✓ Correo enviado. Revisa tu bandeja de entrada (y spam).
+              <div className="mt-6 rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-sm text-green-300">
+                Correo enviado. Revisa tu bandeja de entrada (y spam).
               </div>
             ) : (
               <form onSubmit={handlePasswordReset} className="mt-6 space-y-4">
                 {error && (
-                  <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                  <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
                     {error}
                   </div>
                 )}
                 <div>
-                  <label htmlFor="reset-email" className="block text-sm font-semibold text-indexa-gray-dark">
+                  <label htmlFor="reset-email" className="block text-sm font-semibold text-white/80">
                     Correo electrónico
                   </label>
                   <input
@@ -129,12 +142,12 @@ export default function ClientLoginPage() {
                     required
                     value={resetEmail}
                     onChange={(e) => setResetEmail(e.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
+                    className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition-all placeholder:text-white/30 focus:border-indexa-orange/50 focus:bg-white/10 focus:ring-2 focus:ring-indexa-orange/20"
                   />
                 </div>
                 <button
                   type="submit"
-                  className="w-full rounded-xl bg-indexa-blue px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-indexa-blue/90"
+                  className="w-full rounded-xl bg-gradient-to-r from-indexa-orange to-orange-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indexa-orange/25 transition-all hover:shadow-xl hover:shadow-indexa-orange/30 hover:-translate-y-0.5"
                 >
                   Enviar enlace
                 </button>
@@ -143,28 +156,28 @@ export default function ClientLoginPage() {
 
             <button
               onClick={() => { setShowReset(false); setError(""); setResetSent(false); }}
-              className="mt-4 w-full text-center text-sm font-medium text-indexa-blue hover:underline"
+              className="mt-4 w-full text-center text-sm font-medium text-indexa-orange/80 transition-colors hover:text-indexa-orange"
             >
-              ← Volver al inicio de sesión
+              Volver al inicio de sesión
             </button>
           </div>
         ) : (
           /* ── Login Form ──────────────────────────────────────────── */
           <form
             onSubmit={handleSubmit}
-            className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm"
+            className="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl"
           >
-            <h2 className="text-lg font-bold text-indexa-gray-dark">Iniciar Sesión</h2>
+            <h2 className="text-lg font-bold text-white">Iniciar Sesión</h2>
 
             {error && (
-              <div className="mt-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+              <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
                 {error}
               </div>
             )}
 
             <div className="mt-6 space-y-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-indexa-gray-dark">
+                <label htmlFor="email" className="block text-sm font-semibold text-white/80">
                   Correo electrónico
                 </label>
                 <input
@@ -173,11 +186,12 @@ export default function ClientLoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
+                  placeholder="correo@ejemplo.com"
+                  className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition-all placeholder:text-white/30 focus:border-indexa-orange/50 focus:bg-white/10 focus:ring-2 focus:ring-indexa-orange/20"
                 />
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-semibold text-indexa-gray-dark">
+                <label htmlFor="password" className="block text-sm font-semibold text-white/80">
                   Contraseña
                 </label>
                 <input
@@ -186,7 +200,8 @@ export default function ClientLoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:ring-2 focus:ring-indexa-blue/20"
+                  placeholder="Tu contraseña"
+                  className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition-all placeholder:text-white/30 focus:border-indexa-orange/50 focus:bg-white/10 focus:ring-2 focus:ring-indexa-orange/20"
                 />
               </div>
             </div>
@@ -194,23 +209,23 @@ export default function ClientLoginPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="mt-6 w-full rounded-xl bg-indexa-blue px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-indexa-blue/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-6 w-full rounded-xl bg-gradient-to-r from-indexa-orange to-orange-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-indexa-orange/25 transition-all hover:shadow-xl hover:shadow-indexa-orange/30 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Ingresando..." : "Ingresar"}
             </button>
 
-            <div className="mt-4 flex flex-col items-center gap-2">
+            <div className="mt-5 flex flex-col items-center gap-3">
               <button
                 type="button"
                 onClick={() => { setShowReset(true); setError(""); setResetEmail(email); }}
-                className="text-sm font-medium text-gray-400 hover:text-indexa-blue transition-colors"
+                className="text-sm font-medium text-white/40 transition-colors hover:text-indexa-orange"
               >
                 ¿Olvidaste tu contraseña?
               </button>
 
-              <div className="mt-2 text-center text-sm text-gray-500">
+              <div className="text-center text-sm text-white/50">
                 ¿No tienes cuenta?{" "}
-                <Link href="/registro" className="font-semibold text-indexa-blue hover:underline">
+                <Link href="/registro" className="font-semibold text-indexa-orange hover:underline">
                   Regístrate gratis
                 </Link>
               </div>
@@ -218,13 +233,12 @@ export default function ClientLoginPage() {
           </form>
         )}
 
-        <p className="mt-6 text-center text-xs text-white/30">
+        <p className="mt-6 text-center text-xs text-white/25">
           ¿Eres administrador?{" "}
-          <Link href="/admin/login" className="font-medium text-white/50 hover:text-indexa-orange">
+          <Link href="/admin/login" className="font-medium text-white/40 transition-colors hover:text-indexa-orange">
             Accede aquí
           </Link>
         </p>
-
       </div>
     </div>
   );

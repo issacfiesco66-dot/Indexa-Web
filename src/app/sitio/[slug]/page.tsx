@@ -5,6 +5,7 @@ import { queryCollection, listCollectionFields } from "@/lib/firestoreRest";
 import type { SitioData } from "@/types/lead";
 import SitioTracker from "./SitioTracker";
 import WhatsAppButton from "./WhatsAppButton";
+import ChatWidget from "./ChatWidget";
 import { ModernTemplate, ElegantTemplate, MinimalistTemplate } from "./templates";
 
 interface SitioPageProps {
@@ -261,6 +262,21 @@ export default async function SitioPage({ params }: SitioPageProps) {
           color={colorPrincipal}
         />
       )}
+
+      <ChatWidget
+        sitio={{
+          nombre,
+          categoria: data.categoria,
+          ciudad: data.ciudad,
+          servicios: data.servicios,
+          descripcion: data.descripcion,
+          direccion: data.direccion,
+          whatsapp: data.whatsapp,
+          horarios: data.horarios,
+        }}
+        colorPrincipal={colorPrincipal}
+        modo="demo"
+      />
 
       {templateId === "elegant" ? (
         <ElegantTemplate {...templateProps} />

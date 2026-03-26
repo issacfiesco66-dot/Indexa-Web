@@ -38,6 +38,10 @@ import {
   Filter,
   Globe,
   Handshake,
+  Sparkles,
+  Copy,
+  X,
+  Send,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -195,6 +199,12 @@ export default function ProspectosPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [prospectoFilter, setProspectoFilter] = useState<ProspectoFilter>("todos");
   const [searchTerm, setSearchTerm] = useState("");
+
+  // ── AI Message state ────────────────────────────────────────────────
+  const [aiMsgProspecto, setAiMsgProspecto] = useState<ProspectoFrio | null>(null);
+  const [aiMsgLoading, setAiMsgLoading] = useState(false);
+  const [aiMsgText, setAiMsgText] = useState("");
+  const [aiMsgCopied, setAiMsgCopied] = useState(false);
 
   // ── Scraper state ──────────────────────────────────────────────────
   const [scraperServicio, setScraperServicio] = useState("");
@@ -547,6 +557,73 @@ export default function ProspectosPage() {
       }
     }
   }, []);
+
+  // ── AI-generated prospecting message ──────────────────────────────
+  const handleGenerateAiMessage = useCallback(async (prospecto: ProspectoFrio) => {
+    setAiMsgProspecto(prospecto);
+    setAiMsgLoading(true);
+    setAiMsgText("");
+    setAiMsgCopied(false);
+
+    const problemas: string[] = [];
+    if (!prospecto.tieneWeb) problemas.push("No tiene página web");
+    problemas.push("Sin sistema de captación de leads online");
+    problemas.push("Sin chat o respuesta inmediata a prospectos");
+    if (!prospecto.email) problemas.push("Sin correo electrónico de contacto visible");
+
+    try {
+      const res = await fetch("/api/ai/generate-prospecting-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombreNegocio: prospecto.nombre,
+          industria: prospecto.categoria || "Negocio local",
+          problemas,
+          propuestaActual: "",
+          ciudad: prospecto.ciudad,
+          tieneWeb: prospecto.tieneWeb,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAiMsgText(data.mensaje);
+      } else {
+        setAiMsgText(`Error: ${data.message}`);
+      }
+    } catch {
+      setAiMsgText("Error de conexión al generar mensaje.");
+    } finally {
+      setAiMsgLoading(false);
+    }
+  }, []);
+
+  const handleSendAiWhatsApp = useCallback(() => {
+    if (!aiMsgProspecto || !aiMsgText) return;
+    const digits = aiMsgProspecto.telefono.replace(/[^\d+]/g, "");
+    const num = digits.startsWith("+") ? digits : `+52${digits}`;
+    const url = `https://wa.me/${num}?text=${encodeURIComponent(aiMsgText)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+
+    if (db) {
+      const updates: Record<string, unknown> = {
+        fechaUltimoContacto: serverTimestamp(),
+        ultimoWhatsAppAt: serverTimestamp(),
+        whatsappCount: increment(1),
+      };
+      if (aiMsgProspecto.status !== "contactado_wa" && aiMsgProspecto.status !== "contactado") {
+        updates.status = "contactado_wa" as ProspectoStatus;
+      }
+      updateDoc(doc(db, "prospectos_frios", aiMsgProspecto.id), updates).catch(console.error);
+    }
+    setAiMsgProspecto(null);
+  }, [aiMsgProspecto, aiMsgText]);
+
+  const handleCopyAiMessage = useCallback(async () => {
+    if (!aiMsgText) return;
+    await navigator.clipboard.writeText(aiMsgText);
+    setAiMsgCopied(true);
+    setTimeout(() => setAiMsgCopied(false), 2000);
+  }, [aiMsgText]);
 
   // ── Enviar correo de prospección ────────────────────────────────────
   const handleSendEmail = useCallback(async (prospecto: ProspectoFrio) => {
@@ -1304,6 +1381,13 @@ export default function ProspectosPage() {
                             >
                               {p.tipoProspecto === "agencia" ? "🏢" : "🏪"}
                             </button>
+                            <button
+                              onClick={() => handleGenerateAiMessage(p)}
+                              className="inline-flex items-center justify-center rounded-lg bg-amber-500 p-1.5 text-white transition-colors hover:bg-amber-600"
+                              title="Mensaje IA personalizado"
+                            >
+                              <Sparkles size={14} />
+                            </button>
                             {p.whatsappCount > 0 && (
                               <span className="inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-[9px] font-semibold text-green-700" title={p.ultimoWhatsAppAt ? `Último: ${p.ultimoWhatsAppAt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}>
                                 ✓{p.whatsappCount}
@@ -1425,6 +1509,16 @@ export default function ProspectosPage() {
                   >
                     {p.tipoProspecto === "agencia" ? "🏢" : "🏪"}
                   </button>
+                  {p.telefono && (
+                    <button
+                      onClick={() => handleGenerateAiMessage(p)}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-amber-600"
+                      title="Mensaje IA"
+                    >
+                      <Sparkles size={13} />
+                      IA
+                    </button>
+                  )}
                   {p.whatsappCount > 0 && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">
                       ✓ {p.whatsappCount}x
@@ -1462,6 +1556,76 @@ export default function ProspectosPage() {
 ]`}
         </pre>
       </details>
+
+      {/* ── AI Message Modal ──────────────────────────────────── */}
+      {aiMsgProspecto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100">
+                  <Sparkles size={16} className="text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">Mensaje IA</h3>
+                  <p className="text-[11px] text-gray-500">{aiMsgProspecto.nombre}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAiMsgProspecto(null)}
+                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4">
+              {aiMsgLoading ? (
+                <div className="flex flex-col items-center gap-3 py-8">
+                  <Loader2 size={24} className="animate-spin text-amber-500" />
+                  <p className="text-sm text-gray-500">Generando mensaje personalizado...</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <textarea
+                    value={aiMsgText}
+                    onChange={(e) => setAiMsgText(e.target.value)}
+                    rows={8}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 leading-relaxed focus:border-amber-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-100"
+                  />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCopyAiMessage}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                    >
+                      <Copy size={14} />
+                      {aiMsgCopied ? "Copiado" : "Copiar"}
+                    </button>
+                    {aiMsgProspecto.telefono && (
+                      <button
+                        onClick={handleSendAiWhatsApp}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700"
+                      >
+                        <Send size={14} />
+                        Enviar por WhatsApp
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleGenerateAiMessage(aiMsgProspecto)}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-600"
+                      title="Regenerar"
+                    >
+                      <Sparkles size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
