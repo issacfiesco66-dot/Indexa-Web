@@ -6,7 +6,7 @@ service cloud.firestore {
     // ── Helper: verifica si el usuario tiene rol 'admin' en /usuarios/{uid} ──
     function isAdmin() {
       return request.auth != null
-        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == "admin";
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role in ["admin", "superadmin"];
     }
 
     function isOwner(ownerId) {
@@ -82,6 +82,13 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(["bioStats"])
         );
+    }
+
+    // ── agencias (agency accounts) ──────────────────────────────────────────
+    match /agencias/{agenciaId} {
+      allow read: if isAdmin()
+        || (request.auth != null && resource.data.uid == request.auth.uid);
+      allow write: if isAdmin();
     }
 
     // ── configuracion (admin settings) ──────────────────────────────────────
