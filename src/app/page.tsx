@@ -8,6 +8,7 @@ import Reviews from "@/components/Reviews";
 import ContactForm from "@/components/ContactForm";
 import FAQ from "@/components/FAQ";
 import Footer from "@/components/Footer";
+import WhatsAppFloat from "@/components/WhatsAppFloat";
 
 export default function Home() {
   return (
@@ -24,6 +25,7 @@ export default function Home() {
         <ContactForm />
       </main>
       <Footer />
+      <WhatsAppFloat />
     </>
   );
 }

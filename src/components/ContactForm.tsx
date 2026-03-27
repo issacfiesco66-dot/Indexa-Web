@@ -81,6 +81,18 @@ export default function ContactForm() {
 
       setSubmitStatus("success");
       setServerMessage(data.message);
+
+      // Send data to WhatsApp
+      const waMsg = [
+        `🚀 *Nuevo lead desde INDEXA*`,
+        `👤 *Nombre:* ${formData.contactName.trim()}`,
+        `🏪 *Negocio:* ${formData.businessName.trim()}`,
+        `📞 *Tel:* ${formData.phone.trim()}`,
+        `📧 *Email:* ${formData.email.trim()}`,
+        formData.mensaje.trim() ? `💬 *Mensaje:* ${formData.mensaje.trim()}` : "",
+      ].filter(Boolean).join("\n");
+      window.open(`https://wa.me/525622042820?text=${encodeURIComponent(waMsg)}`, "_blank");
+
       setFormData({ contactName: "", businessName: "", phone: "", email: "", mensaje: "" });
     } catch {
       setSubmitStatus("error");
