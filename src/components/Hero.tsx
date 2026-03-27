@@ -20,15 +20,6 @@ export default function Hero() {
 
       {/* Content */}
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col items-center justify-center px-4 pt-20 text-center sm:px-6 lg:px-8">
-        {/* Badge */}
-        <div className="animate-fade-up mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-sm">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indexa-orange opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-indexa-orange" />
-          </span>
-          <span className="text-sm font-medium text-white/80">Potenciado por Inteligencia Artificial</span>
-        </div>
-
         <h1 className="animate-fade-up-delay mx-auto max-w-5xl text-4xl font-extrabold leading-[1.1] tracking-tight text-white sm:text-6xl lg:text-7xl">
           Tu negocio merece una{" "}
           <span className="bg-gradient-to-r from-indexa-orange via-orange-400 to-amber-300 bg-clip-text text-transparent">
