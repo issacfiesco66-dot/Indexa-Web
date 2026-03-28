@@ -32,7 +32,7 @@ FIREBASE_PROJECT_ID = os.getenv("NEXT_PUBLIC_FIREBASE_PROJECT_ID", "")
 CRON_SECRET = os.getenv("CRON_SECRET", "")
 ALLOWED_ORIGINS = os.getenv(
     "CORS_ORIGINS",
-    "https://www.indexa.com.mx,https://indexa.com.mx,https://indexa-web-ten.vercel.app,http://localhost:3000",
+    "https://www.indexa.com.mx,https://indexa.com.mx,https://indexaia.com,https://www.indexaia.com,https://indexa-web-ten.vercel.app,http://localhost:3000",
 ).split(",")
 
 app.add_middleware(
