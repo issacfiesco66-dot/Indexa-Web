@@ -32,6 +32,10 @@ export const maxDuration = 120;
 const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const GEMINI_MODEL = "gemini-2.0-flash";
 
 const SYSTEM_PROMPT = `Eres un Motor de Operaciones de Publicidad de Alto Rendimiento para TikTok Ads API. SIEMPRE responde en español.
 
@@ -89,6 +93,101 @@ Campaña < 48h → sugiere esperar 3-5 días.
 Resultados en tabla Markdown. Formato: $1,234.56 dinero, 2.5% porcentajes.
 ERRORES: Muestra mensaje EXACTO de TikTok. NO resumas ni ocultes errores.
 CTAs: LEARN_MORE, SIGN_UP, DOWNLOAD, SHOP_NOW, CONTACT_US, APPLY_NOW, GET_QUOTE, BOOK_NOW, SUBSCRIBE, ORDER_NOW.`;
+
+// ── Groq fallback helpers ─────────────────────────────────────────────
+
+function isBillingError(status: number, body: string): boolean {
+  if (status === 402 || status === 529) return true;
+  const lower = body.toLowerCase();
+  return (
+    lower.includes("credit balance") ||
+    lower.includes("billing") ||
+    lower.includes("insufficient_quota") ||
+    lower.includes("quota exceeded") ||
+    lower.includes("rate limit") ||
+    lower.includes("overloaded")
+  );
+}
+
+type AnthropicContent = string | Record<string, unknown>[];
+type AnthropicMessage = { role: "user" | "assistant"; content: AnthropicContent };
+type GroqMessage = {
+  role: string;
+  content: string | null;
+  tool_calls?: { id: string; type: string; function: { name: string; arguments: string } }[];
+  tool_call_id?: string;
+};
+
+function toGroqTools(anthropicTools: typeof tools) {
+  return anthropicTools.map((t) => ({
+    type: "function" as const,
+    function: { name: t.name, description: t.description, parameters: t.input_schema },
+  }));
+}
+
+function toGroqMessages(messages: AnthropicMessage[]): GroqMessage[] {
+  const result: GroqMessage[] = [];
+  for (const msg of messages) {
+    if (typeof msg.content === "string") {
+      result.push({ role: msg.role, content: msg.content });
+      continue;
+    }
+    const blocks = msg.content as Record<string, unknown>[];
+    if (msg.role === "user") {
+      const toolResults = blocks.filter((b) => b.type === "tool_result");
+      const textBlocks = blocks.filter((b) => b.type === "text");
+      for (const tr of toolResults) {
+        result.push({
+          role: "tool",
+          tool_call_id: tr.tool_use_id as string,
+          content: typeof tr.content === "string" ? tr.content : JSON.stringify(tr.content),
+        });
+      }
+      if (textBlocks.length > 0) {
+        result.push({ role: "user", content: (textBlocks as { text?: string }[]).map((b) => b.text ?? "").join("\n") });
+      }
+    } else {
+      const textBlock = blocks.find((b) => b.type === "text") as { text?: string } | undefined;
+      const toolUseBlocks = blocks.filter((b) => b.type === "tool_use") as {
+        id: string; name: string; input: Record<string, unknown>;
+      }[];
+      const toolCalls = toolUseBlocks.map((tu) => ({
+        id: tu.id,
+        type: "function",
+        function: { name: tu.name, arguments: JSON.stringify(tu.input) },
+      }));
+      result.push({
+        role: "assistant",
+        content: textBlock?.text ?? null,
+        ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+      });
+    }
+  }
+  return result;
+}
+
+function fromGroqResponse(groqData: Record<string, unknown>): Record<string, unknown> {
+  const choices = groqData.choices as Record<string, unknown>[];
+  const choice = choices?.[0];
+  const message = choice?.message as {
+    content?: string | null;
+    tool_calls?: { id: string; function: { name: string; arguments: string } }[];
+  };
+  const finishReason = choice?.finish_reason as string;
+
+  const content: Record<string, unknown>[] = [];
+  if (message?.content) content.push({ type: "text", text: message.content });
+  for (const tc of message?.tool_calls ?? []) {
+    let input: Record<string, unknown> = {};
+    try { input = JSON.parse(tc.function.arguments); } catch { /* noop */ }
+    content.push({ type: "tool_use", id: tc.id, name: tc.function.name, input });
+  }
+
+  return {
+    content,
+    stop_reason: finishReason === "tool_calls" ? "tool_use" : "end_turn",
+  };
+}
 
 // ── Tool definitions ─────────────────────────────────────────────────
 const tools = [
@@ -1061,6 +1160,11 @@ export async function POST(request: NextRequest) {
     const DEADLINE_MS = 40_000; // 50s, leaving 10s buffer for maxDuration=60
 
     let lastText = "";
+    let useFallback = false;
+    // Prefer Gemini (likely already configured) then Groq
+    const fallbackKey = process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY;
+    const fallbackUrl = process.env.GEMINI_API_KEY ? GEMINI_URL : GROQ_URL;
+    const fallbackModel = process.env.GEMINI_API_KEY ? GEMINI_MODEL : GROQ_MODEL;
 
     // Agentic loop — up to 8 rounds with time budget
     for (let round = 0; round < 8; round++) {
@@ -1070,41 +1174,95 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-
-      const claudeRes = await fetch(ANTHROPIC_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": anthropicKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: CLAUDE_MODEL,
-          max_tokens: 1536,
-          system: SYSTEM_PROMPT,
-          tools,
-          messages: claudeMessages,
-        }),
-      });
-
-      const claudeText = await claudeRes.text();
-
-      if (!claudeRes.ok) {
-        let errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${claudeText.slice(0, 300)}`;
-        try {
-          const parsed = JSON.parse(claudeText);
-          errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${parsed?.error?.message || claudeText.slice(0, 200)}`;
-        } catch { /* noop */ }
-        console.error("[tiktok-ads/ai] Claude error:", errMsg);
-        return NextResponse.json({ error: errMsg }, { status: 400 });
-      }
-
       let response: Record<string, unknown>;
-      try {
-        response = JSON.parse(claudeText);
-      } catch {
-        return NextResponse.json({ error: "Respuesta inválida de Claude API." }, { status: 400 });
+
+      if (!useFallback) {
+        const claudeRes = await fetch(ANTHROPIC_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: CLAUDE_MODEL,
+            max_tokens: 1536,
+            system: SYSTEM_PROMPT,
+            tools,
+            messages: claudeMessages,
+          }),
+        });
+
+        const claudeText = await claudeRes.text();
+
+        if (!claudeRes.ok) {
+          if (isBillingError(claudeRes.status, claudeText) && fallbackKey) {
+            const provider = process.env.GEMINI_API_KEY ? "Gemini" : "Groq";
+            console.warn(`[tiktok-ads/ai] Claude billing/quota error — switching to ${provider} fallback`);
+            useFallback = true;
+          } else {
+            let errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${claudeText.slice(0, 300)}`;
+            try {
+              const parsed = JSON.parse(claudeText);
+              errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${parsed?.error?.message || claudeText.slice(0, 200)}`;
+            } catch { /* noop */ }
+            console.error("[tiktok-ads/ai] Claude error:", errMsg);
+            return NextResponse.json({ error: errMsg }, { status: 400 });
+          }
+        } else {
+          try {
+            response = JSON.parse(claudeText);
+          } catch {
+            return NextResponse.json({ error: "Respuesta inválida de Claude API." }, { status: 400 });
+          }
+        }
       }
+
+      if (useFallback) {
+        if (!fallbackKey) {
+          return NextResponse.json(
+            { error: "Límite de créditos de Claude alcanzado. Configura GEMINI_API_KEY o GROQ_API_KEY como fallback." },
+            { status: 503 }
+          );
+        }
+        const groqRes = await fetch(fallbackUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${fallbackKey}`,
+          },
+          body: JSON.stringify({
+            model: fallbackModel,
+            max_tokens: 1536,
+            tools: toGroqTools(tools),
+            tool_choice: "auto",
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              ...toGroqMessages(claudeMessages as AnthropicMessage[]),
+            ],
+          }),
+        });
+
+        const groqText = await groqRes.text();
+        if (!groqRes.ok) {
+          let errMsg = `Error de IA fallback (HTTP ${groqRes.status}): ${groqText.slice(0, 300)}`;
+          try {
+            const parsed = JSON.parse(groqText);
+            errMsg = `Error de IA fallback: ${parsed?.error?.message || groqText.slice(0, 200)}`;
+          } catch { /* noop */ }
+          console.error("[tiktok-ads/ai] fallback error:", errMsg);
+          return NextResponse.json({ error: errMsg }, { status: 400 });
+        }
+        try {
+          const groqData = JSON.parse(groqText);
+          response = fromGroqResponse(groqData);
+        } catch {
+          return NextResponse.json({ error: "Respuesta inválida de IA fallback." }, { status: 400 });
+        }
+      }
+
+      // response is guaranteed assigned here (either from Claude or Groq)
+      response = response!;
 
       // Capture any text from this response
       const contentBlocks = (response.content as { type: string; text?: string }[]) || [];

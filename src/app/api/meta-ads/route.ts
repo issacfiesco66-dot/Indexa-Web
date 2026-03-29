@@ -29,13 +29,14 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Params ────────────────────────────────────────────────────
-  const metaToken = request.nextUrl.searchParams.get("metaToken");
-  const adAccountId = request.nextUrl.searchParams.get("adAccountId");
+  // Credentials come from headers (never query params) to avoid log/history exposure
+  const metaToken = request.headers.get("x-meta-token");
+  const adAccountId = request.headers.get("x-meta-account-id");
   const action = request.nextUrl.searchParams.get("action") || "campaigns";
   const campaignId = request.nextUrl.searchParams.get("campaignId");
 
   if (!metaToken || !adAccountId) {
-    return NextResponse.json({ error: "Faltan credenciales de Meta." }, { status: 400 });
+    return NextResponse.json({ error: "Faltan credenciales de Meta (headers x-meta-token y x-meta-account-id requeridos)." }, { status: 400 });
   }
 
   try {

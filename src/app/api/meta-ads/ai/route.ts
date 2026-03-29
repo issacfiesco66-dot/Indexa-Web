@@ -9,6 +9,10 @@ const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
 const META_GRAPH_URL = "https://graph.facebook.com/v21.0";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const GEMINI_MODEL = "gemini-2.0-flash";
 
 const SYSTEM_PROMPT = `Eres un Senior Media Buyer especializado en Meta Ads (Facebook e Instagram). SIEMPRE responde en español.
 
@@ -107,8 +111,13 @@ Cuando analices métricas, da insights accionables, no solo números.`;
 // ── Meta helpers ────────────────────────────────────────────────────
 async function metaGet(url: string): Promise<Record<string, unknown>> {
   const res = await fetch(url);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
+  const text = await res.text();
+  let data: Record<string, unknown>;
+  try { data = JSON.parse(text); } catch { throw new Error(`Meta API (HTTP ${res.status}): respuesta no-JSON: ${text.slice(0, 200)}`); }
+  if (!res.ok || data.error) {
+    const errData = data.error as { message?: string; error_user_msg?: string } | undefined;
+    throw new Error(errData?.error_user_msg || errData?.message || `HTTP ${res.status}`);
+  }
   return data;
 }
 
@@ -118,9 +127,85 @@ async function metaPost(
 ): Promise<Record<string, unknown>> {
   const body = new URLSearchParams(params);
   const res = await fetch(url, { method: "POST", body });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
+  const text = await res.text();
+  let data: Record<string, unknown>;
+  try { data = JSON.parse(text); } catch { throw new Error(`Meta API (HTTP ${res.status}): respuesta no-JSON: ${text.slice(0, 200)}`); }
+  if (!res.ok || data.error) {
+    const errData = data.error as { message?: string; error_user_msg?: string } | undefined;
+    throw new Error(errData?.error_user_msg || errData?.message || `HTTP ${res.status}`);
+  }
   return data;
+}
+
+// ── Groq fallback helpers ────────────────────────────────────────────
+
+function isBillingError(status: number, body: string): boolean {
+  if (status === 402 || status === 529) return true;
+  const lower = body.toLowerCase();
+  return (
+    lower.includes("credit balance") ||
+    lower.includes("billing") ||
+    lower.includes("insufficient_quota") ||
+    lower.includes("quota exceeded") ||
+    lower.includes("rate limit") ||
+    lower.includes("overloaded")
+  );
+}
+
+type AnthropicMsg = { role: "user" | "assistant"; content: string | Record<string, unknown>[] };
+type GroqMsg = {
+  role: string;
+  content: string | null;
+  tool_calls?: { id: string; type: string; function: { name: string; arguments: string } }[];
+  tool_call_id?: string;
+};
+
+function toGroqTools(anthropicTools: { name: string; description: string; input_schema: Record<string, unknown> }[]) {
+  return anthropicTools.map((t) => ({
+    type: "function" as const,
+    function: { name: t.name, description: t.description, parameters: t.input_schema },
+  }));
+}
+
+function toGroqMessages(messages: AnthropicMsg[]): GroqMsg[] {
+  const result: GroqMsg[] = [];
+  for (const msg of messages) {
+    if (typeof msg.content === "string") {
+      result.push({ role: msg.role, content: msg.content });
+      continue;
+    }
+    const blocks = msg.content as Record<string, unknown>[];
+    if (msg.role === "user") {
+      for (const tr of blocks.filter((b) => b.type === "tool_result")) {
+        result.push({ role: "tool", tool_call_id: tr.tool_use_id as string, content: typeof tr.content === "string" ? tr.content : JSON.stringify(tr.content) });
+      }
+      const textBlocks = blocks.filter((b) => b.type === "text") as { text?: string }[];
+      if (textBlocks.length > 0) result.push({ role: "user", content: textBlocks.map((b) => b.text ?? "").join("\n") });
+    } else {
+      const textBlock = blocks.find((b) => b.type === "text") as { text?: string } | undefined;
+      const toolUseBlocks = blocks.filter((b) => b.type === "tool_use") as { id: string; name: string; input: Record<string, unknown> }[];
+      result.push({
+        role: "assistant",
+        content: textBlock?.text ?? null,
+        ...(toolUseBlocks.length > 0 ? { tool_calls: toolUseBlocks.map((tu) => ({ id: tu.id, type: "function", function: { name: tu.name, arguments: JSON.stringify(tu.input) } })) } : {}),
+      });
+    }
+  }
+  return result;
+}
+
+function fromGroqResponse(groqData: Record<string, unknown>): Record<string, unknown> {
+  const choice = (groqData.choices as Record<string, unknown>[])?.[0];
+  const message = choice?.message as { content?: string | null; tool_calls?: { id: string; function: { name: string; arguments: string } }[] };
+  const finishReason = choice?.finish_reason as string;
+  const content: Record<string, unknown>[] = [];
+  if (message?.content) content.push({ type: "text", text: message.content });
+  for (const tc of message?.tool_calls ?? []) {
+    let input: Record<string, unknown> = {};
+    try { input = JSON.parse(tc.function.arguments); } catch { /* noop */ }
+    content.push({ type: "tool_use", id: tc.id, name: tc.function.name, input });
+  }
+  return { content, stop_reason: finishReason === "tool_calls" ? "tool_use" : "end_turn" };
 }
 
 // ── Tool executor ───────────────────────────────────────────────────
@@ -418,10 +503,15 @@ export async function POST(request: NextRequest) {
       { role: "user", content: message },
     ];
 
-    // Time budget: stop 10s before Vercel timeout
+    // Time budget: stop 15s before Vercel timeout
     const startTime = Date.now();
-    const DEADLINE_MS = 50_000;
+    const DEADLINE_MS = 45_000;
     let lastText = "";
+    let useFallback = false;
+    // Prefer Gemini (likely already configured) then Groq
+    const fallbackKey = process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY;
+    const fallbackUrl = process.env.GEMINI_API_KEY ? GEMINI_URL : GROQ_URL;
+    const fallbackModel = process.env.GEMINI_API_KEY ? GEMINI_MODEL : GROQ_MODEL;
 
     // Agentic loop — up to 8 rounds with time budget
     for (let round = 0; round < 8; round++) {
@@ -430,41 +520,83 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-
-      const claudeRes = await fetch(ANTHROPIC_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": anthropicKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: CLAUDE_MODEL,
-          max_tokens: 1536,
-          system: SYSTEM_PROMPT,
-          tools,
-          messages: claudeMessages,
-        }),
-      });
-
-      const claudeText = await claudeRes.text();
-
-      if (!claudeRes.ok) {
-        let errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${claudeText.slice(0, 300)}`;
-        try {
-          const parsed = JSON.parse(claudeText);
-          errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${parsed?.error?.message || claudeText.slice(0, 200)}`;
-        } catch { /* noop */ }
-        console.error("[meta-ads/ai] Claude error:", errMsg);
-        return NextResponse.json({ error: errMsg }, { status: 400 });
-      }
-
       let response: Record<string, unknown>;
-      try {
-        response = JSON.parse(claudeText);
-      } catch {
-        return NextResponse.json({ error: "Respuesta inválida de Claude API." }, { status: 400 });
+
+      if (!useFallback) {
+        const claudeRes = await fetch(ANTHROPIC_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: CLAUDE_MODEL,
+            max_tokens: 1536,
+            system: SYSTEM_PROMPT,
+            tools,
+            messages: claudeMessages,
+          }),
+        });
+
+        const claudeText = await claudeRes.text();
+
+        if (!claudeRes.ok) {
+          if (isBillingError(claudeRes.status, claudeText) && fallbackKey) {
+            const provider = process.env.GEMINI_API_KEY ? "Gemini" : "Groq";
+            console.warn(`[meta-ads/ai] Claude billing/quota error — switching to ${provider} fallback`);
+            useFallback = true;
+          } else {
+            let errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${claudeText.slice(0, 300)}`;
+            try {
+              const parsed = JSON.parse(claudeText);
+              errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${parsed?.error?.message || claudeText.slice(0, 200)}`;
+            } catch { /* noop */ }
+            console.error("[meta-ads/ai] Claude error:", errMsg);
+            return NextResponse.json({ error: errMsg }, { status: 400 });
+          }
+        } else {
+          try {
+            response = JSON.parse(claudeText);
+          } catch {
+            return NextResponse.json({ error: "Respuesta inválida de Claude API." }, { status: 400 });
+          }
+        }
       }
+
+      if (useFallback) {
+        if (!fallbackKey) {
+          return NextResponse.json(
+            { error: "Límite de créditos de Claude alcanzado. Configura GEMINI_API_KEY o GROQ_API_KEY como fallback." },
+            { status: 503 }
+          );
+        }
+        const groqRes = await fetch(fallbackUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${fallbackKey}` },
+          body: JSON.stringify({
+            model: fallbackModel,
+            max_tokens: 1536,
+            tools: toGroqTools(tools),
+            tool_choice: "auto",
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              ...toGroqMessages(claudeMessages as AnthropicMsg[]),
+            ],
+          }),
+        });
+        const fallbackText = await groqRes.text();
+        if (!groqRes.ok) {
+          let errMsg = `Error de IA fallback (HTTP ${groqRes.status}): ${fallbackText.slice(0, 300)}`;
+          try { const p = JSON.parse(fallbackText); errMsg = `Error de IA fallback: ${p?.error?.message || fallbackText.slice(0, 200)}`; } catch { /* noop */ }
+          return NextResponse.json({ error: errMsg }, { status: 400 });
+        }
+        try { response = fromGroqResponse(JSON.parse(fallbackText)); } catch {
+          return NextResponse.json({ error: "Respuesta inválida de IA fallback." }, { status: 400 });
+        }
+      }
+
+      response = response!;
 
       // Capture text from this response
       const contentBlocks = (response.content as { type: string; text?: string }[]) || [];

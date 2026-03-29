@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
@@ -28,7 +27,6 @@ type PreviewMode = "facebook" | "instagram";
 
 export default function CrearAnuncioPage() {
   const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
 
   const [apiKey, setApiKey] = useState("");
   const [pageLoading, setPageLoading] = useState(true);

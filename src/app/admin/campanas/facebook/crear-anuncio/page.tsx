@@ -127,7 +127,7 @@ export default function AdminCrearAnuncioPage() {
           <Wand2 size={40} className="mx-auto text-gray-300" />
           <h1 className="mt-4 text-lg font-bold text-indexa-gray-dark">API Key requerida</h1>
           <p className="mt-2 text-sm text-gray-500">
-            Configura tu API key de Gemini en la pestaña de Campañas de Facebook para generar imágenes con IA.
+            Configura tu API key de NanoBanana en la pestaña de Campañas de Facebook para generar imágenes con IA.
           </p>
           <Link
             href="/admin/campanas/facebook"
