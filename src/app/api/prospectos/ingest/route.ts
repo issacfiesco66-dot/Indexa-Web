@@ -6,7 +6,7 @@ const limiter = createRateLimiter({ windowMs: 60_000, max: 20 });
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
-const INGEST_SECRET = process.env.INGEST_WEBHOOK_SECRET || "";
+const INGEST_SECRET = process.env.INGEST_WEBHOOK_SECRET;
 
 // ── Firestore REST helpers ──────────────────────────────────────────────
 
@@ -114,13 +114,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: "Rate limit exceeded." }, { status: 429 });
   }
 
-  // Auth: validate webhook secret
-  if (INGEST_SECRET) {
-    const authHeader = request.headers.get("authorization") || "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-    if (token !== INGEST_SECRET) {
-      return NextResponse.json({ success: false, message: "Unauthorized." }, { status: 401 });
-    }
+  // Auth: validate webhook secret (mandatory)
+  if (!INGEST_SECRET) {
+    return NextResponse.json({ success: false, message: "Server misconfigured: INGEST_WEBHOOK_SECRET not set." }, { status: 500 });
+  }
+  const authHeader = request.headers.get("authorization") || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (token !== INGEST_SECRET) {
+    return NextResponse.json({ success: false, message: "Unauthorized." }, { status: 401 });
   }
 
   if (!PROJECT_ID || !API_KEY) {

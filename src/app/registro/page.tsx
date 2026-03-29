@@ -32,7 +32,7 @@ function RegistroContent() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const sitioIdParam = searchParams.get("sitioId") || "";
+  const sitioIdParam = searchParams?.get("sitioId") || "";
 
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");

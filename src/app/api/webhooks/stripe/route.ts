@@ -8,7 +8,10 @@ function getStripe() {
   return _stripe;
 }
 
-const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET!;
+const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+if (!WEBHOOK_SECRET) {
+  throw new Error("STRIPE_WEBHOOK_SECRET is not configured. Set it in your environment variables.");
+}
 
 // ── Firestore REST helpers (no service account needed) ───────────────────
 

@@ -7,7 +7,7 @@ export default function Footer() {
       <div className="absolute top-0 left-1/2 h-px w-1/2 -translate-x-1/2 bg-gradient-to-r from-transparent via-indexa-orange/40 to-transparent" />
 
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-7">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-2">
@@ -35,9 +35,35 @@ export default function Footer() {
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-white/30">Recursos</h4>
             <ul className="mt-4 space-y-2.5">
+              <li><a href="/guia" className="text-sm text-white/50 hover:text-white transition-colors">Todas las Guías</a></li>
               <li><a href="/guia/presencia-digital-pymes" className="text-sm text-white/50 hover:text-white transition-colors">Guía: Presencia Digital</a></li>
               <li><a href="/guia/seo-local-mexico" className="text-sm text-white/50 hover:text-white transition-colors">Guía: SEO Local México</a></li>
               <li><a href="/guia/marketing-digital-pymes" className="text-sm text-white/50 hover:text-white transition-colors">Guía: Marketing Digital</a></li>
+              <li><a href="/guia/google-mi-negocio" className="text-sm text-white/50 hover:text-white transition-colors">Guía: Google Mi Negocio</a></li>
+              <li><a href="/directorio" className="text-sm text-white/50 hover:text-white transition-colors">Directorio de Negocios</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/30">Ciudades</h4>
+            <ul className="mt-4 space-y-2.5">
+              <li><a href="/pagina-web-cdmx" className="text-sm text-white/50 hover:text-white transition-colors">CDMX</a></li>
+              <li><a href="/pagina-web-guadalajara" className="text-sm text-white/50 hover:text-white transition-colors">Guadalajara</a></li>
+              <li><a href="/pagina-web-monterrey" className="text-sm text-white/50 hover:text-white transition-colors">Monterrey</a></li>
+              <li><a href="/pagina-web-puebla" className="text-sm text-white/50 hover:text-white transition-colors">Puebla</a></li>
+              <li><a href="/pagina-web-queretaro" className="text-sm text-white/50 hover:text-white transition-colors">Querétaro</a></li>
+              <li><a href="/pagina-web-tijuana" className="text-sm text-white/50 hover:text-white transition-colors">Tijuana</a></li>
+              <li><a href="/pagina-web-merida" className="text-sm text-white/50 hover:text-white transition-colors">Mérida</a></li>
+              <li><a href="/pagina-web-leon" className="text-sm text-white/50 hover:text-white transition-colors">León</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/30">Por Giro</h4>
+            <ul className="mt-4 space-y-2.5">
+              <li><a href="/sitio-web-restaurante" className="text-sm text-white/50 hover:text-white transition-colors">Restaurantes</a></li>
+              <li><a href="/sitio-web-dentista" className="text-sm text-white/50 hover:text-white transition-colors">Dentistas</a></li>
+              <li><a href="/sitio-web-taller-mecanico" className="text-sm text-white/50 hover:text-white transition-colors">Talleres Mecánicos</a></li>
             </ul>
           </div>
 

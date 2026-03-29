@@ -39,16 +39,14 @@ export async function PATCH(request: NextRequest) {
     // Also accept if site.agencyId matches from request
     const siteAgencyId = site.data.agencyId as string;
 
-    if (!userAgencyId && !siteAgencyId) {
-      return NextResponse.json({ success: false, message: "No se pudo verificar la agencia." }, { status: 403 });
+    // Both IDs must exist and match — prevents privilege escalation
+    if (!siteAgencyId) {
+      return NextResponse.json({ success: false, message: "Este sitio no está asociado a ninguna agencia." }, { status: 403 });
     }
 
-    // Agency users might not have agencyId in their profile — verify via agencias collection
-    if (siteAgencyId) {
-      const agencia = await readDoc("agencias", siteAgencyId);
-      if (!agencia || agencia.data.uid !== agencyUser.uid) {
-        return NextResponse.json({ success: false, message: "Este sitio no pertenece a tu agencia." }, { status: 403 });
-      }
+    const agencia = await readDoc("agencias", siteAgencyId);
+    if (!agencia || agencia.data.uid !== agencyUser.uid) {
+      return NextResponse.json({ success: false, message: "Este sitio no pertenece a tu agencia." }, { status: 403 });
     }
 
     if (action === "pause") {

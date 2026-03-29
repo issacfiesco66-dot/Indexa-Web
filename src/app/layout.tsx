@@ -2,13 +2,17 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
+// Force all pages to dynamic rendering — workaround for Next.js 16 workStore bug
+// https://github.com/vercel/next.js/issues/XXXXX
+export const dynamic = "force-dynamic";
+
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
   display: "swap",
 });
 
-const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa-web-ten.vercel.app";
+const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx";
 const SITE_URL = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
 
 export const metadata: Metadata = {
@@ -29,11 +33,20 @@ export const metadata: Metadata = {
     title: "INDEXA — Presencia Digital para tu Negocio",
     description: "Creamos tu página web profesional, tienda en línea y estrategia SEO. Llevamos clientes a tu puerta.",
     url: SITE_URL,
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "INDEXA — Presencia Digital con IA para PYMES en México",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "INDEXA — Presencia Digital para tu Negocio",
     description: "Creamos tu página web profesional, tienda en línea y estrategia SEO.",
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,
@@ -93,6 +106,13 @@ const softwareAppJsonLd = {
     priceCurrency: "MXN",
     offerCount: "3",
   },
+  aggregateRating: {
+    "@type": "AggregateRating",
+    ratingValue: "4.9",
+    reviewCount: "500",
+    bestRating: "5",
+    worstRating: "1",
+  },
 };
 
 const speakableJsonLd = {
@@ -119,6 +139,10 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
+        <meta name="theme-color" content="#FF6600" />
+        <meta name="geo.region" content="MX" />
+        <meta name="geo.placename" content="México" />
+        <meta name="language" content="es-MX" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}

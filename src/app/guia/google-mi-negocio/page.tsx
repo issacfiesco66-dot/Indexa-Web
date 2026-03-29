@@ -3,6 +3,9 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
+const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx";
+const SITE_URL = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
+
 export const metadata: Metadata = {
   title: "Google Business Profile (Mi Negocio): Guía Completa para PYMES en México (2026)",
   description:
@@ -20,15 +23,15 @@ const jsonLd = {
   publisher: { "@type": "Organization", name: "INDEXA" },
   datePublished: "2026-03-05",
   dateModified: "2026-03-27",
-  mainEntityOfPage: "https://indexa.mx/guia/google-mi-negocio",
+  mainEntityOfPage: `${SITE_URL}/guia/google-mi-negocio`,
 };
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   itemListElement: [
-    { "@type": "ListItem", position: 1, name: "INDEXA", item: "https://indexa.mx" },
-    { "@type": "ListItem", position: 2, name: "Guías", item: "https://indexa.mx/guia" },
+    { "@type": "ListItem", position: 1, name: "INDEXA", item: `${SITE_URL}` },
+    { "@type": "ListItem", position: 2, name: "Guías", item: `${SITE_URL}/guia` },
     { "@type": "ListItem", position: 3, name: "Google Business Profile" },
   ],
 };

@@ -77,10 +77,11 @@ export async function verifyRole(
 }
 
 /**
- * Verifies a Firebase ID token AND checks that the user has the "admin"/"superadmin" role.
+ * Verifies a Firebase ID token AND checks that the user has the "admin" or "superadmin" role.
  * Returns the user payload if admin, null otherwise.
  */
 export async function verifyAdmin(idToken: string): Promise<TokenPayload | null> {
+  // "admin" role strings are normalized to "superadmin" by normalizeRole()
   return verifyRole(idToken, ["superadmin"]);
 }
 

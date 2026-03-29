@@ -3,6 +3,8 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Cómo Elegir la Mejor Página Web para tu Negocio: Freelance vs Agencia vs Plataforma (2026)",
   description:

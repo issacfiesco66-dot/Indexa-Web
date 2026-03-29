@@ -56,3 +56,5 @@ logs_scraper.txt
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel

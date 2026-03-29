@@ -35,7 +35,9 @@ export function useTrackView(sitioId: string, slug?: string) {
       updates.interesNivel = increment(1);
     }
 
-    updateDoc(doc(db, "sitios", sitioId), updates).catch(() => {});
+    updateDoc(doc(db, "sitios", sitioId), updates).catch((err) => {
+      console.error("[SitioTracker] Failed to update view count for sitio:", sitioId, err);
+    });
 
     // Also track demo view for the linked prospecto (fire-and-forget)
     const trackSlug = slug || sitioId;
@@ -43,7 +45,9 @@ export function useTrackView(sitioId: string, slug?: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ slug: trackSlug }),
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error("[SitioTracker] Failed to track demo view for slug:", trackSlug, err);
+    });
   }, [sitioId, slug]);
 }
 
@@ -52,7 +56,9 @@ export function useTrackWhatsAppClick(sitioId: string) {
     if (!db || !sitioId) return;
     updateDoc(doc(db, "sitios", sitioId), {
       clicsWhatsApp: increment(1),
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error("[SitioTracker] Failed to track WhatsApp click for sitio:", sitioId, err);
+    });
   }, [sitioId]);
 }
 

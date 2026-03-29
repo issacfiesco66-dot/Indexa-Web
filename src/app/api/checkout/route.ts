@@ -76,7 +76,14 @@ export async function POST(request: NextRequest) {
     }
 
     const existingCustomerId = sitioDoc.data.stripeCustomerId as string | undefined;
-    const origin = request.headers.get("origin") || "https://indexa-web-ten.vercel.app";
+    const rawOrigin = request.headers.get("origin") || "";
+    const allowedOrigins = [
+      process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx",
+      "https://indexa.mx",
+      "https://www.indexa.mx",
+      "http://localhost:3000",
+    ];
+    const origin = allowedOrigins.includes(rawOrigin) ? rawOrigin : (process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx");
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "subscription",

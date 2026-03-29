@@ -272,7 +272,7 @@ function TikTokAdsContent() {
 
   // Auto-exchange if auth_code comes in URL (from redirect)
   useEffect(() => {
-    const authCode = searchParams.get("auth_code");
+    const authCode = searchParams?.get("auth_code");
     if (!authCode || oauthSuccess || connected) return;
     exchangeAuthCode(authCode);
     router.replace("/admin/campanas/tiktok", { scroll: false });

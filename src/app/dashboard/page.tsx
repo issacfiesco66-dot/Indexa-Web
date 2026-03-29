@@ -276,7 +276,7 @@ export default function ClientDashboardPage() {
 
   // ── Detect checkout success/cancel from Stripe redirect ────────
   useEffect(() => {
-    const checkout = searchParams.get("checkout");
+    const checkout = searchParams?.get("checkout");
     if (checkout === "success") {
       setCheckoutMsg("¡Pago exitoso! Tu plan se activará en unos segundos.");
       // Clean URL

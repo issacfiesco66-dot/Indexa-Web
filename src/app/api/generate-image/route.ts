@@ -29,10 +29,16 @@ export async function POST(request: NextRequest) {
 
   // ── Body ──────────────────────────────────────────────────────
   const body = await request.json();
-  const { apiKey, prompt, aspectRatio } = body;
+  const { prompt, aspectRatio } = body;
 
-  if (!apiKey || !prompt) {
-    return NextResponse.json({ error: "Faltan parámetros (apiKey, prompt)." }, { status: 400 });
+  if (!prompt) {
+    return NextResponse.json({ error: "Falta el parámetro prompt." }, { status: 400 });
+  }
+
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+  if (!geminiKey) {
+    console.error("[generate-image] GEMINI_API_KEY is not configured.");
+    return NextResponse.json({ error: "Servicio de generación de imágenes no configurado." }, { status: 503 });
   }
 
   try {
@@ -48,8 +54,7 @@ export async function POST(request: NextRequest) {
       },
     };
 
-
-    const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+    const res = await fetch(`${GEMINI_ENDPOINT}?key=${geminiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
