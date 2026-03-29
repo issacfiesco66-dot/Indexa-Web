@@ -10,7 +10,7 @@ function getStripe() {
 
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 if (!WEBHOOK_SECRET) {
-  throw new Error("STRIPE_WEBHOOK_SECRET is not configured. Set it in your environment variables.");
+  console.warn("⚠ STRIPE_WEBHOOK_SECRET is not configured. Stripe webhooks will not work.");
 }
 
 // ── Firestore REST helpers (no service account needed) ───────────────────
