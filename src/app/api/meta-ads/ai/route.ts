@@ -509,9 +509,9 @@ export async function POST(request: NextRequest) {
     let lastText = "";
     let useFallback = false;
     // Prefer Gemini (likely already configured) then Groq
-    const fallbackKey = process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY;
-    const fallbackUrl = process.env.GEMINI_API_KEY ? GEMINI_URL : GROQ_URL;
-    const fallbackModel = process.env.GEMINI_API_KEY ? GEMINI_MODEL : GROQ_MODEL;
+    const fallbackKey = process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY;
+    const fallbackUrl = process.env.GROQ_API_KEY ? GROQ_URL : GEMINI_URL;
+    const fallbackModel = process.env.GROQ_API_KEY ? GROQ_MODEL : GEMINI_MODEL;
 
     // Agentic loop — up to 8 rounds with time budget
     for (let round = 0; round < 8; round++) {
@@ -543,7 +543,7 @@ export async function POST(request: NextRequest) {
 
         if (!claudeRes.ok) {
           if (isBillingError(claudeRes.status, claudeText) && fallbackKey) {
-            const provider = process.env.GEMINI_API_KEY ? "Gemini" : "Groq";
+            const provider = process.env.GROQ_API_KEY ? "Groq" : "Gemini";
             console.warn(`[meta-ads/ai] Claude billing/quota error — switching to ${provider} fallback`);
             useFallback = true;
           } else {
