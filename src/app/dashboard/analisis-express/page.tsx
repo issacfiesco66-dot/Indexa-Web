@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
@@ -20,96 +20,64 @@ import {
   ArrowRight,
   CheckCircle,
   XCircle,
-  Clock,
   Sparkles,
-  ExternalLink,
   Plug,
+  ExternalLink,
+  Megaphone,
+  Video,
+  Activity,
+  Target,
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import MetaAIChatPanel from "@/components/MetaAIChatPanel";
+import { PaywallOverlay } from "@/components/PaywallGate";
 
-// ── Post-payment AI context prompt ──────────────────────────────
-const POST_PAYMENT_CONTEXT = `Eres el Estratega de Optimización de Indexa. El usuario acaba de pagar para desbloquear su diagnóstico. Tu prioridad absoluta es convertir esos "$4,320 MXN desperdiciados" en ahorro real o mejores conversiones.
+// ── Types ────────────────────────────────────────────────────────
+type Platform = "meta" | "tiktok";
+type Severity = "critical" | "warning" | "good" | "excellent";
+type PagePhase = "select-platform" | "credentials" | "scanning" | "results";
 
-═══ PROTOCOLO DE BIENVENIDA POST-PAGO ═══
-1. RECONOCIMIENTO: Inicia validando los hallazgos críticos que el usuario vio en el Paywall (CTR bajo, Gasto sin retorno, Píxel mal configurado).
-2. ACCIÓN INMEDIATA: Presenta las 3 campañas exactas que están drenando el presupuesto. No uses nombres genéricos; usa los datos reales de la herramienta 'analyze_campaign_performance'.
-3. COMANDO DE EJECUCIÓN: Ofrece un botón de acción rápida: "He preparado los ajustes para estas 3 campañas. ¿Deseas que los aplique ahora mismo en modo PAUSED para tu revisión?".
+interface DiagnosticResult {
+  platform: Platform;
+  campaigns: { name: string; status: string; objective: string }[];
+  severities: { ctr: Severity; cpc: Severity; cpm: Severity };
+  healthScore: number;
+  totalCampaigns: number;
+  activeCampaigns: number;
+  findings: { type: string; severity: Severity; title: string; description: string }[];
+}
 
-═══ REGLAS DE ANÁLISIS ═══
-- Sé agresivo con la eficiencia: Si un Ad Set tiene un CPC 50% mayor al benchmark de MX ($8.00), sugiere pausarlo de inmediato.
-- Transparencia: Explica brevemente por qué sugieres el cambio (ej: "Tu frecuencia es de 4.5, la audiencia ya está saturada").
-- Lenguaje: Directo, profesional y enfocado en ROI. Prohibido el relleno.
+// ── Post-payment AI context ──────────────────────────────────────
+const POST_PAYMENT_CONTEXT_META = `Eres el Estratega de Optimización de Indexa. El usuario acaba de pagar para desbloquear su diagnóstico. Tu prioridad absoluta es convertir su gasto desperdiciado en ahorro real o mejores conversiones.
 
-═══ ESTRUCTURA DE LA RESPUESTA ═══
-Muestra una tabla con: Campaña | Problema Detectado | Acción Propuesta | Impacto Estimado.
+PROTOCOLO:
+1. Analiza TODAS las campañas activas con analyze_campaign_performance.
+2. Presenta las 3 campañas más problemáticas en una tabla: Campaña | Problema | Acción | Impacto Estimado.
+3. Si CPC > $8 MXN, sugiere pausar inmediatamente. Explica por qué.
+4. Al final pregunta: "¿Deseas que genere los nuevos anuncios con IA para reemplazar los que no están funcionando?"
 
-Al final, termina con: "¿Deseas que genere los nuevos anuncios con IA para reemplazar los que no están funcionando?"`;
+Sé directo, profesional y enfocado en ROI. Prohibido el relleno.`;
 
-const AUTO_MESSAGE = "Acabo de desbloquear mi diagnóstico. Analiza todas mis campañas activas e identifica las que están desperdiciando presupuesto. Dame un plan de recuperación de inversión con las 3 campañas más problemáticas.";
+const POST_PAYMENT_CONTEXT_TIKTOK = `Eres el Estratega de Optimización de TikTok Ads de Indexa. El usuario acaba de pagar para desbloquear su diagnóstico. Tu prioridad absoluta es optimizar sus campañas.
 
-const UNLOCKED_EXAMPLE_PROMPTS = [
-  "Pausa las campañas con peor rendimiento",
-  "Crea nuevos anuncios optimizados con IA",
-  "¿Cuánto estoy gastando sin conversiones?",
-  "Genera un reporte completo de mi cuenta",
-];
+PROTOCOLO:
+1. Analiza el rendimiento con analyze_campaign_performance.
+2. Presenta las campañas problemáticas en una tabla: Campaña | Problema | Acción | Impacto Estimado.
+3. Si CPC > $6 MXN o CTR < 0.3%, sugiere pausar o reestructurar.
+4. Al final pregunta: "¿Deseas que optimice las campañas automáticamente?"
 
-// ── Simulated diagnostic findings (paywall mode) ────────────────
-const HALLAZGOS = [
-  {
-    icon: TrendingDown,
-    severity: "critical" as const,
-    title: "CTR por debajo del promedio",
-    description:
-      "Tu tasa de clics es un 68% menor al promedio de tu industria. Estás perdiendo clientes potenciales cada día.",
-    metric: "0.4%",
-    benchmark: "1.2%",
-    label: "CTR actual vs industria",
-  },
-  {
-    icon: BadgeDollarSign,
-    severity: "critical" as const,
-    title: "Gasto sin conversiones detectado",
-    description:
-      "Se identificaron $4,320 MXN en gasto publicitario que no generó ninguna conversión en los últimos 30 días.",
-    metric: "$4,320",
-    benchmark: "$0",
-    label: "Gasto desperdiciado",
-  },
-  {
-    icon: ShieldAlert,
-    severity: "warning" as const,
-    title: "Píxel de seguimiento mal configurado",
-    description:
-      "El píxel de Meta no está registrando eventos de conversión. Tus campañas no pueden optimizarse correctamente.",
-    metric: "0 eventos",
-    benchmark: "~120/día",
-    label: "Eventos rastreados",
-  },
-];
+Sé directo, profesional y enfocado en ROI. Prohibido el relleno.`;
 
-const CAMPANAS_BLUR = [
-  { nombre: "Campaña - Leads Junio 2025", gasto: "$2,150", roi: "-34%", estado: "Crítico" },
-  { nombre: "Remarketing - Verano 2025", gasto: "$1,890", roi: "-12%", estado: "Riesgo" },
-  { nombre: "Prospección - Audiencia Fría", gasto: "$3,420", roi: "+8%", estado: "Mejorable" },
-  { nombre: "Conversiones - Landing Principal", gasto: "$980", roi: "-56%", estado: "Crítico" },
-  { nombre: "Campaña Brand Awareness Q2", gasto: "$1,640", roi: "-21%", estado: "Riesgo" },
-];
+const AUTO_MESSAGE = "Analiza todas mis campañas activas e identifica las que están desperdiciando presupuesto. Dame un plan de recuperación de inversión con las 3 campañas más problemáticas.";
 
-const SCAN_PHASES = [
-  "Conectando con Meta Ads API...",
-  "Analizando estructura de campañas...",
-  "Evaluando métricas de rendimiento...",
-  "Detectando anomalías de gasto...",
-  "Verificando configuración de píxeles...",
-  "Generando diagnóstico con IA...",
-  "Diagnóstico completado",
-];
+const SEVERITY_CONFIG: Record<Severity, { color: string; bg: string; label: string; icon: typeof AlertTriangle }> = {
+  critical: { color: "text-red-400", bg: "bg-red-500/10 border-red-500/20", label: "Crítico", icon: XCircle },
+  warning: { color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20", label: "Medio", icon: AlertTriangle },
+  good: { color: "text-emerald-400", bg: "bg-emerald-500/10 border-emerald-500/20", label: "Bueno", icon: CheckCircle },
+  excellent: { color: "text-indigo-400", bg: "bg-indigo-500/10 border-indigo-500/20", label: "Excelente", icon: Sparkles },
+};
 
-// ══════════════════════════════════════════════════════════════════
-//  COMPONENT
 // ══════════════════════════════════════════════════════════════════
 export default function AnalisisExpressPage() {
   const { user, loading: authLoading } = useAuth();
@@ -121,18 +89,23 @@ export default function AnalisisExpressPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
 
-  // Meta Ads credentials (for unlocked mode)
+  // Flow state
+  const [phase, setPhase] = useState<PagePhase>("select-platform");
+  const [platform, setPlatform] = useState<Platform | null>(null);
+
+  // Credentials
   const [metaToken, setMetaToken] = useState("");
-  const [metaAdAccountId, setMetaAdAccountId] = useState("");
-  const [loadingTokens, setLoadingTokens] = useState(false);
+  const [metaAccountId, setMetaAccountId] = useState("");
+  const [tiktokToken, setTiktokToken] = useState("");
+  const [tiktokAdvertiserId, setTiktokAdvertiserId] = useState("");
+  const [credInput1, setCredInput1] = useState("");
+  const [credInput2, setCredInput2] = useState("");
 
-  // Scan animation state (paywall mode)
-  const [scanning, setScanning] = useState(true);
-  const [scanPhase, setScanPhase] = useState(0);
-  const [scanProgress, setScanProgress] = useState(0);
-  const scanInterval = useRef<ReturnType<typeof setInterval>>(undefined);
+  // Diagnostic results
+  const [diagnostic, setDiagnostic] = useState<DiagnosticResult | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
 
-  // Unlocked celebration
+  const isActive = sitio?.statusPago === "activo";
   const isUnlocked = searchParams?.get("unlocked") === "true";
 
   // ── Auth + data + tokens ───────────────────────────────────────
@@ -150,69 +123,79 @@ export default function AnalisisExpressPage() {
 
         setSitioId(profile.sitioId);
         const sitioSnap = await getDoc(doc(db!, "sitios", profile.sitioId));
-        if (sitioSnap.exists()) {
-          const data = sitioSnap.data() as SitioData;
-          setSitio(data);
+        if (sitioSnap.exists()) setSitio(sitioSnap.data() as SitioData);
 
-          // If active, load Meta Ads tokens
-          if (data.statusPago === "activo") {
-            setLoadingTokens(true);
-            try {
-              const authToken = await user.getIdToken();
-              const res = await fetch("/api/tokens", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
-                body: JSON.stringify({ action: "load" }),
-              });
-              const { tokens: tkData } = await res.json();
-              if (tkData?.metaAccessToken) setMetaToken(tkData.metaAccessToken);
-              if (tkData?.metaAdAccountId) setMetaAdAccountId(tkData.metaAdAccountId);
-            } catch { /* tokens not available */ }
-            setLoadingTokens(false);
-          }
-        }
+        // Load saved tokens
+        const authToken = await user.getIdToken();
+        const res = await fetch("/api/tokens", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+          body: JSON.stringify({ action: "load" }),
+        });
+        const { tokens: tkData } = await res.json();
+        if (tkData?.metaAccessToken) setMetaToken(tkData.metaAccessToken);
+        if (tkData?.metaAdAccountId) setMetaAccountId(tkData.metaAdAccountId);
+        if (tkData?.tiktokAccessToken) setTiktokToken(tkData.tiktokAccessToken);
+        if (tkData?.tiktokAdvertiserId) setTiktokAdvertiserId(tkData.tiktokAdvertiserId);
       } catch { /* silently fail */ }
       setLoadingData(false);
     })();
   }, [user, authLoading, router]);
 
-  // ── Scan animation (paywall only) ──────────────────────────────
-  const isActive = sitio?.statusPago === "activo";
-
-  useEffect(() => {
-    if (loadingData || !scanning || isActive) return;
-
-    scanInterval.current = setInterval(() => {
-      setScanProgress((p) => {
-        const next = p + Math.random() * 3 + 1;
-        if (next >= 100) {
-          clearInterval(scanInterval.current);
-          setScanning(false);
-          return 100;
-        }
-        return next;
+  // ── Run diagnostic ─────────────────────────────────────────────
+  const runDiagnostic = useCallback(async (plat: Platform, tok: string, accId: string) => {
+    if (!user) return;
+    setPhase("scanning");
+    setScanError(null);
+    try {
+      const authToken = await user.getIdToken();
+      const res = await fetch("/api/diagnostics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform: plat, token: tok, accountId: accId, authToken }),
       });
-    }, 120);
+      const data = await res.json();
+      if (data.error) {
+        setScanError(data.error);
+        setPhase("credentials");
+      } else {
+        setDiagnostic(data);
+        setPhase("results");
+      }
+    } catch {
+      setScanError("Error de conexión al analizar tu cuenta.");
+      setPhase("credentials");
+    }
+  }, [user]);
 
-    return () => clearInterval(scanInterval.current);
-  }, [loadingData, scanning, isActive]);
+  // ── Platform selection handler ─────────────────────────────────
+  const selectPlatform = useCallback((plat: Platform) => {
+    setPlatform(plat);
+    // Auto-proceed if credentials already saved
+    if (plat === "meta" && metaToken && metaAccountId) {
+      runDiagnostic("meta", metaToken, metaAccountId);
+    } else if (plat === "tiktok" && tiktokToken && tiktokAdvertiserId) {
+      runDiagnostic("tiktok", tiktokToken, tiktokAdvertiserId);
+    } else {
+      setPhase("credentials");
+    }
+  }, [metaToken, metaAccountId, tiktokToken, tiktokAdvertiserId, runDiagnostic]);
 
-  useEffect(() => {
-    const phaseIndex = Math.min(
-      Math.floor((scanProgress / 100) * SCAN_PHASES.length),
-      SCAN_PHASES.length - 1,
-    );
-    setScanPhase(phaseIndex);
-  }, [scanProgress]);
+  // ── Credential submit handler ──────────────────────────────────
+  const submitCredentials = () => {
+    if (!platform) return;
+    if (!credInput1.trim() || !credInput2.trim()) return;
+    if (platform === "meta") {
+      runDiagnostic("meta", credInput1.trim(), credInput2.trim());
+    } else {
+      runDiagnostic("tiktok", credInput1.trim(), credInput2.trim());
+    }
+  };
 
-  // ── Checkout handler (paywall only) ────────────────────────────
+  // ── Checkout handler ───────────────────────────────────────────
   const handleCheckout = useCallback(async () => {
     const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER || "";
-    if (!user || !sitioId) return;
-    if (!priceId) {
-      alert("Error de configuración: precio no disponible. Contacta soporte.");
-      return;
-    }
+    if (!user || !sitioId || !priceId) return;
     setCheckingOut(true);
     try {
       const token = await user.getIdToken();
@@ -222,19 +205,12 @@ export default function AnalisisExpressPage() {
         body: JSON.stringify({ priceId, planId: "starter", sitioId, authToken: token }),
       });
       const data = await res.json();
-      if (data.success && data.url) {
-        window.location.href = data.url;
-      } else {
-        alert(data.message || "Error al crear sesión de pago.");
-        setCheckingOut(false);
-      }
-    } catch {
-      alert("Error de conexión. Intenta de nuevo.");
-      setCheckingOut(false);
-    }
+      if (data.success && data.url) window.location.href = data.url;
+      else { alert(data.message || "Error."); setCheckingOut(false); }
+    } catch { alert("Error de conexión."); setCheckingOut(false); }
   }, [user, sitioId]);
 
-  // ── Loading state ───────────────────────────────────────────────
+  // ── Loading ────────────────────────────────────────────────────
   if (authLoading || loadingData) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#060918]">
@@ -243,10 +219,10 @@ export default function AnalisisExpressPage() {
     );
   }
 
-  const hasMetaToken = !!metaToken && !!metaAdAccountId;
+  // ── Helpers ────────────────────────────────────────────────────
+  const hasMetaCreds = !!metaToken && !!metaAccountId;
+  const hasTiktokCreds = !!tiktokToken && !!tiktokAdvertiserId;
 
-  // ══════════════════════════════════════════════════════════════════
-  //  RENDER
   // ══════════════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen bg-[#060918] text-white">
@@ -254,25 +230,18 @@ export default function AnalisisExpressPage() {
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[#060918]/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-2 text-white/60 transition hover:text-white"
-            >
+            <Link href="/dashboard" className="flex items-center gap-2 text-white/60 transition hover:text-white">
               <ChevronLeft size={18} />
             </Link>
             <Link href="/dashboard" className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indexa-orange to-orange-400">
                 <span className="text-sm font-black text-white">IX</span>
               </div>
-              <span className="text-lg font-extrabold tracking-tight text-white">
-                INDEXA
-              </span>
+              <span className="text-lg font-extrabold tracking-tight text-white">INDEXA</span>
             </Link>
           </div>
           <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            isActive
-              ? "bg-emerald-500/10 text-emerald-400"
-              : "bg-red-500/10 text-red-400"
+            isActive ? "bg-emerald-500/10 text-emerald-400" : "bg-indigo-500/10 text-indigo-400"
           }`}>
             {isActive ? "Diagnóstico Desbloqueado" : "Diagnóstico Express"}
           </span>
@@ -282,398 +251,397 @@ export default function AnalisisExpressPage() {
       <main className="mx-auto max-w-5xl px-4 pb-24 pt-6 sm:px-6">
 
         {/* ════════════════════════════════════════════════════════
-            UNLOCKED MODE (statusPago === "activo")
+            PHASE 1: Platform Selector
             ════════════════════════════════════════════════════════ */}
-        {isActive ? (
-          <>
-            {/* Welcome Banner */}
+        {phase === "select-platform" && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="mb-8 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600">
+                <Activity className="h-7 w-7 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold sm:text-3xl">Diagnóstico Express</h1>
+              <p className="mt-2 text-white/50">Selecciona la plataforma que quieres analizar</p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {/* Meta Ads */}
+              <button
+                onClick={() => selectPlatform("meta")}
+                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-left transition-all hover:border-indigo-500/30 hover:bg-indigo-500/5"
+              >
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10">
+                  <Megaphone className="h-6 w-6 text-blue-400" />
+                </div>
+                <h3 className="mb-1 text-lg font-bold">Meta Ads</h3>
+                <p className="text-sm text-white/40">Facebook e Instagram Ads</p>
+                {hasMetaCreds && (
+                  <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-400">
+                    <CheckCircle size={10} /> Conectado
+                  </span>
+                )}
+                <ArrowRight className="absolute right-5 top-1/2 h-5 w-5 -translate-y-1/2 text-white/10 transition-all group-hover:text-indigo-400 group-hover:translate-x-1" />
+              </button>
+
+              {/* TikTok Ads */}
+              <button
+                onClick={() => selectPlatform("tiktok")}
+                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-left transition-all hover:border-indigo-500/30 hover:bg-indigo-500/5"
+              >
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-pink-500/10">
+                  <Video className="h-6 w-6 text-pink-400" />
+                </div>
+                <h3 className="mb-1 text-lg font-bold">TikTok Ads</h3>
+                <p className="text-sm text-white/40">TikTok Business</p>
+                {hasTiktokCreds && (
+                  <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-400">
+                    <CheckCircle size={10} /> Conectado
+                  </span>
+                )}
+                <ArrowRight className="absolute right-5 top-1/2 h-5 w-5 -translate-y-1/2 text-white/10 transition-all group-hover:text-pink-400 group-hover:translate-x-1" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════
+            PHASE 2: Credential Entry
+            ════════════════════════════════════════════════════════ */}
+        {phase === "credentials" && platform && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+            <button
+              onClick={() => { setPhase("select-platform"); setPlatform(null); setScanError(null); }}
+              className="mb-6 flex items-center gap-1 text-sm text-white/40 hover:text-white"
+            >
+              <ChevronLeft size={14} /> Cambiar plataforma
+            </button>
+
+            <div className="mx-auto max-w-md">
+              <div className="mb-6 text-center">
+                <div className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${
+                  platform === "meta" ? "bg-blue-500/10" : "bg-pink-500/10"
+                }`}>
+                  {platform === "meta" ? <Megaphone className="h-6 w-6 text-blue-400" /> : <Video className="h-6 w-6 text-pink-400" />}
+                </div>
+                <h2 className="text-xl font-bold">
+                  {platform === "meta" ? "Conecta Meta Ads" : "Conecta TikTok Ads"}
+                </h2>
+                <p className="mt-1 text-sm text-white/50">
+                  Ingresa tus credenciales para analizar tus campañas
+                </p>
+              </div>
+
+              {scanError && (
+                <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-400">
+                  {scanError}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-white/40">
+                    {platform === "meta" ? "Access Token" : "Access Token"}
+                  </label>
+                  <input
+                    type="password"
+                    value={credInput1}
+                    onChange={(e) => setCredInput1(e.target.value)}
+                    placeholder={platform === "meta" ? "EAAxxxxxxx..." : "Tu access token de TikTok"}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-white/40">
+                    {platform === "meta" ? "Ad Account ID" : "Advertiser ID"}
+                  </label>
+                  <input
+                    type="text"
+                    value={credInput2}
+                    onChange={(e) => setCredInput2(e.target.value)}
+                    placeholder={platform === "meta" ? "act_123456789" : "123456789"}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20"
+                  />
+                </div>
+                <button
+                  onClick={submitCredentials}
+                  disabled={!credInput1.trim() || !credInput2.trim()}
+                  className="w-full rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-3.5 text-sm font-bold text-white transition-all hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
+                >
+                  Analizar mi cuenta
+                </button>
+              </div>
+
+              <p className="mt-4 text-center text-[11px] text-white/25">
+                Tus credenciales se transmiten de forma segura y no se almacenan sin tu permiso.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════
+            PHASE 3: Scanning
+            ════════════════════════════════════════════════════════ */}
+        {phase === "scanning" && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="py-20">
+            <div className="flex flex-col items-center text-center">
+              <div className="relative mb-6 flex h-16 w-16 items-center justify-center">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-20" />
+                <ShieldAlert className="relative h-8 w-8 text-indigo-400" />
+              </div>
+              <h2 className="mb-2 text-xl font-bold">Analizando tu cuenta...</h2>
+              <p className="mb-6 text-sm text-white/50">
+                Conectando con {platform === "meta" ? "Meta Ads" : "TikTok Ads"} y evaluando tus métricas
+              </p>
+              <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
+            </div>
+          </motion.div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════
+            PHASE 4: Results
+            ════════════════════════════════════════════════════════ */}
+        {phase === "results" && diagnostic && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            {/* Health Score Banner */}
             <motion.section
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className="mb-8"
             >
-              <div className="overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 via-indigo-500/5 to-emerald-500/10 p-6 sm:p-8">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20">
-                    <Sparkles className="h-6 w-6 text-emerald-400" />
+              <div className={`overflow-hidden rounded-2xl border p-6 sm:p-8 ${
+                diagnostic.healthScore < 40
+                  ? "border-red-500/20 bg-gradient-to-r from-red-500/10 via-red-900/5 to-red-500/10"
+                  : diagnostic.healthScore < 70
+                    ? "border-amber-500/20 bg-gradient-to-r from-amber-500/10 via-amber-900/5 to-amber-500/10"
+                    : "border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 via-emerald-900/5 to-emerald-500/10"
+              }`}>
+                <div className="flex flex-col items-center text-center sm:flex-row sm:items-start sm:text-left">
+                  <div className="mb-4 sm:mb-0 sm:mr-6">
+                    <div className={`flex h-20 w-20 items-center justify-center rounded-2xl ${
+                      diagnostic.healthScore < 40 ? "bg-red-500/20" : diagnostic.healthScore < 70 ? "bg-amber-500/20" : "bg-emerald-500/20"
+                    }`}>
+                      <span className={`text-3xl font-black ${
+                        diagnostic.healthScore < 40 ? "text-red-400" : diagnostic.healthScore < 70 ? "text-amber-400" : "text-emerald-400"
+                      }`}>
+                        {diagnostic.healthScore}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-center text-[10px] font-medium uppercase tracking-wider text-white/30">
+                      /100
+                    </p>
                   </div>
                   <div>
                     <h1 className="text-xl font-bold sm:text-2xl">
-                      Plan de Recuperación de Inversión
+                      Salud de tu cuenta: {" "}
+                      <span className={
+                        diagnostic.healthScore < 40 ? "text-red-400" : diagnostic.healthScore < 70 ? "text-amber-400" : "text-emerald-400"
+                      }>
+                        {diagnostic.healthScore < 40 ? "Necesita atención urgente" : diagnostic.healthScore < 70 ? "Puede mejorar" : "Buen estado"}
+                      </span>
                     </h1>
-                    <p className="text-sm text-white/50">
-                      {isUnlocked
-                        ? "Tu diagnóstico está listo. La IA está analizando tus campañas reales ahora mismo."
-                        : "Tu Estratega IA analiza tus campañas y te da acciones concretas para recuperar tu inversión."
-                      }
+                    <p className="mt-1 text-sm text-white/50">
+                      {diagnostic.totalCampaigns} campañas encontradas, {diagnostic.activeCampaigns} activas
                     </p>
                   </div>
                 </div>
               </div>
             </motion.section>
 
-            {/* Meta Token Check */}
-            {loadingTokens ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
-                <span className="ml-3 text-sm text-white/50">Cargando credenciales de Meta Ads...</span>
+            {/* Severity Cards */}
+            <motion.section
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="mb-8"
+            >
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/40">
+                <Target size={14} /> Hallazgos del diagnóstico
+              </h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {diagnostic.findings.map((f, i) => {
+                  const cfg = SEVERITY_CONFIG[f.severity];
+                  const Icon = cfg.icon;
+                  return (
+                    <motion.div
+                      key={f.type}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + i * 0.1 }}
+                      className={`overflow-hidden rounded-xl border p-5 ${cfg.bg}`}
+                    >
+                      <div className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${cfg.color} bg-white/5`}>
+                        <Icon size={10} />
+                        {cfg.label}
+                      </div>
+                      <h3 className="mb-2 text-base font-bold leading-tight">{f.title}</h3>
+                      <p className="text-xs leading-relaxed text-white/50">{f.description}</p>
+                    </motion.div>
+                  );
+                })}
               </div>
-            ) : hasMetaToken ? (
-              /* ── AI Chat Panel ───────────────────────────────── */
+            </motion.section>
+
+            {/* KPI Severity Bars */}
+            <motion.section
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="mb-8"
+            >
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/40">
+                <BarChart3 size={14} /> Métricas clave
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {(["ctr", "cpc", "cpm"] as const).map((metric) => {
+                  const sev = diagnostic.severities[metric];
+                  const cfg = SEVERITY_CONFIG[sev];
+                  const Icon = cfg.icon;
+                  const labels = { ctr: "CTR (Tasa de clics)", cpc: "CPC (Costo por clic)", cpm: "CPM (Costo por 1k impresiones)" };
+                  return (
+                    <div key={metric} className={`rounded-xl border p-4 ${cfg.bg}`}>
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-xs font-medium text-white/50">{labels[metric]}</span>
+                        <Icon size={14} className={cfg.color} />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isActive ? (
+                          <span className={`text-lg font-bold ${cfg.color}`}>{cfg.label}</span>
+                        ) : (
+                          <>
+                            <span className="text-lg font-bold text-white/20 blur-sm select-none">$0.00</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${cfg.color} bg-white/5`}>
+                              {cfg.label}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.section>
+
+            {/* Campaign Table */}
+            <motion.section
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7 }}
+              className="mb-10"
+            >
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/40">
+                <Megaphone size={14} /> Campañas ({diagnostic.totalCampaigns})
+              </h2>
+
+              <PaywallOverlay locked={!isActive} featureName="Desbloquea métricas detalladas de cada campaña" sitioId={sitioId}>
+                <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+                  <div className="grid grid-cols-3 gap-4 border-b border-white/10 px-6 py-3 text-xs font-semibold uppercase tracking-wider text-white/30">
+                    <span>Campaña</span>
+                    <span>Estado</span>
+                    <span>Objetivo</span>
+                  </div>
+                  {diagnostic.campaigns.slice(0, 8).map((c, i) => (
+                    <div key={i} className={`grid grid-cols-3 gap-4 px-6 py-3.5 text-sm ${
+                      i < Math.min(diagnostic.campaigns.length, 8) - 1 ? "border-b border-white/5" : ""
+                    }`}>
+                      <span className="font-medium text-white truncate">{c.name}</span>
+                      <span>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          c.status === "ACTIVE" || c.status === "ENABLE" || c.status === "CAMPAIGN_STATUS_ENABLE"
+                            ? "bg-emerald-500/10 text-emerald-400"
+                            : "bg-white/5 text-white/40"
+                        }`}>
+                          {c.status === "ACTIVE" || c.status === "ENABLE" || c.status === "CAMPAIGN_STATUS_ENABLE" ? "Activa" : "Pausada"}
+                        </span>
+                      </span>
+                      <span className="text-white/40 truncate text-xs">{c.objective}</span>
+                    </div>
+                  ))}
+                  {diagnostic.campaigns.length > 8 && (
+                    <div className="border-t border-white/5 px-6 py-3 text-center text-xs text-white/30">
+                      + {diagnostic.campaigns.length - 8} campañas más
+                    </div>
+                  )}
+                </div>
+              </PaywallOverlay>
+            </motion.section>
+
+            {/* ── Post-payment: AI Chat ─────────────────────────── */}
+            {isActive && platform && (
               <motion.section
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
+                transition={{ delay: 0.9 }}
+                className="mb-10"
               >
                 <MetaAIChatPanel
                   user={user!}
-                  metaToken={metaToken}
-                  adAccountId={metaAdAccountId}
-                  context={POST_PAYMENT_CONTEXT}
+                  apiEndpoint={platform === "meta" ? "/api/meta-ads/ai" : "/api/tiktok-ads/ai"}
+                  credentialPayload={
+                    platform === "meta"
+                      ? { metaToken: metaToken || credInput1, adAccountId: metaAccountId || credInput2 }
+                      : { tiktokToken: tiktokToken || credInput1, advertiserId: tiktokAdvertiserId || credInput2 }
+                  }
+                  context={platform === "meta" ? POST_PAYMENT_CONTEXT_META : POST_PAYMENT_CONTEXT_TIKTOK}
                   autoMessage={AUTO_MESSAGE}
                   darkMode={true}
                   emptyStateTitle="Estratega IA de Optimización"
                   emptyStateDesc="Analizo tus campañas y ejecuto optimizaciones en tiempo real."
-                  examplePrompts={UNLOCKED_EXAMPLE_PROMPTS}
+                  examplePrompts={[
+                    "Pausa las campañas con peor rendimiento",
+                    "Crea nuevos anuncios optimizados con IA",
+                    "¿Cuánto estoy gastando sin conversiones?",
+                    "Genera un reporte completo",
+                  ]}
                 />
               </motion.section>
-            ) : (
-              /* ── Connect Meta Ads Prompt ──────────────────── */
+            )}
+
+            {/* ── Pre-payment: CTA ─────────────────────────────── */}
+            {!isActive && (
               <motion.section
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
+                transition={{ delay: 1.0 }}
               >
-                <div className="overflow-hidden rounded-2xl border border-amber-500/20 bg-amber-500/5 p-8 sm:p-10">
+                <div className="overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent p-6 sm:p-8">
                   <div className="flex flex-col items-center text-center">
-                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10">
-                      <Plug className="h-8 w-8 text-amber-400" />
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-500/10">
+                      <Zap className="h-6 w-6 text-indigo-400" />
                     </div>
-
-                    <h2 className="mb-2 text-xl font-bold">
-                      Conecta tu cuenta de Meta Ads
-                    </h2>
-                    <p className="mb-6 max-w-md text-sm leading-relaxed text-white/50">
-                      Para analizar tus campañas reales y darte un plan de recuperación personalizado,
-                      necesitamos acceso a tu cuenta de Meta Ads. Solo toma 2 minutos.
+                    <h3 className="mb-2 text-lg font-bold sm:text-xl">
+                      Desbloquea el plan de optimización completo
+                    </h3>
+                    <p className="mb-6 max-w-lg text-sm leading-relaxed text-white/50">
+                      Accede a las métricas exactas, recomendaciones personalizadas y deja que nuestra IA optimice tus campañas automáticamente.
                     </p>
-
-                    <Link
-                      href="/dashboard/marketing"
-                      className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-4 text-base font-bold text-white shadow-xl shadow-amber-500/20 transition-all hover:scale-105 hover:shadow-amber-500/40"
+                    <button
+                      onClick={handleCheckout}
+                      disabled={checkingOut || !sitioId}
+                      className="group mb-4 flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-8 py-4 text-base font-bold text-white shadow-xl shadow-indigo-500/20 transition-all hover:scale-105 disabled:opacity-50"
                     >
-                      <Plug className="h-5 w-5" />
-                      Conectar Meta Ads
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                    </Link>
-
-                    <div className="mt-6 flex flex-col gap-2 text-xs text-white/30">
-                      <p>Necesitarás tu Access Token y Ad Account ID de Meta Business Suite.</p>
-                      <a
-                        href="https://business.facebook.com/settings"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300"
-                      >
-                        <ExternalLink size={10} /> Ir a Meta Business Suite
-                      </a>
+                      {checkingOut ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
+                      {checkingOut ? "Redirigiendo a pago..." : "Activar plan desde $299/mes"}
+                      {!checkingOut && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />}
+                    </button>
+                    <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-white/30">
+                      <span className="flex items-center gap-1"><Lock size={10} /> Pago seguro</span>
+                      <span className="flex items-center gap-1"><Eye size={10} /> Cancela cuando quieras</span>
+                      <span className="flex items-center gap-1"><Zap size={10} /> Activación inmediata</span>
                     </div>
                   </div>
                 </div>
               </motion.section>
             )}
-          </>
-        ) : (
-          /* ════════════════════════════════════════════════════════
-             PAYWALL MODE (not active)
-             ════════════════════════════════════════════════════════ */
-          <>
-            {/* Scanning Banner */}
-            <AnimatePresence mode="wait">
-              {scanning ? (
-                <motion.section
-                  key="scanning"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="mb-8"
-                >
-                  <div className="overflow-hidden rounded-2xl border border-amber-500/20 bg-gradient-to-r from-amber-500/10 via-red-500/10 to-amber-500/10 p-6 sm:p-8">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="relative flex h-10 w-10 items-center justify-center">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-30" />
-                        <ShieldAlert className="relative h-6 w-6 text-amber-400" />
-                      </div>
-                      <div>
-                        <h1 className="text-xl font-bold sm:text-2xl">
-                          Analizando salud de tu cuenta...
-                        </h1>
-                        <p className="text-sm text-white/50">
-                          Nuestra IA está escaneando tus campañas en busca de problemas
-                        </p>
-                      </div>
-                    </div>
 
-                    <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/5">
-                      <motion.div
-                        className="h-full rounded-full bg-gradient-to-r from-amber-500 via-red-500 to-amber-500"
-                        style={{ width: `${scanProgress}%` }}
-                        transition={{ duration: 0.3 }}
-                      />
-                    </div>
-                    <p className="mt-2 text-xs font-mono text-amber-300/70">
-                      {SCAN_PHASES[scanPhase]}
-                    </p>
-                  </div>
-                </motion.section>
-              ) : (
-                <motion.section
-                  key="done"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mb-8"
-                >
-                  <div className="overflow-hidden rounded-2xl border border-red-500/30 bg-gradient-to-r from-red-500/10 via-red-900/10 to-red-500/10 p-6 sm:p-8">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500/20">
-                        <AlertTriangle className="h-6 w-6 text-red-400" />
-                      </div>
-                      <div>
-                        <h1 className="text-xl font-bold sm:text-2xl">
-                          Se encontraron{" "}
-                          <span className="text-red-400">3 problemas críticos</span>
-                        </h1>
-                        <p className="text-sm text-white/50">
-                          Tu cuenta necesita atención inmediata para dejar de perder dinero
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </motion.section>
-              )}
-            </AnimatePresence>
-
-            {/* Critical Findings Cards */}
-            <AnimatePresence>
-              {!scanning && (
-                <motion.section
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                  className="mb-10"
-                >
-                  <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/40">
-                    <AlertTriangle size={14} />
-                    Hallazgos Críticos
-                  </h2>
-
-                  <div className="grid gap-4 md:grid-cols-3">
-                    {HALLAZGOS.map((h, i) => (
-                      <motion.div
-                        key={h.title}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 + i * 0.15 }}
-                        className={`group relative overflow-hidden rounded-xl border p-5 ${
-                          h.severity === "critical"
-                            ? "border-red-500/20 bg-red-500/5"
-                            : "border-amber-500/20 bg-amber-500/5"
-                        }`}
-                      >
-                        <div
-                          className={`mb-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                            h.severity === "critical"
-                              ? "bg-red-500/20 text-red-400"
-                              : "bg-amber-500/20 text-amber-400"
-                          }`}
-                        >
-                          <h.icon size={10} />
-                          {h.severity === "critical" ? "Crítico" : "Advertencia"}
-                        </div>
-
-                        <h3 className="mb-2 text-base font-bold leading-tight">
-                          {h.title}
-                        </h3>
-                        <p className="mb-4 text-xs leading-relaxed text-white/50">
-                          {h.description}
-                        </p>
-
-                        <div className="rounded-lg bg-white/5 p-3">
-                          <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-white/30">
-                            {h.label}
-                          </p>
-                          <div className="flex items-end gap-2">
-                            <span className="text-2xl font-black text-red-400">
-                              {h.metric}
-                            </span>
-                            <span className="mb-1 text-xs text-white/30">
-                              vs {h.benchmark}
-                            </span>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </motion.section>
-              )}
-            </AnimatePresence>
-
-            {/* Blurred Paywall Section */}
-            <AnimatePresence>
-              {!scanning && (
-                <motion.section
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.8 }}
-                  className="mb-10"
-                >
-                  <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-white/40">
-                    <BarChart3 size={14} />
-                    Campañas Específicas a Optimizar
-                  </h2>
-
-                  <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
-                    <div className="pointer-events-none select-none blur-[10px] opacity-50">
-                      <div className="grid grid-cols-4 gap-4 border-b border-white/10 px-6 py-3 text-xs font-semibold uppercase tracking-wider text-white/40">
-                        <span>Campaña</span>
-                        <span>Gasto</span>
-                        <span>ROI</span>
-                        <span>Estado</span>
-                      </div>
-                      {CAMPANAS_BLUR.map((c, i) => (
-                        <div
-                          key={i}
-                          className={`grid grid-cols-4 gap-4 px-6 py-4 text-sm ${
-                            i < CAMPANAS_BLUR.length - 1 ? "border-b border-white/5" : ""
-                          }`}
-                        >
-                          <span className="font-medium text-white">{c.nombre}</span>
-                          <span className="text-white/70">{c.gasto}</span>
-                          <span className={c.roi.startsWith("-") ? "text-red-400" : "text-emerald-400"}>
-                            {c.roi}
-                          </span>
-                          <span>
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                              c.estado === "Crítico"
-                                ? "bg-red-500/20 text-red-400"
-                                : c.estado === "Riesgo"
-                                  ? "bg-amber-500/20 text-amber-400"
-                                  : "bg-blue-500/20 text-blue-400"
-                            }`}>
-                              {c.estado === "Crítico" ? <XCircle size={10} /> : c.estado === "Riesgo" ? <AlertTriangle size={10} /> : <Clock size={10} />}
-                              {c.estado}
-                            </span>
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Unlock overlay */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#060918]/40 backdrop-blur-[1px]">
-                      <div className="flex flex-col items-center gap-4 px-6 text-center">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/25">
-                          <Lock className="h-7 w-7 text-white" />
-                        </div>
-
-                        <div>
-                          <h3 className="mb-1 text-lg font-bold">
-                            Desbloquea tu análisis completo
-                          </h3>
-                          <p className="text-sm text-white/50">
-                            Ve exactamente qué campañas están perdiendo dinero y cómo corregirlas
-                          </p>
-                        </div>
-
-                        <button
-                          onClick={handleCheckout}
-                          disabled={checkingOut || !sitioId}
-                          className="group mt-2 flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-8 py-4 text-base font-bold text-white shadow-xl shadow-indigo-500/20 transition-all hover:scale-105 hover:shadow-indigo-500/40 disabled:opacity-50 disabled:hover:scale-100"
-                        >
-                          {checkingOut ? (
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                          ) : (
-                            <Zap className="h-5 w-5" />
-                          )}
-                          {checkingOut
-                            ? "Redirigiendo a pago..."
-                            : "Desbloquear Análisis y Corregir Errores"}
-                          {!checkingOut && (
-                            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                          )}
-                        </button>
-
-                        <p className="max-w-md text-xs leading-relaxed text-white/40">
-                          Plan Starter &mdash; <span className="text-white/60 font-semibold">$299/mes</span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </motion.section>
-              )}
-            </AnimatePresence>
-
-            {/* Urgency / Social Proof */}
-            <AnimatePresence>
-              {!scanning && (
-                <motion.section
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 1.0 }}
-                >
-                  <div className="overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-purple-500/5 to-transparent p-6 sm:p-8">
-                    <div className="flex flex-col items-center text-center">
-                      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
-                        <CheckCircle className="h-6 w-6 text-emerald-400" />
-                      </div>
-
-                      <h3 className="mb-2 text-lg font-bold sm:text-xl">
-                        Cada día sin optimizar te cuesta dinero
-                      </h3>
-                      <p className="mb-6 max-w-lg text-sm leading-relaxed text-white/50">
-                        Basado en tu diagnóstico, estimamos que puedes{" "}
-                        <span className="font-semibold text-emerald-400">
-                          recuperar hasta $4,320 MXN/mes
-                        </span>{" "}
-                        en gasto desperdiciado al corregir estos problemas.
-                      </p>
-
-                      <button
-                        onClick={handleCheckout}
-                        disabled={checkingOut || !sitioId}
-                        className="group mb-4 flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 px-8 py-4 text-base font-bold text-white shadow-xl shadow-emerald-500/20 transition-all hover:scale-105 hover:shadow-emerald-500/40 disabled:opacity-50 disabled:hover:scale-100"
-                      >
-                        {checkingOut ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <Zap className="h-5 w-5" />
-                        )}
-                        {checkingOut ? "Procesando..." : "Empezar a Recuperar Mi Inversión"}
-                        {!checkingOut && (
-                          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                        )}
-                      </button>
-
-                      <p className="text-xs text-amber-400/80 font-medium">
-                        Oferta de lanzamiento: 50% de descuento en tu primer mes. Recupera tu inversión hoy mismo.
-                      </p>
-
-                      <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-white/30">
-                        <span className="flex items-center gap-1">
-                          <Lock size={10} /> Pago seguro con Stripe
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Eye size={10} /> Cancela cuando quieras
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Zap size={10} /> Activación inmediata
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.section>
-              )}
-            </AnimatePresence>
-          </>
+            {/* Back to platform selector */}
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => { setPhase("select-platform"); setPlatform(null); setDiagnostic(null); }}
+                className="text-xs text-white/30 hover:text-white/60"
+              >
+                Analizar otra plataforma
+              </button>
+            </div>
+          </motion.div>
         )}
       </main>
     </div>

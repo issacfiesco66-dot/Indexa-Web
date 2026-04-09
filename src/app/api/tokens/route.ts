@@ -7,9 +7,9 @@ import { createRateLimiter } from "@/lib/rateLimit";
 const limiter = createRateLimiter({ windowMs: 60_000, max: 20 });
 
 // Fields that get encrypted at rest
-const ENCRYPTED_FIELDS = ["metaAccessToken", "nanoBananaApiKey"] as const;
+const ENCRYPTED_FIELDS = ["metaAccessToken", "nanoBananaApiKey", "tiktokAccessToken"] as const;
 // Fields stored in plaintext (not sensitive secrets)
-const PLAIN_FIELDS = ["metaAdAccountId", "metaPageId"] as const;
+const PLAIN_FIELDS = ["metaAdAccountId", "metaPageId", "tiktokAdvertiserId"] as const;
 const ALL_FIELDS = [...ENCRYPTED_FIELDS, ...PLAIN_FIELDS] as const;
 
 type TokenField = (typeof ALL_FIELDS)[number];

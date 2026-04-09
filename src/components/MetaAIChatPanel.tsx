@@ -12,8 +12,14 @@ interface ChatMessage {
 
 interface MetaAIChatPanelProps {
   user: User;
-  metaToken: string;
-  adAccountId: string;
+  /** Meta Ads token (legacy — prefer credentialPayload) */
+  metaToken?: string;
+  /** Meta Ad Account ID (legacy — prefer credentialPayload) */
+  adAccountId?: string;
+  /** API endpoint to call (default: /api/meta-ads/ai) */
+  apiEndpoint?: string;
+  /** Flexible credential payload sent in request body (for Meta or TikTok) */
+  credentialPayload?: Record<string, string>;
   /** Optional extra context appended to the system prompt server-side */
   context?: string;
   /** If provided, auto-sends this message on first mount */
@@ -33,6 +39,8 @@ export default function MetaAIChatPanel({
   user,
   metaToken,
   adAccountId,
+  apiEndpoint = "/api/meta-ads/ai",
+  credentialPayload,
   context,
   autoMessage,
   darkMode = false,
@@ -65,7 +73,9 @@ export default function MetaAIChatPanel({
 
       try {
         const authToken = await user.getIdToken();
-        const res = await fetch("/api/meta-ads/ai", {
+        // Build credentials: prefer credentialPayload, fallback to legacy metaToken/adAccountId
+        const creds = credentialPayload || { metaToken: metaToken || "", adAccountId: adAccountId || "" };
+        const res = await fetch(apiEndpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -74,8 +84,7 @@ export default function MetaAIChatPanel({
           body: JSON.stringify({
             message: userMsg,
             history,
-            metaToken,
-            adAccountId,
+            ...creds,
             ...(context ? { context } : {}),
           }),
         });
@@ -102,7 +111,7 @@ export default function MetaAIChatPanel({
         setLoading(false);
       }
     },
-    [user, metaToken, adAccountId, context, history, loading],
+    [user, metaToken, adAccountId, apiEndpoint, credentialPayload, context, history, loading],
   );
 
   // ── Auto-trigger first message ──────────────────────────────
