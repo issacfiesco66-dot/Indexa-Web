@@ -410,13 +410,9 @@ export default function AdminFacebookAdsPage() {
     setError("");
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({
-        metaToken: savedToken,
-        adAccountId: savedAccount,
-        action: "campaigns",
-      });
+      const params = new URLSearchParams({ action: "campaigns" });
       const res = await fetch(`/api/meta-ads?${params}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount },
       });
       const text = await res.text();
       let data;
@@ -439,14 +435,9 @@ export default function AdminFacebookAdsPage() {
     if (!user || !savedToken || !savedAccount) return;
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({
-        metaToken: savedToken,
-        adAccountId: savedAccount,
-        action: "account_insights",
-        datePreset,
-      });
+      const params = new URLSearchParams({ action: "account_insights", datePreset });
       const res = await fetch(`/api/meta-ads?${params}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount },
       });
       const data = await res.json();
       if (!data.error && data.data?.[0]) {
@@ -462,15 +453,9 @@ export default function AdminFacebookAdsPage() {
     if (!user || !savedToken || !savedAccount) return;
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({
-        metaToken: savedToken,
-        adAccountId: savedAccount,
-        action: "insights",
-        campaignId,
-        datePreset,
-      });
+      const params = new URLSearchParams({ action: "insights", campaignId, datePreset });
       const res = await fetch(`/api/meta-ads?${params}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount },
       });
       const data = await res.json();
       if (!data.error && data.data?.[0]) {
@@ -673,8 +658,8 @@ export default function AdminFacebookAdsPage() {
     setLoadingAdSets(true);
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "all_adsets" });
-      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const params = new URLSearchParams({ action: "all_adsets" });
+      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount } });
       const data = await res.json();
       if (!data.error) setAdSets(data.data || []);
     } catch { /* non-critical */ } finally { setLoadingAdSets(false); }
@@ -686,8 +671,8 @@ export default function AdminFacebookAdsPage() {
     setLoadingAds(true);
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "ads" });
-      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const params = new URLSearchParams({ action: "ads" });
+      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount } });
       const data = await res.json();
       if (!data.error) setMetaAds(data.data || []);
     } catch { /* non-critical */ } finally { setLoadingAds(false); }
@@ -699,8 +684,8 @@ export default function AdminFacebookAdsPage() {
     setLoadingPages(true);
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "pages" });
-      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const params = new URLSearchParams({ action: "pages" });
+      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount } });
       const data = await res.json();
       if (!data.error) setPages(data.data || []);
     } catch { /* non-critical */ } finally { setLoadingPages(false); }
@@ -712,8 +697,8 @@ export default function AdminFacebookAdsPage() {
     setLoadingLeadForms(true);
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "lead_forms", pageId: savedPageId });
-      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const params = new URLSearchParams({ action: "lead_forms", pageId: savedPageId });
+      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount } });
       const data = await res.json();
       if (!data.error) setLeadForms(data.data || []);
     } catch { /* non-critical */ } finally { setLoadingLeadForms(false); }
@@ -726,8 +711,8 @@ export default function AdminFacebookAdsPage() {
     setSelectedFormId(formId);
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "leads", formId });
-      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const params = new URLSearchParams({ action: "leads", formId });
+      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount } });
       const data = await res.json();
       if (!data.error) setLeads(data.data || []);
     } catch { /* non-critical */ } finally { setLoadingLeads(false); }
@@ -739,8 +724,8 @@ export default function AdminFacebookAdsPage() {
     setLoadingCatalogs(true);
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({ metaToken: savedToken, adAccountId: savedAccount, action: "catalogs", businessId: businessId.trim() });
-      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}` } });
+      const params = new URLSearchParams({ action: "catalogs", businessId: businessId.trim() });
+      const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount } });
       const data = await res.json();
       if (!data.error) setCatalogs(data.data || []);
       else setError(data.error);
@@ -753,10 +738,10 @@ export default function AdminFacebookAdsPage() {
     setLoadingWA(true);
     try {
       const authToken = await user.getIdToken();
-      const base = { metaToken: savedToken, adAccountId: savedAccount, wabaId: wabaId.trim() };
+      const metaHeaders = { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount };
       const [phonesRes, templatesRes] = await Promise.all([
-        fetch(`/api/meta-ads?${new URLSearchParams({ ...base, action: "whatsapp_phone_numbers" })}`, { headers: { Authorization: `Bearer ${authToken}` } }),
-        fetch(`/api/meta-ads?${new URLSearchParams({ ...base, action: "whatsapp_templates" })}`, { headers: { Authorization: `Bearer ${authToken}` } }),
+        fetch(`/api/meta-ads?${new URLSearchParams({ action: "whatsapp_phone_numbers", wabaId: wabaId.trim() })}`, { headers: metaHeaders }),
+        fetch(`/api/meta-ads?${new URLSearchParams({ action: "whatsapp_templates", wabaId: wabaId.trim() })}`, { headers: metaHeaders }),
       ]);
       const phonesData = await phonesRes.json();
       const templatesData = await templatesRes.json();

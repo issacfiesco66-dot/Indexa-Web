@@ -246,13 +246,9 @@ export default function MarketingPage() {
     setError("");
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({
-        metaToken: savedToken,
-        adAccountId: savedAccount,
-        action: "campaigns",
-      });
+      const params = new URLSearchParams({ action: "campaigns" });
       const res = await fetch(`/api/meta-ads?${params}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount },
       });
       const text = await res.text();
       let data;
@@ -275,14 +271,9 @@ export default function MarketingPage() {
     if (!user || !savedToken || !savedAccount) return;
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({
-        metaToken: savedToken,
-        adAccountId: savedAccount,
-        action: "account_insights",
-        datePreset,
-      });
+      const params = new URLSearchParams({ action: "account_insights", datePreset });
       const res = await fetch(`/api/meta-ads?${params}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount },
       });
       const data = await res.json();
       if (!data.error && data.data?.[0]) {
@@ -298,15 +289,9 @@ export default function MarketingPage() {
     if (!user || !savedToken || !savedAccount) return;
     try {
       const authToken = await user.getIdToken();
-      const params = new URLSearchParams({
-        metaToken: savedToken,
-        adAccountId: savedAccount,
-        action: "insights",
-        campaignId,
-        datePreset,
-      });
+      const params = new URLSearchParams({ action: "insights", campaignId, datePreset });
       const res = await fetch(`/api/meta-ads?${params}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount },
       });
       const data = await res.json();
       if (!data.error && data.data?.[0]) {
