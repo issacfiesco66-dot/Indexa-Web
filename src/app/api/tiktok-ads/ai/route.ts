@@ -82,7 +82,7 @@ REGLAS PARA create_ad / batch_create_ads / generate_and_create_ads_batch:
 - SIEMPRE incluye display_name (nombre del negocio, máx 40 chars). OBLIGATORIO.
 - ad_name debe ser ÚNICO por anuncio.
 - CTA "Contactar" = "CONTACT_US" (no existe "CONTACT_NOW").
-- Imagen: 1024x1792 (vertical 9:16).
+- Imagen: 1024x1024 (cuadrado 1:1, compatible con TikTok).
 
 ═══ OPTIMIZACIÓN ═══
 "optimiza mi campaña" → list_campaigns → optimize_campaign.
@@ -645,13 +645,13 @@ async function executeTool(
         const imgPrompt = input.prompt as string;
         const imgStyle = (input.style as "vivid" | "natural") || "vivid";
 
-        const dallePrompt = `Imagen publicitaria profesional para TikTok Ads. ${imgPrompt}. Estilo: limpio, moderno, atractivo para redes sociales. NO incluir texto ni letras en la imagen. Formato vertical 9:16 optimizado para móvil.`;
+        const dallePrompt = `Imagen publicitaria profesional para TikTok Ads. ${imgPrompt}. Estilo: limpio, moderno, atractivo para redes sociales. NO incluir texto ni letras en la imagen. Formato cuadrado 1:1.`;
 
         const dalleRes = await openai.images.generate({
           model: "dall-e-3",
           prompt: dallePrompt,
           n: 1,
-          size: "1024x1792",
+          size: "1024x1024",
           style: imgStyle,
           response_format: "url",
         });
@@ -1031,10 +1031,10 @@ async function executeTool(
         const results = await Promise.allSettled(adsInput.map(async (ad, idx) => {
           const label = ad.ad_name || `Anuncio ${idx + 1}`;
 
-          // 2a. Generate image with DALL-E
-          const dallePrompt = `Imagen publicitaria profesional para TikTok Ads. ${ad.image_prompt}. Estilo: limpio, moderno, atractivo para redes sociales. NO incluir texto ni letras. Formato vertical 9:16 optimizado para móvil.`;
+          // 2a. Generate image with DALL-E (1024x1024 = 1:1, compatible con TikTok)
+          const dallePrompt = `Imagen publicitaria profesional para TikTok Ads. ${ad.image_prompt}. Estilo: limpio, moderno, atractivo para redes sociales. NO incluir texto ni letras. Formato cuadrado 1:1.`;
           const dalleRes = await openai.images.generate({
-            model: "dall-e-3", prompt: dallePrompt, n: 1, size: "1024x1792",
+            model: "dall-e-3", prompt: dallePrompt, n: 1, size: "1024x1024",
             style: "vivid", response_format: "url",
           });
           const imageUrl = dalleRes.data?.[0]?.url;
