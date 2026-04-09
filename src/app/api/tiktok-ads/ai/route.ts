@@ -58,10 +58,11 @@ Usa create_full_campaign. Crea TODO en una sola llamada: campaña + 3 ad groups 
 NO uses create_campaign_draft ni create_adgroup por separado. NO digas "ve a TikTok Ads Manager". HAZLO TÚ.
 
 Del mensaje del usuario extrae: Nicho, Geo-Targeting, KPI, Budget (default: $500 MXN).
-- Negocio local → LEAD_GENERATION o CONVERSIONS
+- Negocio local → TRAFFIC (NO uses LEAD_GENERATION, no funciona vía API)
 - Visitas web → TRAFFIC
 - Visibilidad → REACH o VIDEO_VIEWS
 - E-commerce → CONVERSIONS
+⚠️ NUNCA uses LEAD_GENERATION. TikTok requiere Instant Forms que no se pueden crear por API. Usa TRAFFIC como alternativa.
 
 Estructura 3 AG (Anti-Overlap):
 AG1 "Interest Stack": Intereses + edad segmentada
@@ -774,7 +775,12 @@ async function executeTool(
       case "create_full_campaign": {
         const bizName = input.business_name as string;
         const locationKw = input.location_keyword as string;
-        const objective = (input.objective as string) || "CONVERSIONS";
+        // Force TRAFFIC if LEAD_GENERATION is passed (Instant Forms can't be created via API)
+        let objective = (input.objective as string) || "TRAFFIC";
+        if (objective === "LEAD_GENERATION") {
+          objective = "TRAFFIC";
+          console.warn(`[create_full_campaign] LEAD_GENERATION → TRAFFIC (Instant Forms not available via API)`);
+        }
         const totalBudget = (input.daily_budget as number) || 500;
         const ageNarrow = (input.age_groups_narrow as string[]) || ["AGE_25_34", "AGE_35_44", "AGE_45_54"];
         const ageBroad = (input.age_groups_broad as string[]) || ["AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_100"];
