@@ -84,25 +84,26 @@ Ad 3 — "Urgencia/Oferta": Beneficio inmediato.
   CTA: SHOP_NOW o SIGN_UP
 
 Puedes generar imágenes publicitarias con IA usando generate_ad_image.
-La imagen generada se devuelve como URL para que el usuario la descargue y suba a Meta Ads Manager.
-SIEMPRE que crees una campaña, genera al menos 1 imagen y muestra la URL al usuario.
+Después de generar la imagen, usa upload_and_create_ad para subirla a Meta y crear el anuncio automáticamente.
+SIEMPRE que crees una campaña, genera al menos 1 imagen y crea el anuncio completo.
 
 ═══ FLUJO DE EJECUCIÓN ═══
 
 1. list_campaigns → verificar duplicados
-2. create_campaign_draft → campaña + ad set (PAUSADA)
-3. generate_ad_image → generar imagen publicitaria con IA
-4. Sugerir las 3 propuestas de copy (Hook-Body-CTA)
-5. Dar instrucciones para subir la imagen generada en Meta Ads Manager
-6. Confirmar resumen técnico completo
+2. create_campaign_draft → campaña + ad set (PAUSADA). Guarda el adSetId.
+3. generate_ad_image → generar imagen publicitaria con IA. Guarda la imageUrl.
+4. upload_and_create_ad → subir imagen a Meta + crear creative + crear anuncio. Necesitas: imageUrl, adSetId, pageId del usuario, texto del ad, headline, link destino.
+5. Sugerir las 3 propuestas de copy (Hook-Body-CTA)
+6. Confirmar resumen técnico con TODOS los IDs (campaign, adset, creative, ad)
 
 ═══ FORMATO DE RESPUESTA ═══
 
-Al crear, devuelve un resumen técnico:
+Al crear, devuelve un resumen técnico con TODOS los IDs:
 - Campaign ID + nombre + objetivo + presupuesto
-- Ad Set: ID + targeting aplicado (edad, ubicación, intereses)
+- Ad Set ID + targeting aplicado (edad, ubicación, intereses)
+- Creative ID + Ad ID + imagen usada
 - Propuestas de texto para anuncios
-- Estado: PAUSADA
+- Estado: PAUSADA (todo PAUSADO hasta que el usuario active)
 - Pasos siguientes claros
 
 Formato numérico: $1,234.56 para dinero, 2.5% para porcentajes.
@@ -276,42 +277,147 @@ async function executeTool(
         const campaignName = input.name as string;
         const objective = (input.objective as string) || "OUTCOME_TRAFFIC";
         const dailyBudgetMxn = input.daily_budget_mxn as number;
-        const ageMin = String(input.age_min || 18);
-        const ageMax = String(input.age_max || 65);
+        const ageMin = Number(input.age_min) || 18;
+        const ageMax = Number(input.age_max) || 65;
         const country = (input.country as string) || "MX";
         const budgetCents = String(Math.round(dailyBudgetMxn * 100));
 
-        const campaignData = await metaPost(`${META_GRAPH_URL}/${actId}/campaigns`, {
-          name: campaignName,
-          objective,
-          status: "PAUSED",
-          special_ad_categories: "[]",
-          access_token: metaToken,
+        // Create campaign using JSON body
+        const campRes = await fetch(`${META_GRAPH_URL}/${actId}/campaigns`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: campaignName,
+            objective,
+            status: "PAUSED",
+            special_ad_categories: [],
+            access_token: metaToken,
+          }),
         });
+        const campText = await campRes.text();
+        let campaignData: Record<string, unknown>;
+        try { campaignData = JSON.parse(campText); } catch { throw new Error(`Respuesta no-JSON de Meta al crear campaña: ${campText.slice(0, 200)}`); }
+        if (campaignData.error) {
+          const e = campaignData.error as { message?: string; error_user_msg?: string };
+          throw new Error(e.error_user_msg || e.message || "Error al crear campaña");
+        }
 
-        const targeting = JSON.stringify({
+        // Create ad set using JSON body with proper number types
+        const targeting = {
           age_min: ageMin,
           age_max: ageMax,
           geo_locations: { countries: [country] },
-        });
+        };
 
-        const adSetData = await metaPost(`${META_GRAPH_URL}/${actId}/adsets`, {
-          campaign_id: campaignData.id as string,
-          name: `${campaignName} - Ad Set`,
-          daily_budget: budgetCents,
-          billing_event: "IMPRESSIONS",
-          optimization_goal: "LINK_CLICKS",
-          targeting,
-          status: "PAUSED",
-          bid_strategy: "LOWEST_COST_WITHOUT_CAP",
-          access_token: metaToken,
+        const adSetRes = await fetch(`${META_GRAPH_URL}/${actId}/adsets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            campaign_id: campaignData.id as string,
+            name: `${campaignName} - Ad Set`,
+            daily_budget: budgetCents,
+            billing_event: "IMPRESSIONS",
+            optimization_goal: "LINK_CLICKS",
+            targeting,
+            status: "PAUSED",
+            bid_strategy: "LOWEST_COST_WITHOUT_CAP",
+            access_token: metaToken,
+          }),
         });
+        const adSetText = await adSetRes.text();
+        let adSetData: Record<string, unknown>;
+        try { adSetData = JSON.parse(adSetText); } catch { throw new Error(`Respuesta no-JSON de Meta al crear ad set: ${adSetText.slice(0, 200)}`); }
+        if (adSetData.error) {
+          const e = adSetData.error as { message?: string; error_user_msg?: string };
+          throw new Error(e.error_user_msg || e.message || "Error al crear ad set");
+        }
 
         return JSON.stringify({
           success: true,
           campaignId: campaignData.id,
           adSetId: adSetData.id,
-          note: `Borrador creado: "${campaignName}" (PAUSADA). ID campaña: ${campaignData.id}. Ahora ve a la pestaña Campañas → botón Nuevo anuncio para añadir la imagen y activarla.`,
+          note: `Campaña creada: "${campaignName}" (PAUSADA). Campaign ID: ${campaignData.id}, Ad Set ID: ${adSetData.id}. Usa upload_and_create_ad para subir imagen y crear el anuncio completo.`,
+        });
+      }
+
+      case "upload_and_create_ad": {
+        const imgUrl = input.image_url as string;
+        const adSetId = input.adset_id as string;
+        const pageId = input.page_id as string;
+        const adText = (input.ad_text as string) || "Visita nuestra página";
+        const adHeadline = (input.headline as string) || "Descubre más";
+        const adLink = (input.link as string) || "https://indexa.com.mx";
+        const ctaType = (input.cta_type as string) || "LEARN_MORE";
+        const adName = (input.ad_name as string) || "Anuncio IA";
+
+        // 1. Download image from DALL-E URL and convert to base64
+        const imgRes = await fetch(imgUrl);
+        if (!imgRes.ok) throw new Error(`No se pudo descargar la imagen (HTTP ${imgRes.status})`);
+        const imgBuffer = await imgRes.arrayBuffer();
+        const imgBase64 = Buffer.from(imgBuffer).toString("base64");
+
+        // 2. Upload image to Meta
+        const uploadData = await metaPost(`${META_GRAPH_URL}/${actId}/adimages`, {
+          bytes: imgBase64,
+          access_token: metaToken,
+        });
+        const imgHashes = uploadData.images;
+        const imgHash = imgHashes ? (Object.values(imgHashes)[0] as { hash: string })?.hash : null;
+        if (!imgHash) throw new Error("No se pudo subir la imagen a Meta.");
+
+        // 3. Create ad creative
+        const creativeRes = await fetch(`${META_GRAPH_URL}/${actId}/adcreatives`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: `${adName} - Creative`,
+            object_story_spec: {
+              page_id: pageId,
+              link_data: {
+                image_hash: imgHash,
+                message: adText,
+                link: adLink,
+                name: adHeadline,
+                call_to_action: { type: ctaType, value: { link: adLink } },
+              },
+            },
+            access_token: metaToken,
+          }),
+        });
+        const creativeText = await creativeRes.text();
+        let creativeData: Record<string, unknown>;
+        try { creativeData = JSON.parse(creativeText); } catch { throw new Error(`Respuesta no-JSON al crear creative: ${creativeText.slice(0, 200)}`); }
+        if (creativeData.error) {
+          const e = creativeData.error as { message?: string; error_user_msg?: string };
+          throw new Error(e.error_user_msg || e.message || "Error al crear creative");
+        }
+
+        // 4. Create ad
+        const adRes = await fetch(`${META_GRAPH_URL}/${actId}/ads`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: adName,
+            adset_id: adSetId,
+            creative: { creative_id: creativeData.id },
+            status: "PAUSED",
+            access_token: metaToken,
+          }),
+        });
+        const adText2 = await adRes.text();
+        let adData: Record<string, unknown>;
+        try { adData = JSON.parse(adText2); } catch { throw new Error(`Respuesta no-JSON al crear ad: ${adText2.slice(0, 200)}`); }
+        if (adData.error) {
+          const e = adData.error as { message?: string; error_user_msg?: string };
+          throw new Error(e.error_user_msg || e.message || "Error al crear anuncio");
+        }
+
+        return JSON.stringify({
+          success: true,
+          adId: adData.id,
+          creativeId: creativeData.id,
+          imageHash: imgHash,
+          note: `Anuncio creado exitosamente. Ad ID: ${adData.id}, Creative ID: ${creativeData.id}. El anuncio está PAUSADO — actívalo cuando estés listo.`,
         });
       }
 
@@ -477,8 +583,30 @@ export async function POST(request: NextRequest) {
         },
       },
       {
+        name: "upload_and_create_ad",
+        description: "Sube una imagen (desde URL de DALL-E) a Meta, crea el creative y el anuncio completo dentro de un ad set existente. Usa esto DESPUÉS de create_campaign_draft y generate_ad_image.",
+        input_schema: {
+          type: "object",
+          properties: {
+            image_url: { type: "string", description: "URL de la imagen generada por DALL-E" },
+            adset_id: { type: "string", description: "ID del ad set donde crear el anuncio" },
+            page_id: { type: "string", description: "ID de la página de Facebook" },
+            ad_text: { type: "string", description: "Texto principal del anuncio" },
+            headline: { type: "string", description: "Título del anuncio" },
+            link: { type: "string", description: "URL de destino del anuncio" },
+            cta_type: {
+              type: "string",
+              enum: ["LEARN_MORE", "SHOP_NOW", "SIGN_UP", "CONTACT_US", "GET_QUOTE", "BOOK_TRAVEL", "SUBSCRIBE", "APPLY_NOW"],
+              description: "Tipo de CTA (default: LEARN_MORE)",
+            },
+            ad_name: { type: "string", description: "Nombre del anuncio" },
+          },
+          required: ["image_url", "adset_id", "page_id", "ad_text", "headline", "link"],
+        },
+      },
+      {
         name: "generate_ad_image",
-        description: "Genera una imagen publicitaria con IA (DALL-E) basada en una descripción del negocio/producto. Devuelve una URL temporal para que el usuario la descargue y suba a Meta Ads Manager.",
+        description: "Genera una imagen publicitaria con IA (DALL-E). Después usa upload_and_create_ad para subir la imagen a Meta y crear el anuncio.",
         input_schema: {
           type: "object",
           properties: {
