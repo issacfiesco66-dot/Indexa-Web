@@ -19,71 +19,21 @@ const GROQ_MODEL = "llama-3.3-70b-versatile";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
-const SYSTEM_PROMPT = `Eres un Senior Media Buyer especializado en Meta Ads (Facebook e Instagram). SIEMPRE responde en español.
+const SYSTEM_PROMPT = `Eres un Media Buyer de Meta Ads. Responde en español. Sé breve y directo.
 
-═══ REGLAS CRÍTICAS DE HERRAMIENTAS ═══
+REGLAS:
+- Llama UNA herramienta a la vez. Espera el resultado antes de llamar otra.
+- USA los datos EXACTOS que devuelve cada herramienta (IDs, URLs). NUNCA inventes datos.
+- Si una herramienta falla, reporta el error exacto. No finjas éxito.
+- Presupuesto en MXN. Mínimo $70 MXN/día. Estado: SIEMPRE PAUSED.
+- Naming: [PAÍS]_[OBJETIVO]_[NEGOCIO]_[MES_AÑO]
 
-REGLA ABSOLUTA — HERRAMIENTAS SECUENCIALES:
-Las herramientas DEBEN llamarse UNA A LA VEZ en orden estricto. NUNCA llames múltiples herramientas en la misma respuesta.
-Cada herramienta devuelve datos reales (IDs, URLs) que NECESITAS para la siguiente.
+CUANDO EL USUARIO PIDA CREAR UNA CAMPAÑA:
+1. Llama create_campaign_draft con los datos. Muestra los IDs reales del resultado.
+2. SOLO si el usuario pide imagen/anuncio completo, usa generate_ad_image y luego upload_and_create_ad.
+3. NO generes imagen automáticamente. Solo crea campaña + ad set.
 
-REGLA ABSOLUTA — USA DATOS REALES:
-NUNCA inventes, supongas ni uses placeholders para IDs, URLs o datos.
-Siempre usa los valores EXACTOS que devuelve cada herramienta.
-Si una herramienta devuelve campaignId: "120212345678", USA ese valor exacto.
-Si no tienes un dato real, PREGUNTA al usuario. No lo inventes.
-
-REGLA ABSOLUTA — REPORTA ERRORES:
-Si una herramienta falla o devuelve error, REPORTA el error exacto al usuario.
-NUNCA digas que algo se creó exitosamente si la herramienta devolvió un error.
-
-═══ GUARDRAILS TÉCNICOS ═══
-
-REGLA #1 — ANTES DE CREAR:
-Usa list_campaigns para verificar que no exista una campaña similar.
-
-REGLA #2 — UNA SOLA CAMPAÑA POR PETICIÓN.
-
-REGLA #3 — PRESUPUESTO:
-Meta usa la moneda de la cuenta (generalmente MXN para cuentas mexicanas).
-Mínimo diario: ~$70 MXN/día. Si el usuario no especifica, pregunta.
-Si dice pesos sin especificar, asume MXN.
-
-REGLA #4 — HAZLO TÚ:
-Ejecuta todo lo que puedas con las herramientas.
-
-═══ FLUJO DE EJECUCIÓN (PASO A PASO, UNO A LA VEZ) ═══
-
-Paso 1: Llama create_campaign_draft → recibirás campaignId y adSetId REALES.
-Paso 2: Llama generate_ad_image → recibirás una imageUrl REAL.
-Paso 3: Llama upload_and_create_ad con los datos REALES de pasos 1 y 2:
-  - adset_id = el adSetId REAL del paso 1
-  - image_url = la imageUrl REAL del paso 2
-  - page_id = el pageId que te dio el usuario
-Paso 4: Muestra resumen con todos los IDs REALES.
-
-IMPORTANTE: Necesitas el page_id del usuario ANTES de empezar. Si no lo tienes, pregúntalo primero.
-
-═══ NAMING CONVENTION ═══
-[PAÍS]_[OBJETIVO]_[NOMBRE_NEGOCIO]_[MES_AÑO]
-Ejemplo: MX_LEADS_MiNegocio_Abr2026
-
-═══ OBJETIVOS ═══
-- Ventas/leads → OUTCOME_LEADS o OUTCOME_SALES
-- Visitas web → OUTCOME_TRAFFIC
-- Visibilidad → OUTCOME_AWARENESS
-- Interacción → OUTCOME_ENGAGEMENT
-
-Estado: SIEMPRE PAUSED.
-
-═══ FORMATO DE RESPUESTA ═══
-Al crear, devuelve resumen con IDs REALES (no inventados):
-- Campaign ID real + nombre + objetivo + presupuesto
-- Ad Set ID real + targeting
-- Creative ID real + Ad ID real
-- Estado: PAUSADA
-
-Formato numérico: $1,234.56 para dinero, 2.5% para porcentajes.`;
+OBJETIVOS: OUTCOME_TRAFFIC, OUTCOME_AWARENESS, OUTCOME_LEADS, OUTCOME_ENGAGEMENT, OUTCOME_SALES`;
 
 // ── Meta helpers ────────────────────────────────────────────────────
 async function metaGet(url: string): Promise<Record<string, unknown>> {
@@ -649,8 +599,8 @@ export async function POST(request: NextRequest) {
       return true;
     }
 
-    // Agentic loop — up to 8 rounds with time budget
-    for (let round = 0; round < 8; round++) {
+    // Agentic loop — up to 4 rounds with time budget
+    for (let round = 0; round < 4; round++) {
       const elapsed = Date.now() - startTime;
       if (elapsed > DEADLINE_MS) break;
 
@@ -658,22 +608,36 @@ export async function POST(request: NextRequest) {
 
       if (currentProvider.format === "openai") {
         // ── OpenAI-compatible path (Gemini / Groq) ──────────────
-        const aiRes = await fetch(currentProvider.url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${currentProvider.key}` },
-          body: JSON.stringify({
-            model: currentProvider.model,
-            max_tokens: 1536,
-            tools: toGroqTools(tools),
-            tool_choice: "auto",
-            parallel_tool_calls: false,
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              ...toGroqMessages(aiMessages as AnthropicMsg[]),
-            ],
-          }),
-        });
-        const aiText = await aiRes.text();
+        const aiController = new AbortController();
+        const aiTimeout = setTimeout(() => aiController.abort(), 20_000);
+        let aiRes: Response;
+        let aiText: string;
+        try {
+          aiRes = await fetch(currentProvider.url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${currentProvider.key}` },
+            signal: aiController.signal,
+            body: JSON.stringify({
+              model: currentProvider.model,
+              max_tokens: 1536,
+              tools: toGroqTools(tools),
+              tool_choice: "auto",
+              parallel_tool_calls: false,
+              messages: [
+                { role: "system", content: SYSTEM_PROMPT },
+                ...toGroqMessages(aiMessages as AnthropicMsg[]),
+              ],
+            }),
+          });
+          aiText = await aiRes.text();
+        } catch (fetchErr) {
+          clearTimeout(aiTimeout);
+          // Timeout or network error — try next provider
+          if (switchToNextProvider(`${currentProvider.name} timeout/network error`)) { round--; continue; }
+          return NextResponse.json({ error: `${currentProvider.name} no respondió a tiempo.` }, { status: 504 });
+        } finally {
+          clearTimeout(aiTimeout);
+        }
 
         if (!aiRes.ok) {
           let errMsg = "";
@@ -720,22 +684,35 @@ export async function POST(request: NextRequest) {
 
       } else {
         // ── Anthropic path (Claude) ─────────────────────────────
-        const claudeRes = await fetch(ANTHROPIC_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": currentProvider.key,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: CLAUDE_MODEL,
-            max_tokens: 1536,
-            system: SYSTEM_PROMPT,
-            tools,
-            messages: aiMessages,
-          }),
-        });
-        const claudeText = await claudeRes.text();
+        const claudeController = new AbortController();
+        const claudeTimeout = setTimeout(() => claudeController.abort(), 20_000);
+        let claudeRes: Response;
+        let claudeText: string;
+        try {
+          claudeRes = await fetch(ANTHROPIC_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": currentProvider.key,
+              "anthropic-version": "2023-06-01",
+            },
+            signal: claudeController.signal,
+            body: JSON.stringify({
+              model: CLAUDE_MODEL,
+              max_tokens: 1536,
+              system: SYSTEM_PROMPT,
+              tools,
+              messages: aiMessages,
+            }),
+          });
+          claudeText = await claudeRes.text();
+        } catch (fetchErr) {
+          clearTimeout(claudeTimeout);
+          if (switchToNextProvider("Claude timeout/network error")) { round--; continue; }
+          return NextResponse.json({ error: "Claude no respondió a tiempo." }, { status: 504 });
+        } finally {
+          clearTimeout(claudeTimeout);
+        }
 
         if (!claudeRes.ok) {
           if (isBillingError(claudeRes.status, claudeText)) {
