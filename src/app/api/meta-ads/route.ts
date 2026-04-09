@@ -169,18 +169,21 @@ export async function GET(request: NextRequest) {
       let parsed;
       try { parsed = JSON.parse(text); } catch { parsed = null; }
       const metaMsg = parsed?.error?.message || text.slice(0, 300);
+      // Non-critical endpoints return 200 with error in body (avoids noisy 400 in browser console)
+      const softFail = ["lead_forms", "catalogs", "catalog_products", "whatsapp_business", "whatsapp_templates"].includes(action);
       return NextResponse.json(
-        { error: metaMsg, code: parsed?.error?.code, metaStatus: res.status },
-        { status: 400 }
+        { error: metaMsg, code: parsed?.error?.code, metaStatus: res.status, data: [] },
+        { status: softFail ? 200 : 400 }
       );
     }
 
     const data = await res.json();
 
     if (data.error) {
+      const softFail = ["lead_forms", "catalogs", "catalog_products", "whatsapp_business", "whatsapp_templates"].includes(action);
       return NextResponse.json(
-        { error: data.error.message || "Error de Meta API.", code: data.error.code },
-        { status: 400 }
+        { error: data.error.message || "Error de Meta API.", code: data.error.code, data: [] },
+        { status: softFail ? 200 : 400 }
       );
     }
 

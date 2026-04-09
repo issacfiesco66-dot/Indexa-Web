@@ -278,6 +278,7 @@ export default function AdminFacebookAdsPage() {
   // Leads
   const [leadForms, setLeadForms] = useState<LeadForm[]>([]);
   const [loadingLeadForms, setLoadingLeadForms] = useState(false);
+  const [leadFormsError, setLeadFormsError] = useState<string | null>(null);
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null);
   const [leads, setLeads] = useState<LeadEntry[]>([]);
   const [loadingLeads, setLoadingLeads] = useState(false);
@@ -642,6 +643,7 @@ export default function AdminFacebookAdsPage() {
       setMetaAds([]);
       setPages([]);
       setLeadForms([]);
+      setLeadFormsError(null);
       setLeads([]);
       setCatalogs([]);
       setWaPhones([]);
@@ -695,13 +697,22 @@ export default function AdminFacebookAdsPage() {
   const fetchLeadForms = useCallback(async () => {
     if (!user || !savedToken || !savedAccount || !savedPageId) return;
     setLoadingLeadForms(true);
+    setLeadFormsError(null);
     try {
       const authToken = await user.getIdToken();
       const params = new URLSearchParams({ action: "lead_forms", pageId: savedPageId });
       const res = await fetch(`/api/meta-ads?${params}`, { headers: { Authorization: `Bearer ${authToken}`, "x-meta-token": savedToken, "x-meta-account-id": savedAccount } });
       const data = await res.json();
-      if (!data.error) setLeadForms(data.data || []);
-    } catch { /* non-critical */ } finally { setLoadingLeadForms(false); }
+      if (data.error) {
+        const msg = typeof data.error === "string" ? data.error : data.error?.message || "Error al obtener formularios";
+        setLeadFormsError(msg.includes("leads_retrieval") || msg.includes("permission")
+          ? "Tu token no tiene permiso de leads_retrieval. Genera un nuevo token con ese permiso."
+          : msg.includes("Unsupported") ? "Esta página no soporta formularios de leads."
+          : msg);
+      } else {
+        setLeadForms(data.data || []);
+      }
+    } catch { setLeadFormsError("Error de conexión al consultar formularios de leads."); } finally { setLoadingLeadForms(false); }
   }, [user, savedToken, savedAccount, savedPageId]);
 
   // ── Fetch leads for a form ──────────────────────────────────
@@ -1327,6 +1338,11 @@ export default function AdminFacebookAdsPage() {
 
               {loadingLeadForms ? (
                 <div className="flex h-40 items-center justify-center rounded-2xl border border-gray-200 bg-white"><Loader2 className="h-6 w-6 animate-spin text-indexa-blue" /></div>
+              ) : leadFormsError ? (
+                <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-amber-200 bg-amber-50 text-center px-6">
+                  <Users size={32} className="text-amber-400" />
+                  <p className="mt-3 text-sm text-amber-700">{leadFormsError}</p>
+                </div>
               ) : leadForms.length === 0 ? (
                 <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white text-center">
                   <Users size={32} className="text-gray-300" />
