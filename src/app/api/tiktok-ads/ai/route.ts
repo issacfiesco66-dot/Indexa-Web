@@ -27,7 +27,7 @@ import {
   type TikTokReportRow,
 } from "@/lib/tiktokAdsClient";
 
-export const maxDuration = 120;
+export const maxDuration = 300; // Vercel Pro: hasta 300s para flujos de creación de anuncios
 
 const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
@@ -72,17 +72,17 @@ Todos: placement TikTok, bid Lowest Cost, estado PAUSADO.
 Naming: MX_[OBJETIVO]_[Negocio]_[Mes][Año]
 
 ═══ CREATIVOS Y ANUNCIOS ═══
-Después de crear campaña, NO llames generate_ad_image en la misma petición (causa timeout).
-Responde con: resumen campaña + 3 ángulos Hook-Body-CTA + pregunta si generar imágenes.
+Para crear MÚLTIPLES anuncios con imágenes, usa generate_and_create_ads_batch.
+Esta herramienta genera imágenes + sube + crea anuncios TODO EN PARALELO (1 sola llamada).
+NO uses generate_ad_image + create_ad por separado cuando sean múltiples anuncios.
 
-REGLAS PARA create_ad / batch_create_ads:
-- SIEMPRE incluye identity_id (obtenerlo dinámicamente con getOrCreateIdentity si no se proporciona).
-- SIEMPRE incluye display_name (nombre del negocio, máx 40 chars). OBLIGATORIO en v1.3.
-- SIEMPRE incluye image_id o video_id. ad_format se auto-detecta (SINGLE_IMAGE/SINGLE_VIDEO).
+Para UN solo anuncio: generate_ad_image → create_ad (2 llamadas).
+
+REGLAS PARA create_ad / batch_create_ads / generate_and_create_ads_batch:
+- SIEMPRE incluye display_name (nombre del negocio, máx 40 chars). OBLIGATORIO.
 - ad_name debe ser ÚNICO por anuncio.
 - CTA "Contactar" = "CONTACT_US" (no existe "CONTACT_NOW").
 - Imagen: 1024x1792 (vertical 9:16).
-- Usa MÁXIMO 1 herramienta por petición. NUNCA encadenes create_full_campaign + generate_ad_image + create_ad.
 
 ═══ OPTIMIZACIÓN ═══
 "optimiza mi campaña" → list_campaigns → optimize_campaign.
@@ -453,6 +453,33 @@ const tools = [
         },
       },
       required: ["campaign_id", "display_name", "ads"],
+    },
+  },
+  {
+    name: "generate_and_create_ads_batch",
+    description: "GENERA imágenes con DALL-E + SUBE a TikTok + CREA anuncios — todo EN PARALELO en una sola llamada. Mucho más rápido que hacer generate_ad_image + create_ad uno por uno. Usa esta herramienta cuando necesites crear múltiples anuncios con imágenes.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        display_name: { type: "string", description: "Nombre del negocio (aparece en el anuncio)" },
+        landing_page_url: { type: "string", description: "URL de destino para todos los anuncios" },
+        call_to_action: { type: "string", description: "CTA: LEARN_MORE, CONTACT_US, SHOP_NOW, etc." },
+        ads: {
+          type: "array",
+          description: "Array de anuncios a crear (máximo 5)",
+          items: {
+            type: "object",
+            properties: {
+              adgroup_id: { type: "string", description: "ID del ad group" },
+              ad_name: { type: "string", description: "Nombre único del anuncio" },
+              ad_text: { type: "string", description: "Texto del anuncio" },
+              image_prompt: { type: "string", description: "Descripción de la imagen: negocio, producto, estilo visual" },
+            },
+            required: ["adgroup_id", "ad_name", "ad_text", "image_prompt"],
+          },
+        },
+      },
+      required: ["display_name", "ads"],
     },
   },
   {
@@ -968,6 +995,91 @@ async function executeTool(
         });
       }
 
+      case "generate_and_create_ads_batch": {
+        const openaiKey = process.env.OPENAI_API_KEY;
+        if (!openaiKey) return JSON.stringify({ success: false, error: "OPENAI_API_KEY no configurada." });
+
+        const displayName = input.display_name as string;
+        const landingUrl = (input.landing_page_url as string) || undefined;
+        const cta = (input.call_to_action as string) || "CONTACT_US";
+        const adsInput = input.ads as Array<{
+          adgroup_id: string; ad_name: string; ad_text: string; image_prompt: string;
+        }>;
+
+        if (!adsInput || !Array.isArray(adsInput) || adsInput.length === 0) {
+          throw new Error("Se requiere un array 'ads' con al menos 1 anuncio.");
+        }
+        if (adsInput.length > 5) throw new Error("Máximo 5 anuncios por lote.");
+        if (!displayName) throw new Error("display_name es requerido.");
+
+        const openai = new OpenAI({ apiKey: openaiKey });
+        const steps: string[] = [];
+
+        // Step 1: Get identity once for all ads
+        let identityId: string | undefined;
+        let identityType: string | undefined;
+        try {
+          const identity = await getOrCreateIdentity(creds, displayName);
+          identityId = identity.identityId;
+          identityType = identity.identityType;
+          steps.push(`✅ Identity: ${identityId} (${identityType})`);
+        } catch (e) {
+          return JSON.stringify({ success: false, error: `No se pudo obtener identity: ${e instanceof Error ? e.message : String(e)}`, steps });
+        }
+
+        // Step 2: Generate all images + upload + create ads IN PARALLEL
+        const results = await Promise.allSettled(adsInput.map(async (ad, idx) => {
+          const label = ad.ad_name || `Anuncio ${idx + 1}`;
+
+          // 2a. Generate image with DALL-E
+          const dallePrompt = `Imagen publicitaria profesional para TikTok Ads. ${ad.image_prompt}. Estilo: limpio, moderno, atractivo para redes sociales. NO incluir texto ni letras. Formato vertical 9:16 optimizado para móvil.`;
+          const dalleRes = await openai.images.generate({
+            model: "dall-e-3", prompt: dallePrompt, n: 1, size: "1024x1792",
+            style: "vivid", response_format: "url",
+          });
+          const imageUrl = dalleRes.data?.[0]?.url;
+          if (!imageUrl) throw new Error("DALL-E no generó imagen");
+
+          // 2b. Upload to TikTok
+          const uploaded = await uploadImageByUrl(creds, imageUrl, `${label.replace(/\s+/g, "_")}_${Date.now()}.png`);
+
+          // 2c. Create ad
+          const adResult = await createAd(creds, {
+            adgroupId: ad.adgroup_id,
+            adName: label,
+            adText: ad.ad_text,
+            imageId: uploaded.imageId,
+            callToAction: cta,
+            landingPageUrl: landingUrl,
+            displayName,
+            identityId,
+            identityType,
+          });
+
+          return { ad_name: label, ad_id: adResult.adId, image_id: uploaded.imageId };
+        }));
+
+        const summary = results.map((r, i) => {
+          if (r.status === "fulfilled") {
+            steps.push(`✅ ${r.value.ad_name}: Ad ID ${r.value.ad_id}, Image ID ${r.value.image_id}`);
+            return r.value;
+          }
+          const errMsg = r.reason?.message || "Error desconocido";
+          steps.push(`❌ ${adsInput[i].ad_name}: ${errMsg}`);
+          return { ad_name: adsInput[i].ad_name, error: errMsg };
+        });
+
+        const ok = summary.filter((s) => !("error" in s)).length;
+        return JSON.stringify({
+          success: ok > 0,
+          total: adsInput.length,
+          created: ok,
+          failed: adsInput.length - ok,
+          results: summary,
+          steps: steps.join("\n"),
+        });
+      }
+
       case "optimize_campaign": {
         const campaignId = input.campaign_id as string;
         const days = Math.min(Math.max((input.days as number) || 7, 1), 30);
@@ -1157,7 +1269,7 @@ export async function POST(request: NextRequest) {
 
     // Time budget: stop 10s before Vercel timeout to return a partial response
     const startTime = Date.now();
-    const DEADLINE_MS = 40_000; // 50s, leaving 10s buffer for maxDuration=60
+    const DEADLINE_MS = 280_000; // 280s, dejando 20s de margen para maxDuration=300
 
     let lastText = "";
     let useFallback = false;
@@ -1308,7 +1420,7 @@ export async function POST(request: NextRequest) {
     }
 
     // If we exhausted the loop or time, return last captured text or a fallback
-    const fallback = lastText || "Se agotó el tiempo procesando tu solicitud. Intenta dividir tu petición en pasos más pequeños (ej: primero busca ubicaciones, luego crea la campaña).";
+    const fallback = lastText || "No se pudo completar la solicitud. Si pediste crear anuncios, intenta de nuevo — el sistema usa procesamiento en paralelo.";
     return NextResponse.json({
       reply: fallback,
       newHistory: [
