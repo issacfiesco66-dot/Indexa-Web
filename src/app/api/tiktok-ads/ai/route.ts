@@ -53,39 +53,54 @@ Fase 3 (Cierre): Entrega SOLO Status Final (✅/❌) y ID del anuncio creado.
 SI EL USUARIO DICE "HAZLO" O "CREA LOS ANUNCIOS":
 No pidas permiso. Usa los últimos datos del contexto y dispara las funciones. Si falta un dato crítico, pídelo en UNA línea.
 
-═══ CREAR CAMPAÑA ═══
-Usa create_full_campaign. Crea TODO en una sola llamada: campaña + 3 ad groups con targeting.
-NO uses create_campaign_draft ni create_adgroup por separado. NO digas "ve a TikTok Ads Manager". HAZLO TÚ.
+═══ ANÁLISIS DE NEGOCIO (ANTES de crear campaña) ═══
+PRIMERO analiza qué necesita el negocio del cliente:
+- ¿Tiene sitio web? → TRAFFIC o CONVERSIONS (requieren URL)
+- ¿No tiene web / solo quiere visibilidad? → REACH (no requiere URL)
+- ¿Quiere mostrar su trabajo en video? → VIDEO_VIEWS (no requiere URL)
+- ¿Quiere interacción social? → ENGAGEMENT (no requiere URL)
 
-Del mensaje del usuario extrae: Nicho, Geo-Targeting, KPI, Budget (default: $500 MXN).
-- Negocio local → TRAFFIC (NO uses LEAD_GENERATION, no funciona vía API)
-- Visitas web → TRAFFIC
-- Visibilidad → REACH o VIDEO_VIEWS
+OBJETIVOS DISPONIBLES:
+| Objetivo | Requiere URL | Ideal para |
+|----------|-------------|------------|
+| TRAFFIC | Sí | Llevar visitas a sitio web |
+| CONVERSIONS | Sí | Ventas/registros online |
+| REACH | No | Que la mayor gente posible vea tu marca |
+| VIDEO_VIEWS | No | Mostrar tu trabajo/servicio en video |
+| ENGAGEMENT | No | Generar likes, comentarios, seguidores |
+
+⚠️ NUNCA uses LEAD_GENERATION (requiere Instant Forms que no se pueden crear por API).
+
+RECOMENDACIÓN por tipo de negocio:
+- Negocio local SIN web → REACH (reconocimiento de marca en su zona)
+- Negocio local CON web → TRAFFIC (llevar gente a su página)
+- Restaurante/tienda física → REACH o ENGAGEMENT
 - E-commerce → CONVERSIONS
-⚠️ NUNCA uses LEAD_GENERATION. TikTok requiere Instant Forms que no se pueden crear por API. Usa TRAFFIC como alternativa.
+- Lanzamiento/nuevo negocio → REACH + VIDEO_VIEWS
 
-Estructura 3 AG (Anti-Overlap):
+═══ CREAR CAMPAÑA ═══
+Usa create_full_campaign. Crea TODO en una sola llamada: campaña + ad groups + imágenes + anuncios.
+NO uses create_campaign_draft ni create_adgroup por separado. HAZLO TÚ.
+Si el objetivo requiere URL y el usuario no la dio, PREGUNTA antes de crear.
+Si el objetivo NO requiere URL, crea sin ella.
+
+Estructura AG (Anti-Overlap, cantidad según presupuesto):
 AG1 "Interest Stack": Intereses + edad segmentada
 AG2 "Broad": Ubicación + edad + género. Algoritmo optimiza.
 AG3 "Amplio": Ubicación + edad amplia. Máxima exploración.
 Todos: placement TikTok, bid Lowest Cost, estado PAUSADO.
-
 Naming: MX_[OBJETIVO]_[Negocio]_[Mes][Año]
 
 ═══ CREATIVOS Y ANUNCIOS ═══
-Para crear MÚLTIPLES anuncios con imágenes, usa generate_and_create_ads_batch.
-Esta herramienta genera imágenes + sube + crea anuncios TODO EN PARALELO (1 sola llamada).
-NO uses generate_ad_image + create_ad por separado cuando sean múltiples anuncios.
+create_full_campaign ya incluye generación de imágenes y creación de anuncios.
+Solo usa generate_and_create_ads_batch si necesitas crear anuncios adicionales para ad groups existentes.
 
-Para UN solo anuncio: generate_ad_image → create_ad (2 llamadas).
-
-REGLAS PARA create_ad / batch_create_ads / generate_and_create_ads_batch:
-- SIEMPRE incluye display_name (nombre del negocio, máx 40 chars). OBLIGATORIO.
-- SIEMPRE incluye landing_page_url (URL del negocio). OBLIGATORIO para todos los tipos de campaña.
+REGLAS:
+- display_name (nombre del negocio, máx 40 chars) OBLIGATORIO.
+- landing_page_url: OBLIGATORIO solo para TRAFFIC y CONVERSIONS. NO la inventes.
 - ad_name debe ser ÚNICO por anuncio.
-- CTA "Contactar" = "CONTACT_US" (no existe "CONTACT_NOW").
+- CTA por objetivo: TRAFFIC→"LEARN_MORE", REACH→"LEARN_MORE", ENGAGEMENT→"LEARN_MORE", negocios locales→"CONTACT_US"
 - Imagen: 1024x1024 (cuadrado 1:1, compatible con TikTok).
-- Si no tienes URL del negocio, PREGUNTA al usuario antes de crear anuncios.
 
 ═══ OPTIMIZACIÓN ═══
 "optimiza mi campaña" → list_campaigns → optimize_campaign.
@@ -394,14 +409,14 @@ const tools = [
   },
   {
     name: "create_full_campaign",
-    description: "HERRAMIENTA PRINCIPAL. Crea campaña COMPLETA en UNA llamada: campaña + ad groups + imágenes IA + anuncios. TODO automático. Requiere landing_page_url para el destino de los anuncios.",
+    description: "HERRAMIENTA PRINCIPAL. Crea campaña COMPLETA en UNA llamada: campaña + ad groups + imágenes IA + anuncios. TODO automático. landing_page_url solo es necesaria para TRAFFIC y CONVERSIONS.",
     input_schema: {
       type: "object" as const,
       properties: {
         business_name: { type: "string", description: "Nombre corto del negocio (ej: 'ElectrodomesticosQRO')" },
         business_description: { type: "string", description: "Descripción del negocio/servicio" },
         location_keyword: { type: "string", description: "Ciudad o estado (ej: 'Querétaro', 'CDMX')" },
-        landing_page_url: { type: "string", description: "URL de destino de los anuncios. OBLIGATORIO." },
+        landing_page_url: { type: "string", description: "URL de destino. SOLO necesaria para TRAFFIC y CONVERSIONS. NO la pases para REACH/VIDEO_VIEWS/ENGAGEMENT." },
         objective: {
           type: "string",
           enum: ["TRAFFIC", "CONVERSIONS", "REACH", "VIDEO_VIEWS", "ENGAGEMENT"],
@@ -427,7 +442,7 @@ const tools = [
           description: "Género (default: GENDER_UNLIMITED)",
         },
       },
-      required: ["business_name", "business_description", "location_keyword", "landing_page_url", "objective", "daily_budget"],
+      required: ["business_name", "business_description", "location_keyword", "objective", "daily_budget"],
     },
   },
   {
@@ -919,16 +934,13 @@ async function executeTool(
         };
         const optGoal = optGoalMap[objective] || "CLICK";
 
-        // Map objective to promotion_type (required by TikTok API v1.3)
+        // Map objective to promotion_type (only required for URL-based objectives)
+        // REACH, VIDEO_VIEWS, ENGAGEMENT do NOT need promotion_type (awareness/engagement objectives)
         const promoTypeMap: Record<string, string> = {
           TRAFFIC: "WEBSITE",
           CONVERSIONS: "WEBSITE",
-          LEAD_GENERATION: "WEBSITE",
-          REACH: "WEBSITE",
-          VIDEO_VIEWS: "WEBSITE",
-          ENGAGEMENT: "WEBSITE",
         };
-        const promotionType = promoTypeMap[objective] || "WEBSITE";
+        const promotionType = promoTypeMap[objective] || undefined;
 
         // Billing event must match optimization goal
         const billingMap: Record<string, string> = {
@@ -980,10 +992,12 @@ async function executeTool(
 
         const totalAgBudget = agIds.length * agBudget;
 
-        // Step 6: Create ads with AI-generated images (if we have ad groups + OPENAI_API_KEY + landing_page_url)
+        // Step 6: Create ads with AI-generated images
+        // URL only required for TRAFFIC and CONVERSIONS
+        const needsUrl = ["TRAFFIC", "CONVERSIONS"].includes(objective);
         const adResults: Array<{ ag: string; ad_id?: string; error?: string }> = [];
         const openaiKey = process.env.OPENAI_API_KEY;
-        if (agIds.length > 0 && openaiKey && landingPageUrl) {
+        if (agIds.length > 0 && openaiKey && (!needsUrl || landingPageUrl)) {
           steps.push("🎨 Generando imágenes y creando anuncios...");
           const openai = new OpenAI({ apiKey: openaiKey });
 
@@ -1000,9 +1014,9 @@ async function executeTool(
 
           if (adIdentityId) {
             const adPrompts = [
-              `Técnico profesional reparando electrodoméstico, taller limpio y organizado, servicio de ${bizDescription}`,
-              `Electrodoméstico funcionando perfectamente después de reparación, familia satisfecha, ${bizDescription}`,
-              `Herramientas profesionales de reparación de electrodomésticos, calidad y confianza, ${bizDescription}`,
+              `Servicio profesional de ${bizDescription}, ambiente limpio y organizado, transmitiendo confianza y calidad`,
+              `Cliente satisfecho usando servicio de ${bizDescription}, resultado exitoso, ambiente profesional`,
+              `Equipo y ambiente profesional de ${bizDescription}, calidad y experiencia, en ${locationName}`,
             ];
 
             // Generate images + create ads in parallel
@@ -1022,14 +1036,15 @@ async function executeTool(
                 const uploaded = await uploadImageByUrl(creds, imgUrl, `${bizName}_ad${idx + 1}_${Date.now()}.png`);
                 if (!uploaded.imageId) throw new Error("Upload sin image_id");
 
-                // Create ad
+                // Create ad — CTA and landing page depend on objective
+                const ctaMap: Record<string, string> = { TRAFFIC: "LEARN_MORE", CONVERSIONS: "SHOP_NOW", REACH: "LEARN_MORE", VIDEO_VIEWS: "LEARN_MORE", ENGAGEMENT: "LEARN_MORE" };
                 const ad = await createAd(creds, {
                   adgroupId: agId,
                   adName,
                   adText: `${bizDescription} en ${locationName}. ¡Contacta ahora!`,
                   imageId: uploaded.imageId,
-                  callToAction: "CONTACT_US",
-                  landingPageUrl: landingPageUrl,
+                  callToAction: ctaMap[objective] || "LEARN_MORE",
+                  landingPageUrl: needsUrl ? landingPageUrl : undefined,
                   displayName: bizName.slice(0, 40),
                   identityId: adIdentityId,
                   identityType: adIdentityType,
@@ -1048,8 +1063,8 @@ async function executeTool(
               adResults.push(r.status === "fulfilled" ? r.value : { ag: "?", error: r.reason?.message });
             }
           }
-        } else if (agIds.length > 0 && !landingPageUrl) {
-          steps.push("⚠️ Sin landing_page_url — anuncios no creados. Usa generate_and_create_ads_batch después.");
+        } else if (agIds.length > 0 && needsUrl && !landingPageUrl) {
+          steps.push("⚠️ Objetivo TRAFFIC/CONVERSIONS requiere landing_page_url. Anuncios no creados.");
         }
 
         const adsCreated = adResults.filter((a) => a.ad_id).length;
