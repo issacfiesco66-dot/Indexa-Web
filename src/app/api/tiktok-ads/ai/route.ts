@@ -394,39 +394,40 @@ const tools = [
   },
   {
     name: "create_full_campaign",
-    description: "HERRAMIENTA PRINCIPAL. Crea una campaña COMPLETA con 3 Ad Groups segmentados en UNA sola llamada. Incluye: campaña + AG1 (Interest Stack) + AG2 (Broad) + AG3 (Amplio) + targeting geográfico + edad. Todo queda PAUSADO.",
+    description: "HERRAMIENTA PRINCIPAL. Crea campaña COMPLETA en UNA llamada: campaña + ad groups + imágenes IA + anuncios. TODO automático. Requiere landing_page_url para el destino de los anuncios.",
     input_schema: {
       type: "object" as const,
       properties: {
         business_name: { type: "string", description: "Nombre corto del negocio (ej: 'ElectrodomesticosQRO')" },
-        business_description: { type: "string", description: "Descripción del negocio/servicio para optimizar targeting" },
-        location_keyword: { type: "string", description: "Ciudad o estado para geo-targeting (ej: 'Querétaro', 'CDMX')" },
+        business_description: { type: "string", description: "Descripción del negocio/servicio" },
+        location_keyword: { type: "string", description: "Ciudad o estado (ej: 'Querétaro', 'CDMX')" },
+        landing_page_url: { type: "string", description: "URL de destino de los anuncios. OBLIGATORIO." },
         objective: {
           type: "string",
-          enum: ["TRAFFIC", "CONVERSIONS", "LEAD_GENERATION", "REACH", "VIDEO_VIEWS", "ENGAGEMENT"],
-          description: "Objetivo de la campaña. Para negocios locales usa LEAD_GENERATION o CONVERSIONS.",
+          enum: ["TRAFFIC", "CONVERSIONS", "REACH", "VIDEO_VIEWS", "ENGAGEMENT"],
+          description: "Objetivo. Para negocios locales usa TRAFFIC.",
         },
         daily_budget: {
           type: "number",
-          description: "Presupuesto diario TOTAL en la moneda de la cuenta. Se divide entre los 3 ad groups. Mínimo $500 MXN o $50 USD.",
+          description: "Presupuesto diario TOTAL en MXN. Se divide entre ad groups. Mínimo $200 MXN.",
         },
         age_groups_narrow: {
           type: "array",
           items: { type: "string", enum: ["AGE_13_17", "AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_100"] },
-          description: "Rangos de edad para AG1 (Interest Stack). Ej: ['AGE_25_34', 'AGE_35_44', 'AGE_45_54'] para servicios del hogar.",
+          description: "Rangos de edad para AG1 (Interest Stack).",
         },
         age_groups_broad: {
           type: "array",
           items: { type: "string", enum: ["AGE_13_17", "AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_100"] },
-          description: "Rangos de edad para AG2/AG3 (Broad). Más amplio que AG1.",
+          description: "Rangos de edad para AG2/AG3 (Broad).",
         },
         gender: {
           type: "string",
           enum: ["GENDER_MALE", "GENDER_FEMALE", "GENDER_UNLIMITED"],
-          description: "Género para targeting (default: GENDER_UNLIMITED)",
+          description: "Género (default: GENDER_UNLIMITED)",
         },
       },
-      required: ["business_name", "business_description", "location_keyword", "objective", "daily_budget", "age_groups_narrow", "age_groups_broad"],
+      required: ["business_name", "business_description", "location_keyword", "landing_page_url", "objective", "daily_budget"],
     },
   },
   {
@@ -782,6 +783,8 @@ async function executeTool(
           console.warn(`[create_full_campaign] LEAD_GENERATION → TRAFFIC (Instant Forms not available via API)`);
         }
         const totalBudget = (input.daily_budget as number) || 500;
+        const landingPageUrl = (input.landing_page_url as string) || "";
+        const bizDescription = (input.business_description as string) || bizName;
         const ageNarrow = (input.age_groups_narrow as string[]) || ["AGE_25_34", "AGE_35_44", "AGE_45_54"];
         const ageBroad = (input.age_groups_broad as string[]) || ["AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_100"];
         const gender = (input.gender as string) || "GENDER_UNLIMITED";
@@ -977,15 +980,89 @@ async function executeTool(
 
         const totalAgBudget = agIds.length * agBudget;
 
+        // Step 6: Create ads with AI-generated images (if we have ad groups + OPENAI_API_KEY + landing_page_url)
+        const adResults: Array<{ ag: string; ad_id?: string; error?: string }> = [];
+        const openaiKey = process.env.OPENAI_API_KEY;
+        if (agIds.length > 0 && openaiKey && landingPageUrl) {
+          steps.push("🎨 Generando imágenes y creando anuncios...");
+          const openai = new OpenAI({ apiKey: openaiKey });
+
+          // Get identity once
+          let adIdentityId: string | undefined;
+          let adIdentityType: string | undefined;
+          try {
+            const identity = await getOrCreateIdentity(creds, bizName);
+            adIdentityId = identity.identityId;
+            adIdentityType = identity.identityType;
+          } catch (e) {
+            errors.push(`Identity ERROR: ${e instanceof Error ? e.message : String(e)}`);
+          }
+
+          if (adIdentityId) {
+            const adPrompts = [
+              `Técnico profesional reparando electrodoméstico, taller limpio y organizado, servicio de ${bizDescription}`,
+              `Electrodoméstico funcionando perfectamente después de reparación, familia satisfecha, ${bizDescription}`,
+              `Herramientas profesionales de reparación de electrodomésticos, calidad y confianza, ${bizDescription}`,
+            ];
+
+            // Generate images + create ads in parallel
+            const adPromises = agIds.map(async (agId, idx) => {
+              const adName = `${bizName} - Ad ${idx + 1}`;
+              try {
+                // Generate image
+                const dalleRes = await openai.images.generate({
+                  model: "dall-e-3",
+                  prompt: `Imagen publicitaria profesional para TikTok Ads. ${adPrompts[idx] || adPrompts[0]}. Estilo: limpio, moderno. NO incluir texto ni letras. Formato cuadrado 1:1.`,
+                  n: 1, size: "1024x1024", style: "vivid", response_format: "url",
+                });
+                const imgUrl = dalleRes.data?.[0]?.url;
+                if (!imgUrl) throw new Error("DALL-E no generó imagen");
+
+                // Upload to TikTok
+                const uploaded = await uploadImageByUrl(creds, imgUrl, `${bizName}_ad${idx + 1}_${Date.now()}.png`);
+                if (!uploaded.imageId) throw new Error("Upload sin image_id");
+
+                // Create ad
+                const ad = await createAd(creds, {
+                  adgroupId: agId,
+                  adName,
+                  adText: `${bizDescription} en ${locationName}. ¡Contacta ahora!`,
+                  imageId: uploaded.imageId,
+                  callToAction: "CONTACT_US",
+                  landingPageUrl: landingPageUrl,
+                  displayName: bizName.slice(0, 40),
+                  identityId: adIdentityId,
+                  identityType: adIdentityType,
+                });
+                steps.push(`✅ Ad "${adName}" (ID: ${ad.adId}) → AG ${agId}`);
+                return { ag: agId, ad_id: ad.adId };
+              } catch (e) {
+                const msg = e instanceof Error ? e.message : String(e);
+                steps.push(`❌ Ad "${adName}" falló: ${msg.slice(0, 100)}`);
+                return { ag: agId, error: msg };
+              }
+            });
+
+            const results = await Promise.allSettled(adPromises);
+            for (const r of results) {
+              adResults.push(r.status === "fulfilled" ? r.value : { ag: "?", error: r.reason?.message });
+            }
+          }
+        } else if (agIds.length > 0 && !landingPageUrl) {
+          steps.push("⚠️ Sin landing_page_url — anuncios no creados. Usa generate_and_create_ads_batch después.");
+        }
+
+        const adsCreated = adResults.filter((a) => a.ad_id).length;
+
         return JSON.stringify({
           success: agIds.length > 0,
           campaign: { id: campaignId, name: campaignName, objective, totalDailyBudget: `$${totalAgBudget} ${currency}/día (${agIds.length} AGs × $${agBudget})`, currency, status: "PAUSADA" },
           adGroups: agIds.map((id, i) => ({ id, name: agDefs[i].name, budget: agBudget, location: locationName })),
           adGroupIds: agIds,
+          ads: adResults.length > 0 ? { created: adsCreated, total: adResults.length, results: adResults } : undefined,
           steps,
           errors: errors.length > 0 ? errors : undefined,
           locationDebug: locationDebug.length > 0 ? locationDebug : undefined,
-          nextStep: agIds.length > 0 ? `Usa generate_and_create_ads_batch con los adgroup_ids: ${JSON.stringify(agIds)} para crear los anuncios con imágenes.` : "Los ad groups fallaron. Revisa los errores.",
         });
       }
 
