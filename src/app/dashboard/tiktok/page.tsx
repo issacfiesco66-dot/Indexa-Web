@@ -85,10 +85,11 @@ export default function ClientTikTokAdsPage() {
   // ── Paywall + site state ───────────────────────────────────────
   const [sitio, setSitio] = useState<SitioData | null>(null);
   const [sitioId, setSitioId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string>("");
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallFeature, setPaywallFeature] = useState("");
 
-  const isActive = sitio?.statusPago === "activo";
+  const isActive = sitio?.statusPago === "activo" || userRole === "admin" || userRole === "superadmin";
   const isConnected = connected && !!accessToken && !!advertiserId;
 
   // ── Get auth token ─────────────────────────────────────────────
@@ -107,6 +108,7 @@ export default function ClientTikTokAdsPage() {
         const profileSnap = await getDoc(doc(db, "usuarios", user.uid));
         if (profileSnap.exists()) {
           const profile = profileSnap.data() as UserProfile;
+          if (profile.role) setUserRole(profile.role as string);
           if (profile.sitioId) {
             setSitioId(profile.sitioId);
             // 2. Load sitio data for statusPago
