@@ -218,6 +218,7 @@ async function executeTool(
             objective,
             status: "PAUSED",
             special_ad_categories: [],
+            is_adset_budget_sharing_enabled: false,
             access_token: metaToken,
           }),
         });
