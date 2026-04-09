@@ -80,9 +80,11 @@ Para UN solo anuncio: generate_ad_image → create_ad (2 llamadas).
 
 REGLAS PARA create_ad / batch_create_ads / generate_and_create_ads_batch:
 - SIEMPRE incluye display_name (nombre del negocio, máx 40 chars). OBLIGATORIO.
+- SIEMPRE incluye landing_page_url (URL del negocio). OBLIGATORIO para todos los tipos de campaña.
 - ad_name debe ser ÚNICO por anuncio.
 - CTA "Contactar" = "CONTACT_US" (no existe "CONTACT_NOW").
 - Imagen: 1024x1024 (cuadrado 1:1, compatible con TikTok).
+- Si no tienes URL del negocio, PREGUNTA al usuario antes de crear anuncios.
 
 ═══ OPTIMIZACIÓN ═══
 "optimiza mi campaña" → list_campaigns → optimize_campaign.
@@ -894,10 +896,12 @@ async function executeTool(
         // Step 5: Create 3 Ad Groups
         const minAgBudget = currency === "MXN" ? 200 : 20;
         const agBudget = Math.max(Math.floor(totalBudget / 3), minAgBudget);
+        // NOTE: LEAD_GENERATION requires Instant Forms (can't be created via API).
+        // We use WEBSITE + CONVERSION goal as workaround — drives to landing page form instead.
         const optGoalMap: Record<string, string> = {
           TRAFFIC: "CLICK",
           CONVERSIONS: "CONVERSION",
-          LEAD_GENERATION: "LEAD_GENERATION",
+          LEAD_GENERATION: "CONVERSION",
           REACH: "REACH",
           VIDEO_VIEWS: "VIDEO_VIEW",
           ENGAGEMENT: "ENGAGEMENT",
@@ -908,7 +912,7 @@ async function executeTool(
         const promoTypeMap: Record<string, string> = {
           TRAFFIC: "WEBSITE",
           CONVERSIONS: "WEBSITE",
-          LEAD_GENERATION: "LEAD_GENERATION",
+          LEAD_GENERATION: "WEBSITE",
           REACH: "WEBSITE",
           VIDEO_VIEWS: "WEBSITE",
           ENGAGEMENT: "WEBSITE",
@@ -1044,13 +1048,14 @@ async function executeTool(
           const uploaded = await uploadImageByUrl(creds, imageUrl, `${label.replace(/\s+/g, "_")}_${Date.now()}.png`);
           if (!uploaded.imageId) throw new Error(`Upload exitoso pero image_id es undefined. Revisa logs del servidor.`);
 
-          // 2c. Create ad (sin landing_page_url para LEAD_GENERATION)
+          // 2c. Create ad
           const adResult = await createAd(creds, {
             adgroupId: ad.adgroup_id,
             adName: label,
             adText: ad.ad_text,
             imageId: uploaded.imageId,
             callToAction: cta,
+            landingPageUrl: landingUrl,
             displayName,
             identityId,
             identityType,

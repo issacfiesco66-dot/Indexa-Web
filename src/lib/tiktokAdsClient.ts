@@ -1033,12 +1033,14 @@ export async function createAd(
 
   console.log(`[createAd] Request body:`, JSON.stringify(body, null, 2));
 
-  // Step 5: Retry logic — up to 3 attempts
-  const MAX_RETRIES = 3;
+  // Step 5: Retry logic with progressive field stripping for source errors
+  const MAX_RETRIES = 4;
   const RETRY_DELAY_MS = 10_000;
+  let sourceRetryPhase = 0; // 0=as-is, 1=no landing_page, 2=no cta, 3=add landing_page back
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
+      console.log(`[createAd] Attempt ${attempt}/${MAX_RETRIES}, sourceRetryPhase=${sourceRetryPhase}, creative keys: ${Object.keys(creative).join(", ")}`);
       const response = await tiktokFetch<{ ad_ids: string[] }>(
         "/ad/create/",
         creds.accessToken,
@@ -1047,34 +1049,44 @@ export async function createAd(
       return { adId: (response.data.ad_ids || [])[0] || "unknown" };
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
-      const isImageError = errMsg.toLowerCase().includes("unable to access image")
-        || errMsg.toLowerCase().includes("image")
-        || errMsg.includes("40002");
-      const isSourceError = errMsg.toLowerCase().includes("incorrect source field")
-        || errMsg.toLowerCase().includes("source field")
-        || errMsg.includes("landing_page_url");
+      const isSourceError = errMsg.toLowerCase().includes("source field")
+        || errMsg.toLowerCase().includes("incorrect source");
+      const isImageAccessError = errMsg.toLowerCase().includes("unable to access image");
 
-      // "Incorrect source field" = LEAD_GENERATION ad group rejects landing_page_url
-      // Fix: remove it and retry immediately
-      if (isSourceError && creative.landing_page_url) {
-        console.warn(`[createAd] "Incorrect source field" — removing landing_page_url and retrying...`);
-        delete creative.landing_page_url;
+      if (isSourceError) {
+        sourceRetryPhase++;
+        if (sourceRetryPhase === 1 && creative.landing_page_url) {
+          // Phase 1: Remove landing_page_url (LEAD_GEN doesn't want it)
+          console.warn(`[createAd] Source error phase 1: removing landing_page_url`);
+          delete creative.landing_page_url;
+        } else if (sourceRetryPhase === 2) {
+          // Phase 2: Also remove call_to_action (might conflict with lead form CTA)
+          console.warn(`[createAd] Source error phase 2: removing call_to_action`);
+          delete creative.call_to_action;
+        } else if (sourceRetryPhase === 3 && params.landingPageUrl) {
+          // Phase 3: Try ADDING landing_page_url back (maybe ad group is actually WEBSITE type)
+          console.warn(`[createAd] Source error phase 3: adding landing_page_url back`);
+          creative.landing_page_url = params.landingPageUrl;
+          creative.call_to_action = params.callToAction || "LEARN_MORE";
+        } else {
+          // All phases exhausted
+          throw new Error(`Error de TikTok "Incorrect source field". Para campañas LEAD_GENERATION, necesitas crear un Instant Form en TikTok Ads Manager primero. Si quieres usar URL de destino, cambia el objetivo a TRAFFIC o CONVERSIONS. Error original: ${errMsg}`);
+        }
         body.creatives = [creative];
         continue;
       }
 
-      if (isImageError && attempt < MAX_RETRIES) {
-        console.warn(`[createAd] Attempt ${attempt}/${MAX_RETRIES} failed (image error): ${errMsg}. Waiting ${RETRY_DELAY_MS / 1000}s before retry...`);
+      if (isImageAccessError && attempt < MAX_RETRIES) {
+        console.warn(`[createAd] Image access error, waiting ${RETRY_DELAY_MS / 1000}s...`);
         await sleep(RETRY_DELAY_MS);
         continue;
       }
 
-      // Final attempt or non-recoverable error — throw
+      // Non-recoverable error
       throw e;
     }
   }
 
-  // Should never reach here
   throw new Error("[createAd] Max retries exceeded");
 }
 
