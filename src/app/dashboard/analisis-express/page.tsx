@@ -32,6 +32,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import MetaAIChatPanel from "@/components/MetaAIChatPanel";
 import { PaywallOverlay } from "@/components/PaywallGate";
+import CelebrationModal from "@/components/CelebrationModal";
 
 // ── Types ────────────────────────────────────────────────────────
 type Platform = "meta" | "tiktok";
@@ -48,28 +49,46 @@ interface DiagnosticResult {
   findings: { type: string; severity: Severity; title: string; description: string }[];
 }
 
-// ── Post-payment AI context ──────────────────────────────────────
-const POST_PAYMENT_CONTEXT_META = `Eres el Estratega de Optimización de Indexa. El usuario acaba de pagar para desbloquear su diagnóstico. Tu prioridad absoluta es convertir su gasto desperdiciado en ahorro real o mejores conversiones.
+// ── Post-payment AI context — Zero Trust Auditor ────────────────
+const ZERO_TRUST_CORE = `
+═══ MODO DE OPERACIÓN: AUDITOR ZERO TRUST ═══
+Actúa como un Auditor de Ciberseguridad y Especialista en Eficiencia de Capital Senior.
+Tu misión es un escaneo "Zero Trust" sobre la cuenta. No aceptes métricas mediocres; busca anomalías que representen riesgos de seguridad o fugas de capital.
 
-PROTOCOLO:
-1. Analiza TODAS las campañas activas con analyze_campaign_performance.
-2. Presenta las 3 campañas más problemáticas en una tabla: Campaña | Problema | Acción | Impacto Estimado.
-3. Si CPC > $8 MXN, sugiere pausar inmediatamente. Explica por qué.
-4. Al final pregunta: "¿Deseas que genere los nuevos anuncios con IA para reemplazar los que no están funcionando?"
+OBJETIVOS PRIMORDIALES:
+1. DETECCIÓN DE "GASTO FANTASMA": Identifica Ad Sets consumiendo presupuesto sin generar eventos de conversión en las últimas 24-48h.
+2. AUDITORÍA DE INTEGRIDAD DEL PÍXEL: Verifica discrepancias entre clics reportados y eventos recibidos. Brecha >15% = falla crítica de seguridad de datos.
+3. ANÁLISIS DE FRAUDE DE CLICS: Busca patrones de tráfico inusuales (picos de CTR en horarios no comerciales o regiones geográficas no deseadas).
 
-Sé directo, profesional y enfocado en ROI. Prohibido el relleno.`;
+FORMATO DE REPORTE (ESTRICTO):
+[DEFCON LEVEL 1-5]: Nivel de alerta general de la cuenta.
+VECTOR DE ATAQUE AL PRESUPUESTO: Explica exactamente por dónde se "desangra" el dinero.
+BRECHAS DE CONFIGURACIÓN: Errores técnicos en la API de Conversiones o el Píxel.
+CONTRAMEDIDA INMEDIATA: La acción exacta que debe tomar el usuario (o que tú puedes ejecutar) para neutralizar el riesgo.
 
-const POST_PAYMENT_CONTEXT_TIKTOK = `Eres el Estratega de Optimización de TikTok Ads de Indexa. El usuario acaba de pagar para desbloquear su diagnóstico. Tu prioridad absoluta es optimizar sus campañas.
+TONO: Directo, autoritario, técnico y centrado en la protección de activos. No uses lenguaje decorativo. Enfócate en la supervivencia financiera de la cuenta.`;
 
-PROTOCOLO:
-1. Analiza el rendimiento con analyze_campaign_performance.
-2. Presenta las campañas problemáticas en una tabla: Campaña | Problema | Acción | Impacto Estimado.
-3. Si CPC > $6 MXN o CTR < 0.3%, sugiere pausar o reestructurar.
-4. Al final pregunta: "¿Deseas que optimice las campañas automáticamente?"
+const POST_PAYMENT_CONTEXT_META = `Eres el Estratega de Optimización de Meta Ads de Indexa. El usuario acaba de pagar para desbloquear su diagnóstico.
+${ZERO_TRUST_CORE}
 
-Sé directo, profesional y enfocado en ROI. Prohibido el relleno.`;
+═══ PROTOCOLO META ADS ═══
+1. Ejecuta analyze_campaign_performance para TODAS las campañas activas.
+2. Presenta una tabla: Campaña | DEFCON Level | Problema Detectado | Contramedida | Impacto Estimado.
+3. Si CPC > $8 MXN → sugiere pausa inmediata. Si CTR < 0.5% → audiencia saturada, recomienda reestructurar.
+4. Si hay gasto >$500 MXN sin conversiones → marca como "Gasto Fantasma" con alerta DEFCON 1.
+5. Al final: "¿Deseas que ejecute las contramedidas? Puedo pausar campañas críticas y generar nuevos anuncios con IA."`;
 
-const AUTO_MESSAGE = "Analiza todas mis campañas activas e identifica las que están desperdiciando presupuesto. Dame un plan de recuperación de inversión con las 3 campañas más problemáticas.";
+const POST_PAYMENT_CONTEXT_TIKTOK = `Eres el Estratega de Optimización de TikTok Ads de Indexa. El usuario acaba de pagar para desbloquear su diagnóstico.
+${ZERO_TRUST_CORE}
+
+═══ PROTOCOLO TIKTOK ADS ═══
+1. Ejecuta analyze_campaign_performance para evaluar el rendimiento.
+2. Presenta una tabla: Campaña | DEFCON Level | Problema Detectado | Contramedida | Impacto Estimado.
+3. Si CPC > $6 MXN → sugiere pausa. Si CTR < 0.3% → creative fatigue, recomienda nuevos videos.
+4. Si hay gasto sin conversiones → marca como "Gasto Fantasma" con alerta DEFCON 1.
+5. Al final: "¿Deseas que ejecute las contramedidas? Puedo optimizar automáticamente pausando ad groups de bajo rendimiento."`;
+
+const AUTO_MESSAGE = "Ejecuta un escaneo Zero Trust completo de mi cuenta. Identifica gasto fantasma, brechas de configuración y campañas que están drenando presupuesto sin retorno. Dame el reporte con nivel DEFCON.";
 
 const SEVERITY_CONFIG: Record<Severity, { color: string; bg: string; label: string; icon: typeof AlertTriangle }> = {
   critical: { color: "text-red-400", bg: "bg-red-500/10 border-red-500/20", label: "Crítico", icon: XCircle },
@@ -107,6 +126,12 @@ export default function AnalisisExpressPage() {
 
   const isActive = sitio?.statusPago === "activo" || authRole === "superadmin";
   const isUnlocked = searchParams?.get("unlocked") === "true";
+  const [showCelebration, setShowCelebration] = useState(false);
+
+  // Show celebration modal when user just paid
+  useEffect(() => {
+    if (isUnlocked && isActive && !loadingData) setShowCelebration(true);
+  }, [isUnlocked, isActive, loadingData]);
 
   // ── Auth + data + tokens ───────────────────────────────────────
   useEffect(() => {
@@ -583,13 +608,13 @@ export default function AnalisisExpressPage() {
                   context={platform === "meta" ? POST_PAYMENT_CONTEXT_META : POST_PAYMENT_CONTEXT_TIKTOK}
                   autoMessage={AUTO_MESSAGE}
                   darkMode={true}
-                  emptyStateTitle="Estratega IA de Optimización"
-                  emptyStateDesc="Analizo tus campañas y ejecuto optimizaciones en tiempo real."
+                  emptyStateTitle="Auditor Zero Trust"
+                  emptyStateDesc="Escaneo de seguridad y eficiencia de capital en tiempo real."
                   examplePrompts={[
-                    "Pausa las campañas con peor rendimiento",
-                    "Crea nuevos anuncios optimizados con IA",
-                    "¿Cuánto estoy gastando sin conversiones?",
-                    "Genera un reporte completo",
+                    "Detecta gasto fantasma en mis campañas",
+                    "Pausa inmediatamente todo lo que tenga DEFCON 1",
+                    "Genera nuevos anuncios para reemplazar los de bajo rendimiento",
+                    "¿Hay indicios de fraude de clics en mi cuenta?",
                   ]}
                 />
               </motion.section>
@@ -644,6 +669,14 @@ export default function AnalisisExpressPage() {
           </motion.div>
         )}
       </main>
+
+      {/* Celebration modal after payment */}
+      <CelebrationModal
+        open={showCelebration}
+        onClose={() => setShowCelebration(false)}
+        planName={sitio?.plan ? sitio.plan.charAt(0).toUpperCase() + sitio.plan.slice(1) : "Starter"}
+        onCtaClick={() => setShowCelebration(false)}
+      />
     </div>
   );
 }
