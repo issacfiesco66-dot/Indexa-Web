@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
           ? { trial_period_days: Math.min(trialDays, 90) }
           : {}),
       },
-      success_url: `${origin}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/dashboard/analisis-express?unlocked=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/dashboard?checkout=cancel`,
       allow_promotion_codes: true,
     };

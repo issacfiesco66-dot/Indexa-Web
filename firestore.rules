@@ -50,7 +50,13 @@ service cloud.firestore {
         || (
           isOwner(userId)
           && !request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(["role", "sitioId", "email", "displayName"])
+              .hasAny(["role", "email", "displayName"])
+        )
+        // Allow owner to set sitioId ONLY if they don't have one yet (first purchase)
+        || (
+          isOwner(userId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["sitioId"])
+          && (!("sitioId" in resource.data) || resource.data.sitioId == "" || resource.data.sitioId == null)
         );
     }
 

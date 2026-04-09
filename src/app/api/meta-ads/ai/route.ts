@@ -910,17 +910,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse body
-    let body: { message?: string; history?: unknown; metaToken?: string; adAccountId?: string };
+    let body: { message?: string; history?: unknown; metaToken?: string; adAccountId?: string; context?: string };
     try {
       body = await request.json();
     } catch {
       return NextResponse.json({ error: "Cuerpo de solicitud inválido (no es JSON)." }, { status: 400 });
     }
 
-    const { message, history, metaToken, adAccountId } = body;
+    const { message, history, metaToken, adAccountId, context } = body;
     if (!message || !metaToken || !adAccountId) {
       return NextResponse.json({ error: "Faltan parámetros: message, metaToken, adAccountId." }, { status: 400 });
     }
+
+    // Optional context injection for specialized flows (e.g. post-payment diagnostics)
+    const safeContext = typeof context === "string" ? context.slice(0, 2000) : "";
+    const effectivePrompt = safeContext ? `${SYSTEM_PROMPT}\n\n${safeContext}` : SYSTEM_PROMPT;
 
     // Build tools inline to avoid any module-level issues
     const tools = [
@@ -1178,7 +1182,7 @@ export async function POST(request: NextRequest) {
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
           body: JSON.stringify({
-            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            system_instruction: { parts: [{ text: effectivePrompt }] },
             contents: toGeminiContents(aiMessages),
             tools: toGeminiTools(tools),
             tool_config: { function_calling_config: { mode: "AUTO" } },
@@ -1226,7 +1230,7 @@ export async function POST(request: NextRequest) {
         const cRes = await fetch(ANTHROPIC_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
-          body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 1536, system: SYSTEM_PROMPT, tools, messages: aiMessages }),
+          body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 1536, system: effectivePrompt, tools, messages: aiMessages }),
         });
         const cText = await cRes.text();
         if (!cRes.ok) { debugLog.push(`Claude HTTP ${cRes.status}: ${cText.slice(0, 150)}`); return false; }
@@ -1297,7 +1301,7 @@ export async function POST(request: NextRequest) {
               model: GROQ_MODEL,
               max_tokens: 1536,
               messages: [
-                { role: "system", content: "Eres un asistente de Meta Ads. Responde en español. No tienes herramientas — responde indicando qué necesitas del usuario." },
+                { role: "system", content: safeContext ? `Eres un asistente de Meta Ads. Responde en español. No tienes herramientas — responde indicando qué necesitas del usuario.\n\n${safeContext}` : "Eres un asistente de Meta Ads. Responde en español. No tienes herramientas — responde indicando qué necesitas del usuario." },
                 ...toGroqMessages(aiMessages as AnthropicMsg[]),
               ],
             }),
