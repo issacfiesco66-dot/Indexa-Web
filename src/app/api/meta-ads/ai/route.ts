@@ -16,23 +16,71 @@ const GROQ_MODEL = "llama-3.3-70b-versatile";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
-const SYSTEM_PROMPT = `Eres un Media Buyer de Meta Ads. Responde en español. Sé breve y directo.
+const SYSTEM_PROMPT = `Eres un Motor de Operaciones de Publicidad de Alto Rendimiento para Meta Ads (Facebook/Instagram). SIEMPRE responde en español.
+
+═══ REGLAS DE INTERACCIÓN (MANDATORIAS) ═══
+1. CERO CONFIRMACIONES: PROHIBIDO responder "Entendido", "Perfecto", "Voy a hacerlo". Si tienes los datos, EJECUTA la función inmediatamente.
+2. FLUJO DE FALLO POSITIVO: Si falla una creación, intenta corregirlo. NO te detengas a explicar. Reporta resumen al final.
+3. TOKEN ECONOMY: Sé ultra-conciso. Usa tablas Markdown para resultados. Cada palabra cuesta dinero.
+4. Presupuesto en MXN. Mínimo $70 MXN/día. Estado: SIEMPRE PAUSED.
+5. Naming: MX_[OBJETIVO]_[Negocio]_[Mes][Año]
+
+═══ ANÁLISIS DE NEGOCIO (ANTES de crear campaña) ═══
+PRIMERO analiza qué necesita el negocio del cliente:
+- ¿Tiene sitio web? → OUTCOME_TRAFFIC o OUTCOME_SALES (requieren URL)
+- ¿No tiene web / solo quiere visibilidad? → OUTCOME_AWARENESS (no requiere URL del negocio)
+- ¿Quiere interacción social, seguidores? → OUTCOME_ENGAGEMENT (no requiere URL del negocio)
+- ¿Quiere capturar datos de clientes? → OUTCOME_LEADS (usa Lead Forms de Meta, no requiere web)
+- ¿Tiene tienda online? → OUTCOME_SALES (requiere URL + pixel)
+
+OBJETIVOS DISPONIBLES:
+| Objetivo | Requiere Web | Ideal para |
+|----------|-------------|------------|
+| OUTCOME_AWARENESS | No | Que la mayor gente posible conozca tu marca |
+| OUTCOME_TRAFFIC | Sí | Llevar visitas a sitio web |
+| OUTCOME_ENGAGEMENT | No | Generar likes, comentarios, seguidores |
+| OUTCOME_LEADS | No (usa Lead Forms) | Capturar teléfonos/emails de clientes potenciales |
+| OUTCOME_SALES | Sí | Ventas/conversiones online |
+
+RECOMENDACIÓN por tipo de negocio:
+- Negocio local SIN web → OUTCOME_AWARENESS (reconocimiento de marca) o OUTCOME_LEADS (captar datos)
+- Negocio local CON web → OUTCOME_TRAFFIC (llevar gente a su página)
+- Restaurante/tienda física → OUTCOME_AWARENESS o OUTCOME_ENGAGEMENT
+- E-commerce → OUTCOME_SALES
+- Profesionista/servicio → OUTCOME_LEADS (captar clientes potenciales)
+- Lanzamiento/nuevo negocio → OUTCOME_AWARENESS
+
+═══ CREAR CAMPAÑA ═══
+Usa create_full_campaign. Crea TODO en una sola llamada: campaña + ad sets + imágenes IA + anuncios.
+NO uses create_campaign_draft + generate_ad_image + upload_and_create_ad por separado. HAZLO TÚ en un paso.
+Si el objetivo requiere URL y el usuario no la dio, PREGUNTA antes de crear.
+Si el objetivo NO requiere URL, crea sin ella (usa URL de la página de Facebook como destino).
+
+Estructura Ad Sets (Anti-Overlap, cantidad según presupuesto):
+AS1 "Interest Stack": Intereses + edad segmentada
+AS2 "Broad": Ubicación + edad + género. Algoritmo optimiza.
+AS3 "Amplio": Ubicación + edad amplia. Máxima exploración.
+Todos: bid Lowest Cost, estado PAUSADO.
+
+═══ CREATIVOS Y ANUNCIOS ═══
+create_full_campaign ya incluye generación de imágenes y creación de anuncios.
+Solo usa create_ads_batch si necesitas crear anuncios adicionales para ad sets existentes.
 
 REGLAS:
-- Llama UNA herramienta a la vez. Espera el resultado antes de llamar otra.
-- USA los datos EXACTOS que devuelve cada herramienta (IDs, URLs). NUNCA inventes datos.
-- Si una herramienta falla, reporta el error exacto. No finjas éxito.
-- Presupuesto en MXN. Mínimo $70 MXN/día. Estado: SIEMPRE PAUSED.
-- Naming: [PAÍS]_[OBJETIVO]_[NEGOCIO]_[MES_AÑO]
+- SIEMPRE incluye el page_id real del usuario (pregunta si no lo tienes).
+- landing_page_url: OBLIGATORIO solo para OUTCOME_TRAFFIC y OUTCOME_SALES. NO la inventes.
+- Si NO tiene web, el link del anuncio será la URL de su página de Facebook.
+- CTA por objetivo: TRAFFIC→"LEARN_MORE", AWARENESS→"LEARN_MORE", ENGAGEMENT→"LIKE_PAGE", LEADS→"SIGN_UP", negocios locales→"CONTACT_US"
+- Imagen: 1024x1024 (cuadrado 1:1, compatible con Meta).
 
-CUANDO EL USUARIO PIDA CREAR ANUNCIOS:
-1. Si necesitas crear la campaña, usa create_campaign_draft primero.
-2. Para crear MÚLTIPLES anuncios, usa create_ads_batch con todos los anuncios en un solo array.
-   Esto genera imágenes y crea ads EN PARALELO — mucho más rápido.
-3. Para UN solo anuncio, puedes usar generate_ad_image + upload_and_create_ad.
-4. SIEMPRE incluye el page_id real del usuario (pregunta si no lo tienes).
+═══ OPTIMIZACIÓN ═══
+"optimiza mi campaña" → list_campaigns → get_campaign_insights.
+Campaña < 48h → sugiere esperar 3-5 días.
 
-OBJETIVOS: OUTCOME_TRAFFIC, OUTCOME_AWARENESS, OUTCOME_LEADS, OUTCOME_ENGAGEMENT, OUTCOME_SALES`;
+═══ FORMATO DE RESPUESTA ═══
+Resultados en tabla Markdown. Formato: $1,234.56 dinero, 2.5% porcentajes.
+ERRORES: Muestra mensaje EXACTO de Meta. NO resumas ni ocultes errores.
+CTAs: LEARN_MORE, SHOP_NOW, SIGN_UP, CONTACT_US, GET_QUOTE, BOOK_TRAVEL, SUBSCRIBE, APPLY_NOW, LIKE_PAGE.`;
 
 // ── Meta helpers ────────────────────────────────────────────────────
 async function metaGet(url: string): Promise<Record<string, unknown>> {
@@ -211,6 +259,16 @@ async function executeTool(
         const country = (input.country as string) || "MX";
         const budgetCents = String(Math.round(dailyBudgetMxn * 100));
 
+        // Map objective to optimization_goal
+        const optGoalMap: Record<string, string> = {
+          OUTCOME_TRAFFIC: "LINK_CLICKS",
+          OUTCOME_AWARENESS: "REACH",
+          OUTCOME_ENGAGEMENT: "POST_ENGAGEMENT",
+          OUTCOME_LEADS: "LEAD_GENERATION",
+          OUTCOME_SALES: "OFFSITE_CONVERSIONS",
+        };
+        const optimizationGoal = optGoalMap[objective] || "LINK_CLICKS";
+
         // Create campaign using JSON body
         const campRes = await fetch(`${META_GRAPH_URL}/${actId}/campaigns`, {
           method: "POST",
@@ -247,7 +305,7 @@ async function executeTool(
             name: `${campaignName} - Ad Set`,
             daily_budget: budgetCents,
             billing_event: "IMPRESSIONS",
-            optimization_goal: "LINK_CLICKS",
+            optimization_goal: optimizationGoal,
             targeting,
             status: "PAUSED",
             bid_strategy: "LOWEST_COST_WITHOUT_CAP",
@@ -266,7 +324,9 @@ async function executeTool(
           success: true,
           campaignId: campaignData.id,
           adSetId: adSetData.id,
-          note: `Campaña creada: "${campaignName}" (PAUSADA). Campaign ID: ${campaignData.id}, Ad Set ID: ${adSetData.id}. Usa upload_and_create_ad para subir imagen y crear el anuncio completo.`,
+          objective,
+          optimizationGoal,
+          note: `Campaña creada: "${campaignName}" (PAUSADA, ${objective}). Campaign ID: ${campaignData.id}, Ad Set ID: ${adSetData.id}.`,
         });
       }
 
@@ -511,6 +571,241 @@ async function executeTool(
         });
       }
 
+      case "create_full_campaign": {
+        const bizName = input.business_name as string;
+        const bizDescription = (input.business_description as string) || bizName;
+        const pageId = input.page_id as string;
+        let objective = (input.objective as string) || "OUTCOME_AWARENESS";
+        const totalBudget = (input.daily_budget_mxn as number) || 200;
+        const landingPageUrl = (input.landing_page_url as string) || "";
+        const country = (input.country as string) || "MX";
+        const ageMin = Number(input.age_min) || 18;
+        const ageMax = Number(input.age_max) || 65;
+
+        if (!pageId || !/^\d+$/.test(pageId)) {
+          return JSON.stringify({ success: false, error: `page_id "${pageId}" no es válido. Debe ser un ID numérico real de una página de Facebook.` });
+        }
+
+        const steps: string[] = [];
+        const errors: string[] = [];
+
+        // Determine if URL is needed
+        const needsUrl = ["OUTCOME_TRAFFIC", "OUTCOME_SALES"].includes(objective);
+        if (needsUrl && !landingPageUrl) {
+          return JSON.stringify({
+            success: false,
+            error: `El objetivo ${objective} requiere landing_page_url. Pregunta al usuario su URL o cambia a OUTCOME_AWARENESS/OUTCOME_ENGAGEMENT que no la requieren.`,
+          });
+        }
+
+        // For non-URL objectives, use Facebook page as link destination
+        const adLink = landingPageUrl || `https://www.facebook.com/${pageId}`;
+        steps.push(landingPageUrl
+          ? `🔗 Destino: ${landingPageUrl}`
+          : `🔗 Sin web — anuncios llevan a la página de Facebook`
+        );
+
+        // Map objective → optimization_goal
+        const optGoalMap: Record<string, string> = {
+          OUTCOME_TRAFFIC: "LINK_CLICKS",
+          OUTCOME_AWARENESS: "REACH",
+          OUTCOME_ENGAGEMENT: "POST_ENGAGEMENT",
+          OUTCOME_LEADS: "LEAD_GENERATION",
+          OUTCOME_SALES: "OFFSITE_CONVERSIONS",
+        };
+        const optimizationGoal = optGoalMap[objective] || "REACH";
+
+        // CTA per objective
+        const ctaMap: Record<string, string> = {
+          OUTCOME_TRAFFIC: "LEARN_MORE",
+          OUTCOME_AWARENESS: "LEARN_MORE",
+          OUTCOME_ENGAGEMENT: "LIKE_PAGE",
+          OUTCOME_LEADS: "SIGN_UP",
+          OUTCOME_SALES: "SHOP_NOW",
+        };
+        const cta = ctaMap[objective] || "LEARN_MORE";
+
+        // Step 1: Create campaign name
+        const now = new Date();
+        const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+        const shortObjective = objective.replace("OUTCOME_", "");
+        const campaignName = `MX_${shortObjective}_${bizName}_${monthNames[now.getMonth()]}${now.getFullYear()}`;
+
+        // Step 2: Create campaign
+        let campaignId = "";
+        try {
+          const campRes = await fetch(`${META_GRAPH_URL}/${actId}/campaigns`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: campaignName,
+              objective,
+              status: "PAUSED",
+              special_ad_categories: [],
+              access_token: metaToken,
+            }),
+          });
+          const campData = await campRes.json();
+          if (campData.error) throw new Error((campData.error as { message?: string; error_user_msg?: string }).error_user_msg || (campData.error as { message?: string }).message || "Error");
+          campaignId = campData.id as string;
+          steps.push(`✅ Campaña: "${campaignName}" (ID: ${campaignId}) — ${objective} — PAUSADA`);
+        } catch (e) {
+          return JSON.stringify({ success: false, error: `Error creando campaña: ${e instanceof Error ? e.message : String(e)}`, steps });
+        }
+
+        // Step 3: Create Ad Sets (1-3 depending on budget)
+        const minAdSetBudget = 7000; // $70 MXN in cents
+        const budgetCents = Math.round(totalBudget * 100);
+        const maxAdSets = Math.min(3, Math.floor(budgetCents / minAdSetBudget)) || 1;
+        const adSetBudget = Math.max(Math.floor(budgetCents / maxAdSets), minAdSetBudget);
+        const adSetBudgetMxn = adSetBudget / 100;
+        steps.push(`📊 Presupuesto: $${totalBudget}/día → ${maxAdSets} Ad Set(s) × $${adSetBudgetMxn}`);
+
+        const adSetDefs = [
+          { name: `${bizName} - Interest Stack`, ageMin: 25, ageMax: 54 },
+          { name: `${bizName} - Broad`, ageMin, ageMax },
+          { name: `${bizName} - Amplio`, ageMin: 18, ageMax: 65 },
+        ].slice(0, maxAdSets);
+
+        const adSetIds: string[] = [];
+        for (const [i, asDef] of adSetDefs.entries()) {
+          try {
+            const asRes = await fetch(`${META_GRAPH_URL}/${actId}/adsets`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                campaign_id: campaignId,
+                name: asDef.name,
+                daily_budget: String(adSetBudget),
+                billing_event: "IMPRESSIONS",
+                optimization_goal: optimizationGoal,
+                targeting: {
+                  age_min: asDef.ageMin,
+                  age_max: asDef.ageMax,
+                  geo_locations: { countries: [country] },
+                },
+                status: "PAUSED",
+                bid_strategy: "LOWEST_COST_WITHOUT_CAP",
+                access_token: metaToken,
+              }),
+            });
+            const asData = await asRes.json();
+            if (asData.error) throw new Error((asData.error as { message?: string; error_user_msg?: string }).error_user_msg || (asData.error as { message?: string }).message || "Error");
+            adSetIds.push(asData.id as string);
+            steps.push(`✅ AS${i + 1} "${asDef.name}" (ID: ${asData.id}) — $${adSetBudgetMxn}/día — ${country}`);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            errors.push(`AS${i + 1} ERROR: ${msg}`);
+            console.error(`[create_full_campaign] AS${i + 1} failed:`, msg);
+          }
+        }
+
+        // Step 4: Create ads with AI-generated images
+        const adResults: Array<{ adset: string; ad_id?: string; error?: string }> = [];
+        const openaiKey = process.env.OPENAI_API_KEY;
+        if (adSetIds.length > 0 && openaiKey) {
+          steps.push("🎨 Generando imágenes y creando anuncios...");
+          const openai = new OpenAI({ apiKey: openaiKey });
+
+          const adPrompts = [
+            `Servicio profesional de ${bizDescription}, ambiente limpio y organizado, transmitiendo confianza y calidad`,
+            `Cliente satisfecho usando servicio de ${bizDescription}, resultado exitoso, ambiente profesional`,
+            `Equipo y ambiente profesional de ${bizDescription}, calidad y experiencia`,
+          ];
+
+          const adPromises = adSetIds.map(async (asId, idx) => {
+            const adName = `${bizName} - Ad ${idx + 1}`;
+            try {
+              // Generate image
+              const dalleRes = await openai.images.generate({
+                model: "dall-e-3",
+                prompt: `Imagen publicitaria profesional para Facebook/Instagram Ads. ${adPrompts[idx] || adPrompts[0]}. Estilo: limpio, moderno, atractivo. NO incluir texto ni letras. Formato cuadrado 1:1.`,
+                n: 1, size: "1024x1024", style: "vivid", response_format: "url",
+              });
+              const imgUrl = dalleRes.data?.[0]?.url;
+              if (!imgUrl) throw new Error("DALL-E no generó imagen");
+
+              // Download image
+              const imgRes = await fetch(imgUrl);
+              if (!imgRes.ok) throw new Error(`HTTP ${imgRes.status} al descargar imagen`);
+              const imgBase64 = Buffer.from(await imgRes.arrayBuffer()).toString("base64");
+
+              // Upload to Meta
+              const uploadData = await metaPost(`${META_GRAPH_URL}/${actId}/adimages`, { bytes: imgBase64, access_token: metaToken });
+              const imgHash = uploadData.images ? (Object.values(uploadData.images)[0] as { hash: string })?.hash : null;
+              if (!imgHash) throw new Error(`Meta no devolvió hash de imagen`);
+
+              // Create creative
+              const creativeRes = await fetch(`${META_GRAPH_URL}/${actId}/adcreatives`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  name: `${adName} - Creative`,
+                  object_story_spec: {
+                    page_id: pageId,
+                    link_data: {
+                      image_hash: imgHash,
+                      message: `${bizDescription}. ¡Conócenos!`,
+                      link: adLink,
+                      name: bizName,
+                      call_to_action: { type: cta, value: { link: adLink } },
+                    },
+                  },
+                  access_token: metaToken,
+                }),
+              });
+              const creativeData = await creativeRes.json();
+              if (creativeData.error) throw new Error(`Creative: ${(creativeData.error as { message?: string }).message}`);
+
+              // Create ad
+              const adRes = await fetch(`${META_GRAPH_URL}/${actId}/ads`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  name: adName,
+                  adset_id: asId,
+                  creative: { creative_id: creativeData.id },
+                  status: "PAUSED",
+                  access_token: metaToken,
+                }),
+              });
+              const adData = await adRes.json();
+              if (adData.error) throw new Error(`Ad: ${(adData.error as { message?: string }).message}`);
+
+              steps.push(`✅ Ad "${adName}" (ID: ${adData.id}) → AS ${asId}`);
+              return { adset: asId, ad_id: adData.id as string };
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : String(e);
+              steps.push(`❌ Ad "${adName}" falló: ${msg.slice(0, 100)}`);
+              return { adset: asId, error: msg };
+            }
+          });
+
+          const results = await Promise.allSettled(adPromises);
+          for (const r of results) {
+            adResults.push(r.status === "fulfilled" ? r.value : { adset: "?", error: r.reason?.message });
+          }
+        }
+
+        const adsCreated = adResults.filter((a) => a.ad_id).length;
+        const totalAdSetBudget = adSetIds.length * adSetBudgetMxn;
+
+        return JSON.stringify({
+          success: adSetIds.length > 0,
+          campaign: {
+            id: campaignId,
+            name: campaignName,
+            objective,
+            totalDailyBudget: `$${totalAdSetBudget} MXN/día (${adSetIds.length} Ad Sets × $${adSetBudgetMxn})`,
+            status: "PAUSADA",
+          },
+          adSets: adSetIds.map((id, i) => ({ id, name: adSetDefs[i].name, budget: `$${adSetBudgetMxn}/día` })),
+          ads: adResults.length > 0 ? { created: adsCreated, total: adResults.length, results: adResults } : undefined,
+          steps,
+          errors: errors.length > 0 ? errors : undefined,
+        });
+      }
+
       default:
         return `Herramienta desconocida: ${name}`;
     }
@@ -712,6 +1007,29 @@ export async function POST(request: NextRequest) {
             },
           },
           required: ["ads"],
+        },
+      },
+      {
+        name: "create_full_campaign",
+        description: "HERRAMIENTA PRINCIPAL. Crea campaña COMPLETA en UNA llamada: campaña + ad sets + imágenes IA + anuncios. TODO automático. landing_page_url solo es necesaria para OUTCOME_TRAFFIC y OUTCOME_SALES; para otros objetivos los anuncios llevan a la página de Facebook.",
+        input_schema: {
+          type: "object",
+          properties: {
+            business_name: { type: "string", description: "Nombre corto del negocio (ej: 'ElectrodomesticosQRO')" },
+            business_description: { type: "string", description: "Descripción del negocio/servicio para generar imágenes y textos relevantes" },
+            page_id: { type: "string", description: "ID de la página de Facebook del cliente" },
+            landing_page_url: { type: "string", description: "URL del sitio web. SOLO necesaria para OUTCOME_TRAFFIC y OUTCOME_SALES. NO la pases para AWARENESS/ENGAGEMENT/LEADS." },
+            objective: {
+              type: "string",
+              enum: ["OUTCOME_TRAFFIC", "OUTCOME_AWARENESS", "OUTCOME_ENGAGEMENT", "OUTCOME_LEADS", "OUTCOME_SALES"],
+              description: "Objetivo de campaña. Elige según análisis de negocio.",
+            },
+            daily_budget_mxn: { type: "number", description: "Presupuesto diario TOTAL en MXN. Se divide entre ad sets. Mínimo $70 MXN." },
+            age_min: { type: "number", description: "Edad mínima (default: 18)" },
+            age_max: { type: "number", description: "Edad máxima (default: 65)" },
+            country: { type: "string", description: "Código de país (default: MX)" },
+          },
+          required: ["business_name", "business_description", "page_id", "objective", "daily_budget_mxn"],
         },
       },
     ];
