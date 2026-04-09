@@ -3,7 +3,7 @@ import { verifyIdToken } from "@/lib/verifyAuth";
 import { createRateLimiter } from "@/lib/rateLimit";
 import OpenAI from "openai";
 
-export const maxDuration = 60;
+export const maxDuration = 300; // Vercel Pro: hasta 300s para flujos de creación de anuncios
 
 const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
 const META_GRAPH_URL = "https://graph.facebook.com/v21.0";
@@ -25,10 +25,12 @@ REGLAS:
 - Presupuesto en MXN. Mínimo $70 MXN/día. Estado: SIEMPRE PAUSED.
 - Naming: [PAÍS]_[OBJETIVO]_[NEGOCIO]_[MES_AÑO]
 
-CUANDO EL USUARIO PIDA CREAR UNA CAMPAÑA:
-1. Llama create_campaign_draft con los datos. Muestra los IDs reales del resultado.
-2. SOLO si el usuario pide imagen/anuncio completo, usa generate_ad_image y luego upload_and_create_ad.
-3. NO generes imagen automáticamente. Solo crea campaña + ad set.
+CUANDO EL USUARIO PIDA CREAR ANUNCIOS:
+1. Si necesitas crear la campaña, usa create_campaign_draft primero.
+2. Para crear MÚLTIPLES anuncios, usa create_ads_batch con todos los anuncios en un solo array.
+   Esto genera imágenes y crea ads EN PARALELO — mucho más rápido.
+3. Para UN solo anuncio, puedes usar generate_ad_image + upload_and_create_ad.
+4. SIEMPRE incluye el page_id real del usuario (pregunta si no lo tienes).
 
 OBJETIVOS: OUTCOME_TRAFFIC, OUTCOME_AWARENESS, OUTCOME_LEADS, OUTCOME_ENGAGEMENT, OUTCOME_SALES`;
 
@@ -405,8 +407,107 @@ async function executeTool(
         return JSON.stringify({
           success: true,
           imageUrl,
-          note: `Imagen generada exitosamente. El usuario debe descargar la imagen desde la URL y subirla manualmente en Meta Ads Manager al crear el anuncio.`,
-          instructions: "Para usar esta imagen: 1) Haz clic derecho en la imagen → Guardar imagen. 2) Ve a Meta Ads Manager → selecciona la campaña → Crear anuncio → Sube la imagen guardada.",
+          note: `Imagen generada exitosamente. Usa upload_and_create_ad para crear el anuncio con esta imagen.`,
+        });
+      }
+
+      case "create_ads_batch": {
+        const openaiKey = process.env.OPENAI_API_KEY;
+        if (!openaiKey) return JSON.stringify({ success: false, error: "OPENAI_API_KEY no configurada." });
+
+        const ads = input.ads as Array<{
+          prompt: string; adset_id: string; page_id: string;
+          ad_text: string; headline: string; link: string;
+          cta_type?: string; ad_name?: string; style?: string;
+        }>;
+        if (!ads || !Array.isArray(ads) || ads.length === 0) {
+          throw new Error("Se requiere un array 'ads' con al menos 1 anuncio.");
+        }
+        if (ads.length > 5) throw new Error("Máximo 5 anuncios por lote.");
+
+        const openai = new OpenAI({ apiKey: openaiKey });
+
+        // Process all ads in parallel
+        const results = await Promise.allSettled(ads.map(async (ad, idx) => {
+          const label = ad.ad_name || `Anuncio ${idx + 1}`;
+          const steps: string[] = [`── ${label} ──`];
+
+          // Validate
+          if (!ad.adset_id || !/^\d+$/.test(ad.adset_id)) throw new Error(`adset_id "${ad.adset_id}" inválido`);
+          if (!ad.page_id || !/^\d+$/.test(ad.page_id)) throw new Error(`page_id "${ad.page_id}" inválido`);
+
+          // 1. Generate image with DALL-E
+          steps.push("1. Generando imagen con DALL-E...");
+          const dallePrompt = `Imagen publicitaria profesional para Facebook/Instagram Ads. ${ad.prompt}. Estilo: limpio, moderno, atractivo para redes sociales. NO incluir texto ni letras. Formato 1:1.`;
+          const dalleRes = await openai.images.generate({
+            model: "dall-e-3", prompt: dallePrompt, n: 1, size: "1024x1024",
+            style: (ad.style as "vivid" | "natural") || "vivid", response_format: "url",
+          });
+          const imageUrl = dalleRes.data?.[0]?.url;
+          if (!imageUrl) throw new Error("DALL-E no generó imagen");
+          steps.push("   ✓ Imagen generada");
+
+          // 2. Download image
+          steps.push("2. Descargando imagen...");
+          const imgRes = await fetch(imageUrl);
+          if (!imgRes.ok) throw new Error(`HTTP ${imgRes.status} al descargar`);
+          const imgBase64 = Buffer.from(await imgRes.arrayBuffer()).toString("base64");
+          steps.push("   ✓ Descargada");
+
+          // 3. Upload to Meta
+          steps.push("3. Subiendo a Meta...");
+          const uploadData = await metaPost(`${META_GRAPH_URL}/${actId}/adimages`, { bytes: imgBase64, access_token: metaToken });
+          const imgHash = uploadData.images ? (Object.values(uploadData.images)[0] as { hash: string })?.hash : null;
+          if (!imgHash) throw new Error(`Meta no devolvió hash: ${JSON.stringify(uploadData).slice(0, 150)}`);
+          steps.push(`   ✓ Subida (hash: ${imgHash})`);
+
+          // 4. Create creative
+          steps.push("4. Creando creative...");
+          const creativeRes = await fetch(`${META_GRAPH_URL}/${actId}/adcreatives`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: `${label} - Creative`,
+              object_story_spec: { page_id: ad.page_id, link_data: {
+                image_hash: imgHash, message: ad.ad_text, link: ad.link,
+                name: ad.headline, call_to_action: { type: ad.cta_type || "LEARN_MORE", value: { link: ad.link } },
+              }},
+              access_token: metaToken,
+            }),
+          });
+          const creativeData = await creativeRes.json();
+          if (creativeData.error) throw new Error(`Creative: ${(creativeData.error as { message?: string }).message}`);
+          steps.push(`   ✓ Creative (ID: ${creativeData.id})`);
+
+          // 5. Create ad
+          steps.push("5. Creando anuncio...");
+          const adRes = await fetch(`${META_GRAPH_URL}/${actId}/ads`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: label, adset_id: ad.adset_id,
+              creative: { creative_id: creativeData.id }, status: "PAUSED", access_token: metaToken,
+            }),
+          });
+          const adData = await adRes.json();
+          if (adData.error) throw new Error(`Ad: ${(adData.error as { message?: string }).message}`);
+          steps.push(`   ✓ Anuncio creado (ID: ${adData.id})`);
+
+          return { ad_name: label, ad_id: adData.id, creative_id: creativeData.id, image_hash: imgHash, steps: steps.join("\n") };
+        }));
+
+        const summary = results.map((r, i) => {
+          if (r.status === "fulfilled") return r.value;
+          return { ad_name: ads[i].ad_name || `Anuncio ${i + 1}`, error: r.reason?.message || "Error desconocido" };
+        });
+
+        const ok = summary.filter((s) => !("error" in s)).length;
+        const fail = summary.filter((s) => "error" in s).length;
+
+        return JSON.stringify({
+          success: fail === 0,
+          total: ads.length,
+          created: ok,
+          failed: fail,
+          results: summary,
         });
       }
 
@@ -585,6 +686,34 @@ export async function POST(request: NextRequest) {
           required: ["prompt"],
         },
       },
+      {
+        name: "create_ads_batch",
+        description: "Crea múltiples anuncios EN PARALELO: genera imagen con DALL-E + sube a Meta + crea creative + crea ad. Usa esta herramienta para crear varios anuncios a la vez de forma eficiente. Requiere ad sets ya creados.",
+        input_schema: {
+          type: "object",
+          properties: {
+            ads: {
+              type: "array",
+              description: "Array de anuncios a crear en paralelo (máximo 5)",
+              items: {
+                type: "object",
+                properties: {
+                  prompt: { type: "string", description: "Descripción de la imagen: tipo de negocio, producto, estilo visual" },
+                  adset_id: { type: "string", description: "ID del ad set (numérico)" },
+                  page_id: { type: "string", description: "ID de la página de Facebook" },
+                  ad_text: { type: "string", description: "Texto principal del anuncio" },
+                  headline: { type: "string", description: "Título del anuncio" },
+                  link: { type: "string", description: "URL de destino" },
+                  cta_type: { type: "string", enum: ["LEARN_MORE", "SHOP_NOW", "SIGN_UP", "CONTACT_US", "GET_QUOTE"], description: "CTA (default: LEARN_MORE)" },
+                  ad_name: { type: "string", description: "Nombre del anuncio" },
+                },
+                required: ["prompt", "adset_id", "page_id", "ad_text", "headline", "link"],
+              },
+            },
+          },
+          required: ["ads"],
+        },
+      },
     ];
 
     type MsgContent = string | Record<string, unknown>[] ;
@@ -643,7 +772,7 @@ export async function POST(request: NextRequest) {
     ];
 
     const startTime = Date.now();
-    const DEADLINE_MS = 55_000;
+    const DEADLINE_MS = 280_000; // 280s — deja 20s de margen para el maxDuration de 300s
     let lastText = "";
     const debugLog: string[] = [];
 
@@ -651,7 +780,7 @@ export async function POST(request: NextRequest) {
     async function callGemini(): Promise<boolean> {
       if (!geminiKey) return false;
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30_000);
+      const timeout = setTimeout(() => controller.abort(), 45_000);
       try {
         debugLog.push("Trying Gemini...");
         const gemRes = await fetch(`${GEMINI_NATIVE_URL}?key=${geminiKey}`, {
@@ -736,9 +865,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Agentic loop — up to 4 rounds
+    // Agentic loop — up to 10 rounds (enough for batch ad creation)
     // Priority: Gemini (free+tools) → Claude (paid+tools) → Groq (free, text-only, last resort)
-    for (let round = 0; round < 4; round++) {
+    for (let round = 0; round < 10; round++) {
       if (Date.now() - startTime > DEADLINE_MS) { debugLog.push("Deadline reached"); break; }
 
       // Try Gemini first
