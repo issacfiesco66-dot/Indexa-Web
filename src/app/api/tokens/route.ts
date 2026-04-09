@@ -102,8 +102,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: "Acción no válida." }, { status: 400 });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Error interno.";
-    console.error("[api/tokens] error:", msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    console.error("[api/tokens] error:", err instanceof Error ? err.message : "unknown");
+    return NextResponse.json({ error: "Error interno del servidor." }, { status: 500 });
   }
 }

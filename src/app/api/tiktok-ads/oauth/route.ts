@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 export const maxDuration = 30;
 
-const APP_ID = process.env.TIKTOK_APP_ID || "7619166839642865681";
+const APP_ID = process.env.TIKTOK_APP_ID;
 const SECRET = process.env.TIKTOK_APP_SECRET;
 
 if (!SECRET) {

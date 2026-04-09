@@ -96,9 +96,14 @@ export default function ChatWidget({ sitio, colorPrincipal, modo = "live" }: Cha
     }
   };
 
-  // Format *bold* text to <strong>
+  // Format *bold* text — sanitize HTML first to prevent XSS
   const formatText = (text: string) => {
-    return text.replace(/\*([^*]+)\*/g, "<strong>$1</strong>");
+    const escaped = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+    return escaped.replace(/\*([^*]+)\*/g, "<strong>$1</strong>");
   };
 
   return (

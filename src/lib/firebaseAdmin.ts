@@ -36,8 +36,8 @@ function getAdminApp(): App {
       const serviceAccount = parseServiceAccount(serviceAccountKey);
       console.log("[Firebase Admin] Initialized from env var (project:", serviceAccount.project_id, ")");
       return initializeApp({ credential: cert(serviceAccount as Parameters<typeof cert>[0]) });
-    } catch (err) {
-      console.error("[Firebase Admin] Failed to parse service account JSON from env var:", err instanceof Error ? err.message : err);
+    } catch {
+      console.error("[Firebase Admin] Failed to parse service account JSON from env var. Check JSON formatting.");
       // fall through to next option
     }
   }

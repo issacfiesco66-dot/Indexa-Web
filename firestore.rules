@@ -71,17 +71,9 @@ service cloud.firestore {
           && (!request.resource.data.diff(resource.data).affectedKeys()
               .hasAny(["ownerId", "statusPago", "plan", "stripeCustomerId", "stripeSubscriptionId", "fechaVencimiento", "ultimoPagoAt"]))
         )
-        // Webhook updates (Stripe signature verified server-side):
-        // Allow unauthenticated updates ONLY to payment fields
-        || (
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(["statusPago", "plan", "stripeCustomerId", "stripeSubscriptionId", "fechaVencimiento", "ultimoPagoAt"])
-        )
-        // Bio visit tracking (public API route, no auth needed)
-        || (
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(["bioStats"])
-        );
+        // Webhook + bio tracking: use Admin SDK server-side (bypasses rules).
+        // No unauthenticated writes allowed.
+        ;
     }
 
     // ── agencias (agency accounts) ──────────────────────────────────────────
@@ -99,7 +91,7 @@ service cloud.firestore {
     // ── webhook_events (audit trail — webhook writes, admin reads) ─────────
     match /webhook_events/{eventId} {
       allow read: if isAdmin();
-      allow create, update: if true; // Webhook server verifies Stripe signature
+      allow create, update: if isAdmin(); // Webhooks use Admin SDK (bypasses rules)
     }
 
     // ── Cualquier otra colección: denegado por defecto ──────────────────────

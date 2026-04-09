@@ -13,7 +13,10 @@ const IV_LENGTH = 12; // 96 bits — recommended for GCM
 const TAG_LENGTH = 16; // 128 bits
 const PREFIX = "enc:v1:";
 
+let _cachedKey: Buffer | null = null;
+
 function getMasterKey(): Buffer {
+  if (_cachedKey) return _cachedKey;
   const hex = process.env.TOKEN_ENCRYPTION_KEY;
   if (!hex || hex.length !== 64) {
     throw new Error(
@@ -21,7 +24,8 @@ function getMasterKey(): Buffer {
         "Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
     );
   }
-  return Buffer.from(hex, "hex");
+  _cachedKey = Buffer.from(hex, "hex");
+  return _cachedKey;
 }
 
 /** Returns true if the value looks like an encrypted token. */

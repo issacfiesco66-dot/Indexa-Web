@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { readDoc, updateDoc, createDoc } from "@/lib/firestoreRest";
+import { getAdminDb } from "@/lib/firebaseAdmin";
 
 let _stripe: Stripe | null = null;
 function getStripe() {
@@ -13,7 +13,7 @@ if (!WEBHOOK_SECRET) {
   console.warn("⚠ STRIPE_WEBHOOK_SECRET is not configured. Stripe webhooks will not work.");
 }
 
-// ── Firestore REST helpers (no service account needed) ───────────────────
+// ── Firestore Admin SDK helpers ──────────────────────────────────────────
 
 async function logWebhookEvent(
   eventId: string,
@@ -22,14 +22,15 @@ async function logWebhookEvent(
   metadata: Record<string, unknown> = {}
 ) {
   try {
-    await createDoc("webhook_events", eventId, {
+    const db = getAdminDb();
+    await db.collection("webhook_events").doc(eventId).set({
       eventId,
       eventType,
       status,
       ...metadata,
       updatedAt: new Date().toISOString(),
       ...(status === "processing" ? { createdAt: new Date().toISOString() } : {}),
-    });
+    }, { merge: true });
   } catch (err) {
     console.error("Failed to log webhook event:", err instanceof Error ? err.message : err);
   }
@@ -37,8 +38,9 @@ async function logWebhookEvent(
 
 async function isEventAlreadyProcessed(eventId: string): Promise<boolean> {
   try {
-    const doc = await readDoc("webhook_events", eventId);
-    return doc !== null && doc.data?.status === "success";
+    const db = getAdminDb();
+    const doc = await db.collection("webhook_events").doc(eventId).get();
+    return doc.exists && doc.data()?.status === "success";
   } catch {
     return false;
   }
@@ -50,36 +52,52 @@ async function activateSitio(
   stripeCustomerId?: string,
   stripeSubscriptionId?: string
 ): Promise<boolean> {
-  const vencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  const updates: Record<string, unknown> = {
-    statusPago: "activo",
-    plan,
-    fechaVencimiento: vencimiento.toISOString(),
-    ultimoPagoAt: new Date().toISOString(),
-  };
-  if (stripeCustomerId) updates.stripeCustomerId = stripeCustomerId;
-  if (stripeSubscriptionId) updates.stripeSubscriptionId = stripeSubscriptionId;
-  return updateDoc("sitios", sitioId, updates);
+  try {
+    const db = getAdminDb();
+    const vencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const updates: Record<string, unknown> = {
+      statusPago: "activo",
+      plan,
+      fechaVencimiento: vencimiento.toISOString(),
+      ultimoPagoAt: new Date().toISOString(),
+    };
+    if (stripeCustomerId) updates.stripeCustomerId = stripeCustomerId;
+    if (stripeSubscriptionId) updates.stripeSubscriptionId = stripeSubscriptionId;
+    await db.collection("sitios").doc(sitioId).update(updates);
+    return true;
+  } catch { return false; }
 }
 
 async function renewSitio(sitioId: string): Promise<boolean> {
-  const vencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  return updateDoc("sitios", sitioId, {
-    statusPago: "activo",
-    fechaVencimiento: vencimiento.toISOString(),
-    ultimoPagoAt: new Date().toISOString(),
-  });
+  try {
+    const db = getAdminDb();
+    const vencimiento = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    await db.collection("sitios").doc(sitioId).update({
+      statusPago: "activo",
+      fechaVencimiento: vencimiento.toISOString(),
+      ultimoPagoAt: new Date().toISOString(),
+    });
+    return true;
+  } catch { return false; }
 }
 
 async function markPaymentFailed(sitioId: string): Promise<boolean> {
-  return updateDoc("sitios", sitioId, { statusPago: "vencido" });
+  try {
+    const db = getAdminDb();
+    await db.collection("sitios").doc(sitioId).update({ statusPago: "vencido" });
+    return true;
+  } catch { return false; }
 }
 
 async function cancelSitio(sitioId: string): Promise<boolean> {
-  return updateDoc("sitios", sitioId, {
-    statusPago: "cancelado",
-    stripeSubscriptionId: "",
-  });
+  try {
+    const db = getAdminDb();
+    await db.collection("sitios").doc(sitioId).update({
+      statusPago: "cancelado",
+      stripeSubscriptionId: "",
+    });
+    return true;
+  } catch { return false; }
 }
 
 // ── Webhook handler ──────────────────────────────────────────────────────

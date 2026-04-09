@@ -165,7 +165,7 @@ export default function BioClient({ sitioId, data, source }: BioClientProps) {
         break;
       case "link":
         if (link.url) {
-          window.location.href = link.url.startsWith("http") ? link.url : link.url;
+          if (/^https?:\/\//i.test(link.url)) window.location.href = link.url;
         }
         break;
     }

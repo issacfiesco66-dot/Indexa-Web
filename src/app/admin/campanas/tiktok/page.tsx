@@ -559,7 +559,7 @@ function TikTokAdsContent() {
   };
 
   // ── OAuth URL (uses redirect_uri registered in TikTok app) ─────
-  const TIKTOK_OAUTH_URL = "https://business-api.tiktok.com/portal/auth?app_id=7619166839642865681&state=indexa&redirect_uri=https%3A%2F%2Ftecnicoscertificados.com%2F";
+  const TIKTOK_OAUTH_URL = `https://business-api.tiktok.com/portal/auth?app_id=${process.env.NEXT_PUBLIC_TIKTOK_APP_ID || ""}&state=indexa&redirect_uri=https%3A%2F%2Ftecnicoscertificados.com%2F`;
 
   if (!connected) {
     return (
