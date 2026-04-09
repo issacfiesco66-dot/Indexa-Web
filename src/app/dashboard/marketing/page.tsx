@@ -126,7 +126,7 @@ const GUIDE_STEPS = [
 
 // ── Main component ───────────────────────────────────────────────────
 export default function MarketingPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, role: authRole } = useAuth();
   const router = useRouter();
 
   // State
@@ -174,12 +174,11 @@ export default function MarketingPage() {
   // Paywall state
   const [sitio, setSitio] = useState<SitioData | null>(null);
   const [sitioId, setSitioId] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string>("");
   const [showPaywall, setShowPaywall] = useState(false);
   const [paywallFeature, setPaywallFeature] = useState("");
 
   const isConnected = !!savedToken && !!savedAccount;
-  const isActive = sitio?.statusPago === "activo" || userRole === "admin" || userRole === "superadmin";
+  const isActive = sitio?.statusPago === "activo" || authRole === "superadmin";
 
   const requireActive = (feature: string, action: () => void) => {
     if (!isActive) {
@@ -229,7 +228,6 @@ export default function MarketingPage() {
         const profileSnap = await getDoc(doc(db!, "usuarios", user.uid));
         if (profileSnap.exists()) {
           const profile = profileSnap.data();
-          if (profile.role) setUserRole(profile.role as string);
           if (profile.sitioId) {
             setSitioId(profile.sitioId);
             const sitioSnap = await getDoc(doc(db!, "sitios", profile.sitioId));

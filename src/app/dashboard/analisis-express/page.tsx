@@ -80,7 +80,7 @@ const SEVERITY_CONFIG: Record<Severity, { color: string; bg: string; label: stri
 
 // ══════════════════════════════════════════════════════════════════
 export default function AnalisisExpressPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, role: authRole } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -104,9 +104,8 @@ export default function AnalisisExpressPage() {
   // Diagnostic results
   const [diagnostic, setDiagnostic] = useState<DiagnosticResult | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string>("");
 
-  const isActive = sitio?.statusPago === "activo" || userRole === "admin" || userRole === "superadmin";
+  const isActive = sitio?.statusPago === "activo" || authRole === "superadmin";
   const isUnlocked = searchParams?.get("unlocked") === "true";
 
   // ── Auth + data + tokens ───────────────────────────────────────
@@ -120,7 +119,6 @@ export default function AnalisisExpressPage() {
         const profileSnap = await getDoc(doc(db!, "usuarios", user.uid));
         if (!profileSnap.exists()) { setLoadingData(false); return; }
         const profile = profileSnap.data() as UserProfile;
-        if (profile.role) setUserRole(profile.role as string);
         if (!profile.sitioId) { setLoadingData(false); return; }
 
         setSitioId(profile.sitioId);

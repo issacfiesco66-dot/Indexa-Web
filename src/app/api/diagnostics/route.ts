@@ -6,6 +6,31 @@ import { getCampaigns, getReporting, type TikTokCredentials } from "@/lib/tiktok
 const META_GRAPH_URL = "https://graph.facebook.com/v21.0";
 const limiter = createRateLimiter({ windowMs: 60_000, max: 10 });
 
+// ── In-memory cache (5 min TTL) to avoid burning Meta/TikTok API quota ──
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const diagnosticCache = new Map<string, { data: unknown; expires: number }>();
+
+function getCached(key: string): unknown | null {
+  const entry = diagnosticCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expires) {
+    diagnosticCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCache(key: string, data: unknown) {
+  diagnosticCache.set(key, { data, expires: Date.now() + CACHE_TTL_MS });
+  // Evict old entries if cache grows too large
+  if (diagnosticCache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of diagnosticCache) {
+      if (now > v.expires) diagnosticCache.delete(k);
+    }
+  }
+}
+
 // ── Benchmarks (Mexico) ──────────────────────────────────────────
 type Severity = "critical" | "warning" | "good" | "excellent";
 
@@ -258,13 +283,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No autorizado." }, { status: 401 });
     }
 
+    // Cache key: uid + platform + accountId (unique per user+account)
+    const cacheKey = `${user.uid}:${platform}:${accountId}`;
+    const cached = getCached(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
+
     if (platform === "meta") {
       const result = await fetchMetaDiagnostics(token, accountId);
+      setCache(cacheKey, result);
       return NextResponse.json(result);
     }
 
     if (platform === "tiktok") {
       const result = await fetchTikTokDiagnostics(token, accountId);
+      setCache(cacheKey, result);
       return NextResponse.json(result);
     }
 
