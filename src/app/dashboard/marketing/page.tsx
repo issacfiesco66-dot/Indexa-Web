@@ -178,9 +178,14 @@ export default function MarketingPage() {
 
     (async () => {
       try {
-        const snap = await getDoc(doc(db, "usuarios", user.uid));
-        if (snap.exists()) {
-          const data = snap.data();
+        const authToken = await user.getIdToken();
+        const res = await fetch("/api/tokens", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+          body: JSON.stringify({ action: "load" }),
+        });
+        const { tokens: data } = await res.json();
+        if (data) {
           if (data.metaAccessToken) {
             setSavedToken(data.metaAccessToken);
             setMetaToken(data.metaAccessToken);
@@ -211,7 +216,7 @@ export default function MarketingPage() {
 
   // ── Save credentials ──────────────────────────────────────────
   const handleSaveCredentials = useCallback(async () => {
-    if (!db || !user) return;
+    if (!user) return;
     if (!metaToken.trim() || !adAccountId.trim()) {
       setSaveMsg("Completa ambos campos.");
       return;
@@ -219,17 +224,29 @@ export default function MarketingPage() {
     setSaving(true);
     setSaveMsg("");
     try {
-      await updateDoc(doc(db, "usuarios", user.uid), {
-        metaAccessToken: metaToken.trim(),
-        metaAdAccountId: adAccountId.trim().replace("act_", ""),
-        ...(nanoBananaKey.trim() ? { nanoBananaApiKey: nanoBananaKey.trim() } : {}),
-        ...(metaPageId.trim() ? { metaPageId: metaPageId.trim() } : {}),
+      const authToken = await user.getIdToken();
+      const res = await fetch("/api/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          action: "save",
+          tokens: {
+            metaAccessToken: metaToken.trim(),
+            metaAdAccountId: adAccountId.trim(),
+            ...(nanoBananaKey.trim() ? { nanoBananaApiKey: nanoBananaKey.trim() } : {}),
+            ...(metaPageId.trim() ? { metaPageId: metaPageId.trim() } : {}),
+          },
+        }),
       });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || "Error al guardar.");
+      }
       if (nanoBananaKey.trim()) setSavedNanoBananaKey(nanoBananaKey.trim());
       if (metaPageId.trim()) setSavedPageId(metaPageId.trim());
       setSavedToken(metaToken.trim());
       setSavedAccount(adAccountId.trim().replace("act_", ""));
-      setSaveMsg("Credenciales guardadas correctamente.");
+      setSaveMsg("Credenciales guardadas (encriptadas).");
       setShowGuide(false);
     } catch (err) {
       console.error("Error saving credentials:", err instanceof Error ? err.message : "unknown");
@@ -461,11 +478,13 @@ export default function MarketingPage() {
 
   // ── Disconnect ────────────────────────────────────────────────
   const handleDisconnect = useCallback(async () => {
-    if (!db || !user) return;
+    if (!user) return;
     try {
-      await updateDoc(doc(db, "usuarios", user.uid), {
-        metaAccessToken: "",
-        metaAdAccountId: "",
+      const authToken = await user.getIdToken();
+      await fetch("/api/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ action: "clear" }),
       });
       setSavedToken("");
       setSavedAccount("");

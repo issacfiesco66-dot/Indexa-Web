@@ -47,15 +47,19 @@ export default function CrearAnuncioPage() {
 
     (async () => {
       try {
+        const authToken = await user.getIdToken();
+        const res = await fetch("/api/tokens", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+          body: JSON.stringify({ action: "load" }),
+        });
+        const { tokens: data } = await res.json();
+        if (data?.nanoBananaApiKey) {
+          setApiKey(data.nanoBananaApiKey);
+        }
         const snap = await getDoc(doc(db, "usuarios", user.uid));
-        if (snap.exists()) {
-          const data = snap.data();
-          if (data.nanoBananaApiKey) {
-            setApiKey(data.nanoBananaApiKey);
-          }
-          if (data.displayName) {
-            setBusinessName(data.displayName);
-          }
+        if (snap.exists() && snap.data().displayName) {
+          setBusinessName(snap.data().displayName);
         }
       } catch (err) {
         console.error("Error loading API key:", err instanceof Error ? err.message : "unknown");

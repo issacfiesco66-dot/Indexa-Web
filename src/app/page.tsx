@@ -1,5 +1,5 @@
 import Header from "@/components/Header";
-import PromoBanner from "@/components/PromoBanner";
+
 import Hero from "@/components/Hero";
 import Solutions from "@/components/Solutions";
 import HowItWorks from "@/components/HowItWorks";
@@ -13,7 +13,6 @@ import WhatsAppFloat from "@/components/WhatsAppFloat";
 export default function Home() {
   return (
     <>
-      <PromoBanner />
       <Header />
       <main>
         <Hero />

@@ -310,9 +310,14 @@ export default function AdminFacebookAdsPage() {
 
     (async () => {
       try {
-        const snap = await getDoc(doc(db, "usuarios", user.uid));
-        if (snap.exists()) {
-          const data = snap.data();
+        const authToken = await user.getIdToken();
+        const res = await fetch("/api/tokens", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+          body: JSON.stringify({ action: "load" }),
+        });
+        const { tokens: data } = await res.json();
+        if (data) {
           if (data.metaAccessToken) {
             setSavedToken(data.metaAccessToken);
             setMetaToken(data.metaAccessToken);
@@ -351,17 +356,29 @@ export default function AdminFacebookAdsPage() {
     setSaving(true);
     setSaveMsg("");
     try {
-      await updateDoc(doc(db, "usuarios", user.uid), {
-        metaAccessToken: metaToken.trim(),
-        metaAdAccountId: adAccountId.trim().replace("act_", ""),
-        ...(nanoBananaKey.trim() ? { nanoBananaApiKey: nanoBananaKey.trim() } : {}),
-        ...(metaPageId.trim() ? { metaPageId: metaPageId.trim() } : {}),
+      const authToken = await user.getIdToken();
+      const res = await fetch("/api/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          action: "save",
+          tokens: {
+            metaAccessToken: metaToken.trim(),
+            metaAdAccountId: adAccountId.trim(),
+            ...(nanoBananaKey.trim() ? { nanoBananaApiKey: nanoBananaKey.trim() } : {}),
+            ...(metaPageId.trim() ? { metaPageId: metaPageId.trim() } : {}),
+          },
+        }),
       });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Error al guardar.");
+      }
       if (nanoBananaKey.trim()) setSavedNanoBananaKey(nanoBananaKey.trim());
       if (metaPageId.trim()) setSavedPageId(metaPageId.trim());
       setSavedToken(metaToken.trim());
       setSavedAccount(adAccountId.trim().replace("act_", ""));
-      setSaveMsg("Credenciales guardadas correctamente.");
+      setSaveMsg("Credenciales guardadas (encriptadas).");
       setShowGuide(false);
     } catch (err) {
       console.error("Error saving credentials:", err instanceof Error ? err.message : "unknown");
@@ -388,13 +405,16 @@ export default function AdminFacebookAdsPage() {
         setSaveMsg(data.error || "Error al extender el token.");
         return;
       }
-      // Save the new long-lived token
+      // Save the new long-lived token (encrypted at rest)
       const longToken = data.access_token;
       setSavedToken(longToken);
       setMetaToken(longToken);
-      if (db) {
-        await updateDoc(doc(db, "usuarios", user.uid), { metaAccessToken: longToken });
-      }
+      const saveRes = await fetch("/api/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ action: "save", tokens: { metaAccessToken: longToken } }),
+      });
+      if (!saveRes.ok) console.error("Error saving extended token");
       const days = data.expires_in ? Math.round(data.expires_in / 86400) : 60;
       setSaveMsg(`Token extendido exitosamente. Expira en ~${days} días.`);
     } catch {
@@ -626,11 +646,13 @@ export default function AdminFacebookAdsPage() {
 
   // ── Disconnect ────────────────────────────────────────────────
   const handleDisconnect = useCallback(async () => {
-    if (!db || !user) return;
+    if (!user) return;
     try {
-      await updateDoc(doc(db, "usuarios", user.uid), {
-        metaAccessToken: "",
-        metaAdAccountId: "",
+      const authToken = await user.getIdToken();
+      await fetch("/api/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ action: "clear" }),
       });
       setSavedToken("");
       setSavedAccount("");
