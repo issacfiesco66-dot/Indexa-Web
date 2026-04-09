@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
 
     // Read sitio (public read — no auth needed) and verify ownership
     const sitioDoc = await readDoc("sitios", sitioId);
+    console.log("CHECKOUT: sitioDoc", sitioDoc ? { id: sitioDoc.id, hasData: Object.keys(sitioDoc.data).length > 0 } : null);
     if (!sitioDoc) {
       return NextResponse.json(
         { success: false, message: "Sitio no encontrado." },

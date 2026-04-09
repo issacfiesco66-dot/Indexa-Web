@@ -44,7 +44,8 @@ function parseValue(val: FirestoreValue): unknown {
   return null;
 }
 
-function parseFields(fields: Record<string, FirestoreValue>): Record<string, unknown> {
+function parseFields(fields: Record<string, FirestoreValue> | undefined | null): Record<string, unknown> {
+  if (!fields) return {};
   const result: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(fields)) {
     result[key] = parseValue(val);
