@@ -277,6 +277,7 @@ async function executeTool(
         const adLink = (input.link as string) || "https://indexa.com.mx";
         const ctaType = (input.cta_type as string) || "LEARN_MORE";
         const adName = (input.ad_name as string) || "Anuncio IA";
+        const steps: string[] = [];
 
         // Validate inputs are real values, not placeholders
         if (!imgUrl || !imgUrl.startsWith("http") || imgUrl.includes("GENERADA") || imgUrl.includes("placeholder")) {
@@ -289,22 +290,27 @@ async function executeTool(
           throw new Error(`page_id "${pageId}" no es válido. Debe ser un ID numérico real de una página de Facebook.`);
         }
 
-        // 1. Download image from DALL-E URL and convert to base64
+        // 1. Download image
+        steps.push("Descargando imagen...");
         const imgRes = await fetch(imgUrl);
-        if (!imgRes.ok) throw new Error(`No se pudo descargar la imagen (HTTP ${imgRes.status})`);
+        if (!imgRes.ok) throw new Error(`Paso 1 FALLÓ: No se pudo descargar la imagen (HTTP ${imgRes.status}). La URL puede haber expirado.`);
         const imgBuffer = await imgRes.arrayBuffer();
         const imgBase64 = Buffer.from(imgBuffer).toString("base64");
+        steps.push(`✓ Imagen descargada (${Math.round(imgBuffer.byteLength / 1024)}KB)`);
 
         // 2. Upload image to Meta
+        steps.push("Subiendo imagen a Meta...");
         const uploadData = await metaPost(`${META_GRAPH_URL}/${actId}/adimages`, {
           bytes: imgBase64,
           access_token: metaToken,
         });
         const imgHashes = uploadData.images;
         const imgHash = imgHashes ? (Object.values(imgHashes)[0] as { hash: string })?.hash : null;
-        if (!imgHash) throw new Error("No se pudo subir la imagen a Meta.");
+        if (!imgHash) throw new Error(`Paso 2 FALLÓ: No se obtuvo hash de imagen. Respuesta de Meta: ${JSON.stringify(uploadData).slice(0, 200)}`);
+        steps.push(`✓ Imagen subida a Meta (hash: ${imgHash})`);
 
         // 3. Create ad creative
+        steps.push("Creando creative...");
         const creativeRes = await fetch(`${META_GRAPH_URL}/${actId}/adcreatives`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -325,13 +331,15 @@ async function executeTool(
         });
         const creativeText = await creativeRes.text();
         let creativeData: Record<string, unknown>;
-        try { creativeData = JSON.parse(creativeText); } catch { throw new Error(`Respuesta no-JSON al crear creative: ${creativeText.slice(0, 200)}`); }
+        try { creativeData = JSON.parse(creativeText); } catch { throw new Error(`Paso 3 FALLÓ: Respuesta no-JSON: ${creativeText.slice(0, 200)}`); }
         if (creativeData.error) {
           const e = creativeData.error as { message?: string; error_user_msg?: string };
-          throw new Error(e.error_user_msg || e.message || "Error al crear creative");
+          throw new Error(`Paso 3 FALLÓ (creative): ${e.error_user_msg || e.message}`);
         }
+        steps.push(`✓ Creative creado (ID: ${creativeData.id})`);
 
         // 4. Create ad
+        steps.push("Creando anuncio...");
         const adRes = await fetch(`${META_GRAPH_URL}/${actId}/ads`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -343,12 +351,23 @@ async function executeTool(
             access_token: metaToken,
           }),
         });
-        const adText2 = await adRes.text();
+        const adResText = await adRes.text();
         let adData: Record<string, unknown>;
-        try { adData = JSON.parse(adText2); } catch { throw new Error(`Respuesta no-JSON al crear ad: ${adText2.slice(0, 200)}`); }
+        try { adData = JSON.parse(adResText); } catch { throw new Error(`Paso 4 FALLÓ: Respuesta no-JSON: ${adResText.slice(0, 200)}`); }
         if (adData.error) {
           const e = adData.error as { message?: string; error_user_msg?: string };
-          throw new Error(e.error_user_msg || e.message || "Error al crear anuncio");
+          throw new Error(`Paso 4 FALLÓ (ad): ${e.error_user_msg || e.message}`);
+        }
+        steps.push(`✓ Anuncio creado (ID: ${adData.id})`);
+
+        // 5. Verify ad exists
+        steps.push("Verificando anuncio en Meta...");
+        const verifyRes = await fetch(`${META_GRAPH_URL}/${adData.id}?fields=id,name,status&access_token=${metaToken}`);
+        const verifyData = await verifyRes.json();
+        if (verifyData.error || !verifyData.id) {
+          steps.push(`⚠ Verificación falló: ${verifyData.error?.message || "Ad no encontrado"}`);
+        } else {
+          steps.push(`✓ Verificado: Ad ${verifyData.id} existe (status: ${verifyData.status})`);
         }
 
         return JSON.stringify({
@@ -356,7 +375,8 @@ async function executeTool(
           adId: adData.id,
           creativeId: creativeData.id,
           imageHash: imgHash,
-          note: `Anuncio creado exitosamente. Ad ID: ${adData.id}, Creative ID: ${creativeData.id}. El anuncio está PAUSADO — actívalo cuando estés listo.`,
+          steps: steps.join("\n"),
+          note: `Anuncio creado. Ad ID: ${adData.id}, Creative ID: ${creativeData.id}. Status: PAUSED.`,
         });
       }
 
