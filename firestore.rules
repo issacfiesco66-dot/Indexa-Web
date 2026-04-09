@@ -94,6 +94,15 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // ── savings_logs (AI optimization audit trail — per sitio) ─────────────
+    // Subcollection: sitios/{sitioId}/savings_logs/{logId}
+    // Read: owner or admin. Write: Admin SDK only (bypasses rules).
+    match /sitios/{sitioId}/savings_logs/{logId} {
+      allow read: if isAdmin()
+        || (request.auth != null && get(/databases/$(database)/documents/sitios/$(sitioId)).data.ownerId == request.auth.uid);
+      allow write: if isAdmin(); // AI actions write via Admin SDK server-side
+    }
+
     // ── webhook_events (audit trail — webhook writes, admin reads) ─────────
     match /webhook_events/{eventId} {
       allow read: if isAdmin();

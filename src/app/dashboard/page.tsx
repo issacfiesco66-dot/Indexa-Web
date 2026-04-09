@@ -44,6 +44,7 @@ import {
   Briefcase,
   AlertTriangle,
   BarChart3,
+  Shield,
 } from "lucide-react";
 import Link from "next/link";
 import AiMagicButton from "@/components/AiMagicButton";
@@ -892,6 +893,31 @@ export default function ClientDashboardPage() {
               </div>
               <span className="hidden sm:flex items-center gap-1 rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white">
                 Ver análisis
+              </span>
+            </Link>
+          </section>
+        )}
+
+        {/* ── Vault CTA (active users only) ────────────────────────── */}
+        {sitio.statusPago === "activo" && (
+          <section className="mb-10">
+            <Link
+              href="/dashboard/vault"
+              className="group flex items-center gap-4 rounded-2xl border-2 border-emerald-200 bg-gradient-to-r from-emerald-50 to-green-50 px-6 py-5 transition-all hover:border-emerald-300 hover:shadow-lg"
+            >
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-100">
+                <Shield size={24} className="text-emerald-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-gray-900">
+                  Bóveda de Activos Rescatados
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Ve cuánto capital ha rescatado la IA y exporta tu reporte de ROI.
+                </p>
+              </div>
+              <span className="hidden sm:flex items-center gap-1 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white">
+                Ver bóveda
               </span>
             </Link>
           </section>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyIdToken } from "@/lib/verifyAuth";
 import { createRateLimiter } from "@/lib/rateLimit";
+import { getAdminDb } from "@/lib/firebaseAdmin";
 import OpenAI from "openai";
 
 export const maxDuration = 300; // Vercel Pro: hasta 300s para flujos de creación de anuncios
@@ -221,7 +222,8 @@ async function executeTool(
   name: string,
   input: Record<string, unknown>,
   metaToken: string,
-  adAccountId: string
+  adAccountId: string,
+  sitioId?: string
 ): Promise<string> {
   const actId = `act_${adAccountId.replace("act_", "")}`;
 
@@ -290,11 +292,35 @@ async function executeTool(
 
       case "pause_campaign": {
         const campaignId = input.campaign_id as string;
+        const pauseReason = (input.reason as string) || "Optimización por IA";
+        const campaignName = (input.campaign_name as string) || campaignId;
+        const estimatedDailySaving = Number(input.estimated_daily_saving) || 0;
+
         await metaPost(`${META_GRAPH_URL}/${campaignId}`, {
           status: "PAUSED",
           access_token: metaToken,
         });
-        return `Campaña ${campaignId} pausada exitosamente.`;
+
+        // Log savings to vault if sitioId available
+        if (sitioId && estimatedDailySaving > 0) {
+          try {
+            const daysLeft = Math.max(1, 30 - new Date().getDate());
+            const adb = getAdminDb();
+            await adb.collection("sitios").doc(sitioId).collection("savings_logs").add({
+              date: new Date().toISOString(),
+              action: "Campaña pausada por IA",
+              campaign: campaignName,
+              reason: pauseReason,
+              estimatedSaving: Math.round(estimatedDailySaving * daysLeft),
+              platform: "meta",
+              defconLevel: Number(input.defcon_level) || 3,
+            });
+          } catch (e) {
+            console.error("Failed to log savings:", e);
+          }
+        }
+
+        return `Campaña ${campaignName || campaignId} pausada exitosamente.${estimatedDailySaving > 0 ? ` Ahorro estimado registrado en la Bóveda.` : ""}`;
       }
 
       case "resume_campaign": {
@@ -910,14 +936,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse body
-    let body: { message?: string; history?: unknown; metaToken?: string; adAccountId?: string; context?: string };
+    let body: { message?: string; history?: unknown; metaToken?: string; adAccountId?: string; context?: string; sitioId?: string };
     try {
       body = await request.json();
     } catch {
       return NextResponse.json({ error: "Cuerpo de solicitud inválido (no es JSON)." }, { status: 400 });
     }
 
-    const { message, history, metaToken, adAccountId, context } = body;
+    const { message, history, metaToken, adAccountId, context, sitioId: reqSitioId } = body;
     if (!message || !metaToken || !adAccountId) {
       return NextResponse.json({ error: "Faltan parámetros: message, metaToken, adAccountId." }, { status: 400 });
     }
@@ -981,10 +1007,16 @@ export async function POST(request: NextRequest) {
       },
       {
         name: "pause_campaign",
-        description: "Pausa una campaña activa",
+        description: "Pausa una campaña activa y registra el ahorro en la Bóveda. Siempre incluye campaign_name, reason, estimated_daily_saving y defcon_level.",
         input_schema: {
           type: "object",
-          properties: { campaign_id: { type: "string", description: "ID de la campaña" } },
+          properties: {
+            campaign_id: { type: "string", description: "ID de la campaña" },
+            campaign_name: { type: "string", description: "Nombre de la campaña" },
+            reason: { type: "string", description: "Motivo de la pausa (ej: Gasto Fantasma, CPC excesivo)" },
+            estimated_daily_saving: { type: "number", description: "Gasto diario de la campaña en MXN que se deja de desperdiciar" },
+            defcon_level: { type: "number", description: "Nivel DEFCON (1=crítico, 5=menor)" },
+          },
           required: ["campaign_id"],
         },
       },
@@ -1201,7 +1233,7 @@ export async function POST(request: NextRequest) {
         if (parsed.toolCalls.length > 0) {
           const tc = parsed.toolCalls[0];
           debugLog.push(`Gemini tool: ${tc.name}`);
-          const toolResult = await executeTool(tc.name, tc.args, metaToken, adAccountId);
+          const toolResult = await executeTool(tc.name, tc.args, metaToken, adAccountId, reqSitioId);
           aiMessages.push({
             role: "assistant",
             content: [
@@ -1246,7 +1278,7 @@ export async function POST(request: NextRequest) {
           const toolBlock = content.find((c) => c.type === "tool_use");
           if (toolBlock?.name) {
             debugLog.push(`Claude tool: ${toolBlock.name}`);
-            const toolResult = await executeTool(toolBlock.name, toolBlock.input || {}, metaToken, adAccountId);
+            const toolResult = await executeTool(toolBlock.name, toolBlock.input || {}, metaToken, adAccountId, reqSitioId);
             aiMessages.push({ role: "assistant", content: content as Record<string, unknown>[] });
             aiMessages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: toolBlock.id, content: toolResult }] as Record<string, unknown>[] });
             return true; // Continue loop
@@ -1355,7 +1387,7 @@ export async function POST(request: NextRequest) {
             toolResults.push({ type: "tool_result", tool_use_id: block.id, content: "Tiempo agotado." });
             continue;
           }
-          const result = await executeTool(block.name, block.input, metaToken, adAccountId);
+          const result = await executeTool(block.name, block.input, metaToken, adAccountId, reqSitioId);
           toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
         }
 

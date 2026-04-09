@@ -20,6 +20,8 @@ interface MetaAIChatPanelProps {
   apiEndpoint?: string;
   /** Flexible credential payload sent in request body (for Meta or TikTok) */
   credentialPayload?: Record<string, string>;
+  /** SitioId for savings logging */
+  sitioId?: string | null;
   /** Optional extra context appended to the system prompt server-side */
   context?: string;
   /** If provided, auto-sends this message on first mount */
@@ -41,6 +43,7 @@ export default function MetaAIChatPanel({
   adAccountId,
   apiEndpoint = "/api/meta-ads/ai",
   credentialPayload,
+  sitioId,
   context,
   autoMessage,
   darkMode = false,
@@ -85,6 +88,7 @@ export default function MetaAIChatPanel({
             message: userMsg,
             history,
             ...creds,
+            ...(sitioId ? { sitioId } : {}),
             ...(context ? { context } : {}),
           }),
         });

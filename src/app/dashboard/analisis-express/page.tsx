@@ -605,6 +605,7 @@ export default function AnalisisExpressPage() {
                       ? { metaToken: metaToken || credInput1, adAccountId: metaAccountId || credInput2 }
                       : { tiktokToken: tiktokToken || credInput1, advertiserId: tiktokAdvertiserId || credInput2 }
                   }
+                  sitioId={sitioId}
                   context={platform === "meta" ? POST_PAYMENT_CONTEXT_META : POST_PAYMENT_CONTEXT_TIKTOK}
                   autoMessage={AUTO_MESSAGE}
                   darkMode={true}
