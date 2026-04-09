@@ -624,79 +624,131 @@ export async function POST(request: NextRequest) {
     const startTime = Date.now();
     const DEADLINE_MS = 55_000;
     let lastText = "";
+    const debugLog: string[] = [];
+
+    // Helper: try calling an AI provider with tools and execute the agentic loop
+    async function callGemini(): Promise<boolean> {
+      if (!geminiKey) return false;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30_000);
+      try {
+        debugLog.push("Trying Gemini...");
+        const gemRes = await fetch(`${GEMINI_NATIVE_URL}?key=${geminiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents: toGeminiContents(aiMessages),
+            tools: toGeminiTools(tools),
+            tool_config: { function_calling_config: { mode: "AUTO" } },
+            generationConfig: { maxOutputTokens: 1536 },
+          }),
+        });
+        clearTimeout(timeout);
+        const gemText = await gemRes.text();
+        if (!gemRes.ok) { debugLog.push(`Gemini HTTP ${gemRes.status}: ${gemText.slice(0, 150)}`); return false; }
+
+        const parsed = fromGeminiResponse(JSON.parse(gemText));
+        if (parsed.text) lastText = parsed.text;
+
+        if (parsed.finished) return true; // Done — lastText has the response
+
+        if (parsed.toolCalls.length > 0) {
+          const tc = parsed.toolCalls[0];
+          debugLog.push(`Gemini tool: ${tc.name}`);
+          const toolResult = await executeTool(tc.name, tc.args, metaToken, adAccountId);
+          aiMessages.push({
+            role: "assistant",
+            content: [
+              ...(parsed.text ? [{ type: "text", text: parsed.text }] : []),
+              { type: "tool_use", id: `call_gem`, name: tc.name, input: tc.args },
+            ] as Record<string, unknown>[],
+          });
+          aiMessages.push({
+            role: "user",
+            content: [{ type: "tool_result", tool_use_id: `call_gem`, tool_name: tc.name, content: toolResult }] as Record<string, unknown>[],
+          });
+          return true; // Succeeded — continue loop for next round
+        }
+        return false;
+      } catch (err) {
+        clearTimeout(timeout);
+        debugLog.push(`Gemini error: ${err instanceof Error ? err.message : "unknown"}`);
+        return false;
+      }
+    }
+
+    async function callClaude(): Promise<boolean> {
+      if (!anthropicKey) return false;
+      try {
+        debugLog.push("Trying Claude...");
+        const cRes = await fetch(ANTHROPIC_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 1536, system: SYSTEM_PROMPT, tools, messages: aiMessages }),
+        });
+        const cText = await cRes.text();
+        if (!cRes.ok) { debugLog.push(`Claude HTTP ${cRes.status}: ${cText.slice(0, 150)}`); return false; }
+
+        const cData = JSON.parse(cText);
+        const content = (cData.content as { type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }[]) || [];
+        const textPart = content.find((c) => c.type === "text");
+        if (textPart?.text) lastText = textPart.text;
+
+        if (cData.stop_reason === "end_turn") return true;
+
+        if (cData.stop_reason === "tool_use") {
+          const toolBlock = content.find((c) => c.type === "tool_use");
+          if (toolBlock?.name) {
+            debugLog.push(`Claude tool: ${toolBlock.name}`);
+            const toolResult = await executeTool(toolBlock.name, toolBlock.input || {}, metaToken, adAccountId);
+            aiMessages.push({ role: "assistant", content: content as Record<string, unknown>[] });
+            aiMessages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: toolBlock.id, content: toolResult }] as Record<string, unknown>[] });
+            return true; // Continue loop
+          }
+        }
+        return false;
+      } catch (err) {
+        debugLog.push(`Claude error: ${err instanceof Error ? err.message : "unknown"}`);
+        return false;
+      }
+    }
 
     // Agentic loop — up to 4 rounds
+    // Priority: Gemini (free+tools) → Claude (paid+tools) → Groq (free, text-only, last resort)
     for (let round = 0; round < 4; round++) {
-      if (Date.now() - startTime > DEADLINE_MS) break;
+      if (Date.now() - startTime > DEADLINE_MS) { debugLog.push("Deadline reached"); break; }
 
-      // ── Try Gemini native API (primary, free) ──────────────────
-      if (geminiKey) {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30_000);
-        try {
-          console.log(`[meta-ads/ai] Round ${round}: calling Gemini`);
-          const gemRes = await fetch(`${GEMINI_NATIVE_URL}?key=${geminiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            signal: controller.signal,
-            body: JSON.stringify({
-              system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-              contents: toGeminiContents(aiMessages),
-              tools: toGeminiTools(tools),
-              tool_config: { function_calling_config: { mode: "AUTO" } },
-              generationConfig: { maxOutputTokens: 1536 },
-            }),
+      // Try Gemini first
+      const gemOk = await callGemini();
+      if (gemOk) {
+        // If lastText is a final response (no tool calls pending), return it
+        // If tool was called, aiMessages was updated — continue loop
+        if (lastText && aiMessages[aiMessages.length - 1]?.role !== "user") {
+          return NextResponse.json({
+            reply: lastText,
+            newHistory: [...(Array.isArray(history) ? history : []), { role: "user", content: message }, { role: "assistant", content: lastText }],
           });
-          clearTimeout(timeout);
-          const gemText = await gemRes.text();
-
-          if (gemRes.ok) {
-            const gemData = JSON.parse(gemText);
-            const parsed = fromGeminiResponse(gemData);
-            if (parsed.text) lastText = parsed.text;
-
-            if (parsed.finished) {
-              return NextResponse.json({
-                reply: lastText,
-                newHistory: [...(Array.isArray(history) ? history : []), { role: "user", content: message }, { role: "assistant", content: lastText }],
-              });
-            }
-
-            // Tool calls — execute and continue loop
-            if (parsed.toolCalls.length > 0) {
-              const tc = parsed.toolCalls[0]; // One at a time
-              console.log(`[meta-ads/ai] Gemini called tool: ${tc.name}`);
-              const toolResult = await executeTool(tc.name, tc.args, metaToken, adAccountId);
-
-              // Add assistant response (with function call) and tool result to conversation
-              aiMessages.push({
-                role: "assistant",
-                content: [
-                  ...(parsed.text ? [{ type: "text", text: parsed.text }] : []),
-                  { type: "tool_use", id: `call_${round}`, name: tc.name, input: tc.args },
-                ] as Record<string, unknown>[],
-              });
-              aiMessages.push({
-                role: "user",
-                content: [{ type: "tool_result", tool_use_id: `call_${round}`, tool_name: tc.name, content: toolResult }] as Record<string, unknown>[],
-              });
-              continue; // Next round
-            }
-
-            // No text and no tools — shouldn't happen, but break
-            break;
-          }
-          // Gemini error — fall through to fallback
-          console.warn(`[meta-ads/ai] Gemini error (${gemRes.status}): ${gemText.slice(0, 200)}`);
-        } catch (err) {
-          clearTimeout(timeout);
-          console.warn(`[meta-ads/ai] Gemini failed: ${err instanceof Error ? err.message : "unknown"}`);
         }
+        continue; // Tool was executed, next round with Gemini
       }
 
-      // ── Fallback: Groq text-only (no tools — Groq breaks them) ─
-      if (groqKey && round === 0) {
-        console.log("[meta-ads/ai] Falling back to Groq (text-only)");
+      // Gemini failed — try Claude (with tools!)
+      const claudeOk = await callClaude();
+      if (claudeOk) {
+        if (lastText && aiMessages[aiMessages.length - 1]?.role !== "user") {
+          return NextResponse.json({
+            reply: lastText,
+            newHistory: [...(Array.isArray(history) ? history : []), { role: "user", content: message }, { role: "assistant", content: lastText }],
+          });
+        }
+        continue; // Tool was executed, next round
+      }
+
+      // Both failed — Groq text-only as absolute last resort
+      if (groqKey) {
+        debugLog.push("Last resort: Groq text-only");
         try {
           const groqRes = await fetch(GROQ_URL, {
             method: "POST",
@@ -705,65 +757,25 @@ export async function POST(request: NextRequest) {
               model: GROQ_MODEL,
               max_tokens: 1536,
               messages: [
-                { role: "system", content: SYSTEM_PROMPT + "\n\nNOTA: No tienes herramientas disponibles. Responde en texto indicando qué pasos ejecutarías y qué datos necesitas del usuario para continuar." },
+                { role: "system", content: "Eres un asistente de Meta Ads. Responde en español. No tienes herramientas — responde indicando qué necesitas del usuario." },
                 ...toGroqMessages(aiMessages as AnthropicMsg[]),
               ],
             }),
           });
-          const groqText = await groqRes.text();
           if (groqRes.ok) {
-            const groqData = JSON.parse(groqText);
+            const groqData = JSON.parse(await groqRes.text());
             const groqMsg = (groqData.choices as Record<string, unknown>[])?.[0]?.message as { content?: string };
             if (groqMsg?.content) {
               return NextResponse.json({
-                reply: groqMsg.content,
+                reply: `⚠️ Modo limitado (sin herramientas). ${groqMsg.content}\n\n_Debug: ${debugLog.join(" → ")}_`,
                 newHistory: [...(Array.isArray(history) ? history : []), { role: "user", content: message }, { role: "assistant", content: groqMsg.content }],
               });
             }
           }
-        } catch { /* fall through */ }
+        } catch { /* nothing left to try */ }
       }
 
-      // ── Fallback: Claude (paid) ────────────────────────────────
-      if (anthropicKey) {
-        console.log("[meta-ads/ai] Falling back to Claude");
-        try {
-          const cRes = await fetch(ANTHROPIC_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
-            body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 1536, system: SYSTEM_PROMPT, tools, messages: aiMessages }),
-          });
-          const cText = await cRes.text();
-          if (cRes.ok) {
-            const cData = JSON.parse(cText);
-            const content = (cData.content as { type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }[]) || [];
-            const textPart = content.find((c) => c.type === "text");
-            if (textPart?.text) lastText = textPart.text;
-
-            if (cData.stop_reason === "end_turn") {
-              return NextResponse.json({
-                reply: lastText,
-                newHistory: [...(Array.isArray(history) ? history : []), { role: "user", content: message }, { role: "assistant", content: lastText }],
-              });
-            }
-            if (cData.stop_reason === "tool_use") {
-              const toolBlock = content.find((c) => c.type === "tool_use");
-              if (toolBlock?.name) {
-                const toolResult = await executeTool(toolBlock.name, toolBlock.input || {}, metaToken, adAccountId);
-                aiMessages.push({ role: "assistant", content: content as Record<string, unknown>[] });
-                aiMessages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: toolBlock.id, content: toolResult }] as Record<string, unknown>[] });
-                continue;
-              }
-            }
-          } else {
-            console.warn(`[meta-ads/ai] Claude error (${cRes.status}): ${cText.slice(0, 200)}`);
-          }
-        } catch (err) {
-          console.warn(`[meta-ads/ai] Claude failed: ${err instanceof Error ? err.message : "unknown"}`);
-        }
-      }
-
-      break; // All providers failed this round
+      break; // All providers failed
 
       response = response!;
 
@@ -810,7 +822,8 @@ export async function POST(request: NextRequest) {
       break;
     }
 
-    const fallback = lastText || "Se agotó el tiempo. Intenta dividir tu petición en pasos más pequeños.";
+    const debugInfo = debugLog.length > 0 ? `\n\n_Debug: ${debugLog.join(" → ")}_` : "";
+    const fallback = lastText || `No se pudo procesar la solicitud.${debugInfo}`;
     return NextResponse.json({
       reply: fallback,
       newHistory: [
