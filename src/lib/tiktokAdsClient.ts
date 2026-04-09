@@ -780,18 +780,26 @@ export async function uploadImageByUrl(
   };
   if (fileName) body.file_name = fileName;
 
-  const response = await tiktokFetch<{
-    id: string;
-    image_url: string;
-    width: number;
-    height: number;
-  }>("/file/image/ad/upload/", creds.accessToken, { method: "POST", body });
+  const response = await tiktokFetch<Record<string, unknown>>(
+    "/file/image/ad/upload/", creds.accessToken, { method: "POST", body }
+  );
+
+  const d = response.data;
+  // TikTok returns 'id' or 'image_id' depending on API version/endpoint
+  const imageId = (d.id || d.image_id || d.material_id) as string | undefined;
+  const imgUrl = (d.image_url || d.url) as string || "";
+
+  console.log(`[uploadImageByUrl] Raw response data keys: ${Object.keys(d).join(", ")}`, JSON.stringify(d).slice(0, 300));
+
+  if (!imageId) {
+    throw new Error(`TikTok no devolvió image ID. Campos disponibles: ${Object.keys(d).join(", ")}. Data: ${JSON.stringify(d).slice(0, 200)}`);
+  }
 
   return {
-    imageId: response.data.id,
-    imageUrl: response.data.image_url,
-    width: response.data.width,
-    height: response.data.height,
+    imageId,
+    imageUrl: imgUrl,
+    width: (d.width as number) || 0,
+    height: (d.height as number) || 0,
   };
 }
 

@@ -1042,15 +1042,15 @@ async function executeTool(
 
           // 2b. Upload to TikTok
           const uploaded = await uploadImageByUrl(creds, imageUrl, `${label.replace(/\s+/g, "_")}_${Date.now()}.png`);
+          if (!uploaded.imageId) throw new Error(`Upload exitoso pero image_id es undefined. Revisa logs del servidor.`);
 
-          // 2c. Create ad
+          // 2c. Create ad (sin landing_page_url para LEAD_GENERATION)
           const adResult = await createAd(creds, {
             adgroupId: ad.adgroup_id,
             adName: label,
             adText: ad.ad_text,
             imageId: uploaded.imageId,
             callToAction: cta,
-            landingPageUrl: landingUrl,
             displayName,
             identityId,
             identityType,
