@@ -9,7 +9,8 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
 import { useAuth } from "@/lib/AuthContext";
-import type { UserProfile } from "@/types/lead";
+import type { UserProfile, SitioData } from "@/types/lead";
+import { PaywallOverlay, PaywallModal } from "@/components/PaywallGate";
 import {
   Megaphone,
   Eye,
@@ -31,7 +32,7 @@ import {
   BookOpen,
   Link2,
   ShieldCheck,
-  ArrowLeft,
+  ChevronLeft,
   Wand2,
   ImagePlus,
   Trash2,
@@ -82,14 +83,14 @@ function formatMoney(val: string | undefined): string {
 function statusLabel(status: string): { text: string; color: string; bg: string } {
   switch (status) {
     case "ACTIVE":
-      return { text: "Activa", color: "text-green-700", bg: "bg-green-100" };
+      return { text: "Activa", color: "text-emerald-400", bg: "bg-emerald-500/10" };
     case "PAUSED":
-      return { text: "Pausada", color: "text-amber-700", bg: "bg-amber-100" };
+      return { text: "Pausada", color: "text-amber-400", bg: "bg-amber-500/10" };
     case "DELETED":
     case "ARCHIVED":
-      return { text: "Eliminada", color: "text-gray-500", bg: "bg-gray-100" };
+      return { text: "Eliminada", color: "text-white/50", bg: "bg-white/5" };
     default:
-      return { text: status, color: "text-gray-500", bg: "bg-gray-100" };
+      return { text: status, color: "text-white/50", bg: "bg-white/5" };
   }
 }
 
@@ -170,7 +171,23 @@ export default function MarketingPage() {
   const [error, setError] = useState("");
   const [datePreset, setDatePreset] = useState("last_7d");
 
+  // Paywall state
+  const [sitio, setSitio] = useState<SitioData | null>(null);
+  const [sitioId, setSitioId] = useState<string | null>(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallFeature, setPaywallFeature] = useState("");
+
   const isConnected = !!savedToken && !!savedAccount;
+  const isActive = sitio?.statusPago === "activo";
+
+  const requireActive = (feature: string, action: () => void) => {
+    if (!isActive) {
+      setPaywallFeature(feature);
+      setShowPaywall(true);
+      return;
+    }
+    action();
+  };
 
   // ── Load saved credentials ────────────────────────────────────
   useEffect(() => {
@@ -204,6 +221,17 @@ export default function MarketingPage() {
           }
           if (data.metaAccessToken && data.metaAdAccountId) {
             setShowGuide(false);
+          }
+        }
+
+        // Load sitio for paywall gating
+        const profileSnap = await getDoc(doc(db!, "usuarios", user.uid));
+        if (profileSnap.exists()) {
+          const profile = profileSnap.data();
+          if (profile.sitioId) {
+            setSitioId(profile.sitioId);
+            const sitioSnap = await getDoc(doc(db!, "sitios", profile.sitioId));
+            if (sitioSnap.exists()) setSitio(sitioSnap.data() as SitioData);
           }
         }
       } catch (err) {
@@ -502,89 +530,92 @@ export default function MarketingPage() {
   // ── Loading ───────────────────────────────────────────────────
   if (pageLoading || authLoading) {
     return (
-      <div className="flex h-96 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-indexa-blue" />
+      <div className="flex h-96 items-center justify-center bg-[#060918]">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
       </div>
     );
   }
 
   const inputClass =
-    "w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none transition-colors focus:border-indexa-blue focus:bg-white focus:ring-2 focus:ring-indexa-blue/20";
+    "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/30 outline-none transition-colors focus:border-indigo-500 focus:bg-white/[0.07] focus:ring-2 focus:ring-indigo-500/20";
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="min-h-screen bg-[#060918] text-white">
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-indexa-gray-dark"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold text-indexa-gray-dark">
-              <Megaphone size={24} className="text-indexa-orange" />
-              Marketing
-            </h1>
-            <p className="mt-0.5 text-sm text-gray-500">
-              Conecta tus anuncios de Meta (Facebook/Instagram) y gestiónalos desde aquí.
-            </p>
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#060918]/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5 sm:px-6">
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard" className="flex items-center gap-2 text-white/60 transition hover:text-white">
+              <ChevronLeft size={18} />
+            </Link>
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indexa-orange to-orange-400">
+                <span className="text-sm font-black text-white">IX</span>
+              </div>
+              <span className="text-lg font-extrabold tracking-tight text-white">INDEXA</span>
+            </Link>
+          </div>
+          <div className="flex items-center gap-3">
+            {isConnected && (
+              <>
+                <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">
+                  <ShieldCheck size={12} /> Conectado
+                </span>
+                <button
+                  onClick={handleDisconnect}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-500"
+                >
+                  Desconectar
+                </button>
+              </>
+            )}
+            <span className="rounded-full bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-400">
+              Meta Ads
+            </span>
           </div>
         </div>
-        {isConnected && (
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
-              <ShieldCheck size={12} /> Conectado
-            </span>
-            <button
-              onClick={handleDisconnect}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-            >
-              Desconectar
-            </button>
-          </div>
-        )}
-      </div>
+      </header>
+
+      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
 
       {/* ── Guide / Setup ──────────────────────────────────────── */}
       {(!isConnected || showGuide) && (
-        <div className="mb-8 rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] shadow-none">
           <button
             onClick={() => setShowGuide(!showGuide)}
             className="flex w-full items-center justify-between px-6 py-4"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-                <BookOpen size={20} className="text-indexa-blue" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10">
+                <BookOpen size={20} className="text-indigo-400" />
               </div>
               <div className="text-left">
-                <h2 className="text-sm font-bold text-indexa-gray-dark">
+                <h2 className="text-sm font-bold text-white">
                   {isConnected ? "Guía de configuración" : "Conecta tu cuenta de Meta Ads"}
                 </h2>
-                <p className="text-xs text-gray-400">Paso a paso para obtener tu token</p>
+                <p className="text-xs text-white/40">Paso a paso para obtener tu token</p>
               </div>
             </div>
-            {showGuide ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
+            {showGuide ? <ChevronUp size={18} className="text-white/40" /> : <ChevronDown size={18} className="text-white/40" />}
           </button>
 
           {showGuide && (
-            <div className="border-t border-gray-100 px-6 pb-6">
+            <div className="border-t border-white/5 px-6 pb-6">
               <div className="mt-4 space-y-4">
                 {GUIDE_STEPS.map((step, i) => (
                   <div key={i} className="flex gap-4">
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-indexa-blue text-xs font-bold text-white">
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white">
                       {i + 1}
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-sm font-bold text-indexa-gray-dark">{step.title}</h3>
-                      <p className="mt-1 text-xs leading-relaxed text-gray-500">{step.desc}</p>
+                      <h3 className="text-sm font-bold text-white">{step.title}</h3>
+                      <p className="mt-1 text-xs leading-relaxed text-white/50">{step.desc}</p>
                       {step.link && (
                         <a
                           href={step.link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-indexa-blue hover:underline"
+                          className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-indigo-400 hover:underline"
                         >
                           <Link2 size={11} /> {step.linkText}
                         </a>
@@ -595,14 +626,14 @@ export default function MarketingPage() {
               </div>
 
               {/* Connection form */}
-              <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-5">
+              <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <Key size={16} className="text-indexa-orange" />
-                  <h3 className="text-sm font-bold text-indexa-gray-dark">Tus credenciales</h3>
+                  <h3 className="text-sm font-bold text-white">Tus credenciales</h3>
                 </div>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500">Access Token</label>
+                    <label className="block text-xs font-semibold text-white/50">Access Token</label>
                     <input
                       type="password"
                       value={metaToken}
@@ -612,7 +643,7 @@ export default function MarketingPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500">Ad Account ID</label>
+                    <label className="block text-xs font-semibold text-white/50">Ad Account ID</label>
                     <input
                       type="text"
                       value={adAccountId}
@@ -620,10 +651,10 @@ export default function MarketingPage() {
                       placeholder="Ej: 123456789"
                       className={`mt-1 ${inputClass}`}
                     />
-                    <p className="mt-1 text-[10px] text-gray-400">Solo el número, sin &quot;act_&quot;</p>
+                    <p className="mt-1 text-[10px] text-white/40">Solo el número, sin &quot;act_&quot;</p>
                   </div>
-                  <div className="border-t border-gray-200 pt-3 mt-1">
-                    <label className="block text-xs font-semibold text-gray-500">NanoBanana API Key <span className="font-normal text-gray-400">(para generar imágenes con IA)</span></label>
+                  <div className="border-t border-white/10 pt-3 mt-1">
+                    <label className="block text-xs font-semibold text-white/50">NanoBanana API Key <span className="font-normal text-white/40">(para generar imágenes con IA)</span></label>
                     <input
                       type="password"
                       value={nanoBananaKey}
@@ -631,10 +662,10 @@ export default function MarketingPage() {
                       placeholder="Tu API key de NanoBanana..."
                       className={`mt-1 ${inputClass}`}
                     />
-                    <p className="mt-1 text-[10px] text-gray-400">Obténla gratis en <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline">aistudio.google.com</a></p>
+                    <p className="mt-1 text-[10px] text-white/40">Obténla gratis en <a href="https://aistudio.google.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">aistudio.google.com</a></p>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500">Facebook Page ID <span className="font-normal text-gray-400">(requerido para crear anuncios)</span></label>
+                    <label className="block text-xs font-semibold text-white/50">Facebook Page ID <span className="font-normal text-white/40">(requerido para crear anuncios)</span></label>
                     <input
                       type="text"
                       value={metaPageId}
@@ -642,18 +673,18 @@ export default function MarketingPage() {
                       placeholder="Ej: 123456789012345"
                       className={`mt-1 ${inputClass}`}
                     />
-                    <p className="mt-1 text-[10px] text-gray-400">Encuéntralo en tu página de Facebook → Acerca de → ID de la página, o en <a href="https://business.facebook.com/settings/pages" target="_blank" rel="noopener noreferrer" className="text-indexa-blue hover:underline">Business Settings → Pages</a></p>
+                    <p className="mt-1 text-[10px] text-white/40">Encuéntralo en tu página de Facebook → Acerca de → ID de la página, o en <a href="https://business.facebook.com/settings/pages" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">Business Settings → Pages</a></p>
                   </div>
                 </div>
                 {saveMsg && (
-                  <p className={`mt-3 text-xs font-medium ${saveMsg.includes("Error") || saveMsg.includes("Completa") ? "text-red-600" : "text-green-600"}`}>
+                  <p className={`mt-3 text-xs font-medium ${saveMsg.includes("Error") || saveMsg.includes("Completa") ? "text-red-400" : "text-emerald-400"}`}>
                     {saveMsg}
                   </p>
                 )}
                 <button
                   onClick={handleSaveCredentials}
                   disabled={saving}
-                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indexa-blue px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indexa-blue/90 disabled:opacity-60"
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indigo-500/90 disabled:opacity-60"
                 >
                   {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                   {saving ? "Guardando..." : isConnected ? "Actualizar" : "Conectar"}
@@ -669,57 +700,59 @@ export default function MarketingPage() {
         <>
           {/* Account-level metrics */}
           {accountInsights && (
+            <PaywallOverlay locked={!isActive} featureName="Métricas completas de tu cuenta" sitioId={sitioId}>
             <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
-                  <Eye size={18} className="text-indexa-blue" />
+              <div className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-4 shadow-none">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10">
+                  <Eye size={18} className="text-indigo-400" />
                 </div>
                 <div>
-                  <p className="text-lg font-extrabold text-indexa-gray-dark">{formatNumber(accountInsights.impressions)}</p>
-                  <p className="text-xs text-gray-500">Impresiones</p>
+                  <p className="text-lg font-extrabold text-white">{formatNumber(accountInsights.impressions)}</p>
+                  <p className="text-xs text-white/50">Impresiones</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50">
-                  <MousePointerClick size={18} className="text-green-600" />
+              <div className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-4 shadow-none">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/5">
+                  <MousePointerClick size={18} className="text-emerald-400" />
                 </div>
                 <div>
-                  <p className="text-lg font-extrabold text-indexa-gray-dark">{formatNumber(accountInsights.clicks)}</p>
-                  <p className="text-xs text-gray-500">Clics</p>
+                  <p className="text-lg font-extrabold text-white">{formatNumber(accountInsights.clicks)}</p>
+                  <p className="text-xs text-white/50">Clics</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-50">
+              <div className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-4 shadow-none">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10">
                   <DollarSign size={18} className="text-indexa-orange" />
                 </div>
                 <div>
-                  <p className="text-lg font-extrabold text-indexa-gray-dark">{formatMoney(accountInsights.spend)}</p>
-                  <p className="text-xs text-gray-500">Gasto total</p>
+                  <p className="text-lg font-extrabold text-white">{formatMoney(accountInsights.spend)}</p>
+                  <p className="text-xs text-white/50">Gasto total</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50">
-                  <Users size={18} className="text-purple-600" />
+              <div className="flex items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-4 shadow-none">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/5">
+                  <Users size={18} className="text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-lg font-extrabold text-indexa-gray-dark">{formatNumber(accountInsights.reach)}</p>
-                  <p className="text-xs text-gray-500">Alcance</p>
+                  <p className="text-lg font-extrabold text-white">{formatNumber(accountInsights.reach)}</p>
+                  <p className="text-xs text-white/50">Alcance</p>
                 </div>
               </div>
             </div>
+            </PaywallOverlay>
           )}
 
           {/* Toolbar */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-lg font-bold text-indexa-gray-dark">
-              <BarChart3 size={20} className="text-indexa-blue" />
+            <h2 className="flex items-center gap-2 text-lg font-bold text-white">
+              <BarChart3 size={20} className="text-indigo-400" />
               Campañas ({campaigns.length})
             </h2>
             <div className="flex items-center gap-2">
               <select
                 value={datePreset}
                 onChange={(e) => setDatePreset(e.target.value)}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-indexa-gray-dark"
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white"
               >
                 <option value="today">Hoy</option>
                 <option value="yesterday">Ayer</option>
@@ -732,15 +765,15 @@ export default function MarketingPage() {
               <button
                 onClick={() => { fetchCampaigns(); fetchAccountInsights(); }}
                 disabled={loadingCampaigns}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/60 transition-colors hover:bg-white/5"
               >
                 <RefreshCw size={12} className={loadingCampaigns ? "animate-spin" : ""} />
                 Actualizar
               </button>
               {savedPageId && (
                 <button
-                  onClick={() => { setShowCreateModal(true); setCreateError(""); }}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indexa-orange to-orange-500 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5"
+                  onClick={() => requireActive("Crear campañas de Meta Ads", () => { setShowCreateModal(true); setCreateError(""); })}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indexa-orange to-orange-500 px-4 py-1.5 text-xs font-bold text-white shadow-none transition-all hover:shadow-md hover:-translate-y-0.5"
                 >
                   <Plus size={14} />
                   Crear Campaña
@@ -750,7 +783,7 @@ export default function MarketingPage() {
           </div>
 
           {error && (
-            <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-400">
               <AlertCircle size={16} />
               {error}
               <button onClick={() => setError("")} className="ml-auto text-xs font-medium hover:underline">
@@ -761,22 +794,22 @@ export default function MarketingPage() {
 
           {/* Campaign list */}
           {loadingCampaigns ? (
-            <div className="flex h-40 items-center justify-center rounded-2xl border border-gray-200 bg-white">
-              <Loader2 className="h-6 w-6 animate-spin text-indexa-blue" />
+            <div className="flex h-40 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03]">
+              <Loader2 className="h-6 w-6 animate-spin text-indigo-400" />
             </div>
           ) : campaigns.length === 0 ? (
-            <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white text-center">
-              <Megaphone size={32} className="text-gray-300" />
-              <p className="mt-3 text-sm text-gray-500">No se encontraron campañas.</p>
+            <div className="flex h-40 flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-center">
+              <Megaphone size={32} className="text-white/30" />
+              <p className="mt-3 text-sm text-white/50">No se encontraron campañas.</p>
               {savedPageId ? (
                 <button
-                  onClick={() => { setShowCreateModal(true); setCreateError(""); }}
+                  onClick={() => requireActive("Crear campañas de Meta Ads", () => { setShowCreateModal(true); setCreateError(""); })}
                   className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-indexa-orange px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-indexa-orange/90"
                 >
                   <Plus size={14} /> Crear tu primera campaña
                 </button>
               ) : (
-                <p className="mt-1 text-xs text-gray-400">Configura tu Facebook Page ID en las credenciales para crear campañas.</p>
+                <p className="mt-1 text-xs text-white/40">Configura tu Facebook Page ID en las credenciales para crear campañas.</p>
               )}
             </div>
           ) : (
@@ -791,16 +824,16 @@ export default function MarketingPage() {
                   : "—";
 
                 return (
-                  <div key={c.id} className="rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+                  <div key={c.id} className="rounded-xl border border-white/10 bg-white/[0.03] shadow-none transition-shadow hover:shadow-md">
                     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-bold text-indexa-gray-dark truncate">{c.name}</h3>
+                          <h3 className="text-sm font-bold text-white truncate">{c.name}</h3>
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${st.color} ${st.bg}`}>
                             {st.text}
                           </span>
                         </div>
-                        <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-gray-400">
+                        <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-white/40">
                           <span>Objetivo: {c.objective?.replace(/_/g, " ") || "—"}</span>
                           <span>Presupuesto: {budget}</span>
                           {c.created_time && <span>Creada: {new Date(c.created_time).toLocaleDateString("es-MX")}</span>}
@@ -810,16 +843,16 @@ export default function MarketingPage() {
                         {!ins && (
                           <button
                             onClick={() => fetchCampaignInsights(c.id)}
-                            className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-[11px] font-medium text-gray-500 transition-colors hover:bg-gray-50"
+                            className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-[11px] font-medium text-white/50 transition-colors hover:bg-white/5"
                           >
                             <TrendingUp size={12} /> Ver métricas
                           </button>
                         )}
                         {c.status === "ACTIVE" && (
                           <button
-                            onClick={() => handleCampaignAction(c.id, "pause")}
+                            onClick={() => requireActive("Pausar campañas", () => handleCampaignAction(c.id, "pause"))}
                             disabled={actionLoading === c.id}
-                            className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-lg bg-amber-500/10 px-3 py-1.5 text-[11px] font-bold text-amber-400 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
                           >
                             {actionLoading === c.id ? <Loader2 size={12} className="animate-spin" /> : <Pause size={12} />}
                             Pausar
@@ -827,9 +860,9 @@ export default function MarketingPage() {
                         )}
                         {c.status === "PAUSED" && (
                           <button
-                            onClick={() => handleCampaignAction(c.id, "resume")}
+                            onClick={() => requireActive("Reanudar campañas", () => handleCampaignAction(c.id, "resume"))}
                             disabled={actionLoading === c.id}
-                            className="inline-flex items-center gap-1 rounded-lg bg-green-50 px-3 py-1.5 text-[11px] font-bold text-green-700 transition-colors hover:bg-green-100 disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-[11px] font-bold text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
                           >
                             {actionLoading === c.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
                             Reanudar
@@ -838,7 +871,7 @@ export default function MarketingPage() {
                         {deleteConfirm === c.id ? (
                           <div className="flex items-center gap-1">
                             <button
-                              onClick={() => handleDeleteCampaign(c.id)}
+                              onClick={() => requireActive("Eliminar campañas", () => handleDeleteCampaign(c.id))}
                               disabled={actionLoading === c.id}
                               className="inline-flex items-center gap-1 rounded-lg bg-red-500 px-3 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
                             >
@@ -847,15 +880,15 @@ export default function MarketingPage() {
                             </button>
                             <button
                               onClick={() => setDeleteConfirm(null)}
-                              className="rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 hover:bg-gray-100"
+                              className="rounded-lg px-2 py-1.5 text-[11px] font-medium text-white/40 hover:bg-white/10"
                             >
                               Cancelar
                             </button>
                           </div>
                         ) : (
                           <button
-                            onClick={() => setDeleteConfirm(c.id)}
-                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                            onClick={() => requireActive("Eliminar campañas", () => setDeleteConfirm(c.id))}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-medium text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-500"
                             title="Eliminar campaña"
                           >
                             <Trash2 size={12} />
@@ -866,7 +899,7 @@ export default function MarketingPage() {
 
                     {/* Campaign insights row */}
                     {ins && (
-                      <div className="grid grid-cols-2 gap-px border-t border-gray-100 bg-gray-100 sm:grid-cols-5">
+                      <div className="grid grid-cols-2 gap-px border-t border-white/5 bg-white/5 sm:grid-cols-5">
                         {[
                           { label: "Impresiones", value: formatNumber(ins.impressions) },
                           { label: "Clics", value: formatNumber(ins.clicks) },
@@ -874,9 +907,9 @@ export default function MarketingPage() {
                           { label: "CPC", value: formatMoney(ins.cpc) },
                           { label: "Gasto", value: formatMoney(ins.spend) },
                         ].map((m) => (
-                          <div key={m.label} className="bg-white px-4 py-3 text-center">
-                            <p className="text-xs font-bold text-indexa-gray-dark">{m.value}</p>
-                            <p className="text-[10px] text-gray-400">{m.label}</p>
+                          <div key={m.label} className="bg-white/[0.03] px-4 py-3 text-center">
+                            <p className="text-xs font-bold text-white">{m.value}</p>
+                            <p className="text-[10px] text-white/40">{m.label}</p>
                           </div>
                         ))}
                       </div>
@@ -892,18 +925,18 @@ export default function MarketingPage() {
             <div className="mt-8">
               <Link
                 href="/dashboard/marketing/crear-anuncio"
-                className="flex items-center justify-between rounded-2xl border border-gray-200 bg-gradient-to-r from-purple-50 to-orange-50 p-5 shadow-sm transition-shadow hover:shadow-md"
+                className="flex items-center justify-between rounded-2xl border border-white/10 bg-gradient-to-r from-purple-500/5 to-orange-500/5 p-5 shadow-none transition-shadow hover:shadow-md"
               >
                 <div className="flex items-center gap-4">
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-indexa-orange">
                     <Wand2 size={20} className="text-white" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-indexa-gray-dark">Crear Anuncio con IA</h3>
-                    <p className="text-xs text-gray-500">Genera imágenes profesionales y previsualiza tus anuncios de Facebook e Instagram.</p>
+                    <h3 className="text-sm font-bold text-white">Crear Anuncio con IA</h3>
+                    <p className="text-xs text-white/50">Genera imágenes profesionales y previsualiza tus anuncios de Facebook e Instagram.</p>
                   </div>
                 </div>
-                <ImagePlus size={18} className="text-gray-400" />
+                <ImagePlus size={18} className="text-white/40" />
               </Link>
             </div>
           )}
@@ -914,7 +947,7 @@ export default function MarketingPage() {
               href="https://www.facebook.com/business/tools/ads-manager"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-400 transition-colors hover:text-indexa-blue"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-white/40 transition-colors hover:text-indigo-400"
             >
               <ExternalLink size={12} />
               Abrir Meta Ads Manager completo
@@ -923,19 +956,24 @@ export default function MarketingPage() {
         </>
       )}
 
+      </div>{/* close inner content wrapper */}
+
+      {/* ── Paywall Modal ──────────────────────────────────────── */}
+      <PaywallModal open={showPaywall} onClose={() => setShowPaywall(false)} featureName={paywallFeature} sitioId={sitioId} />
+
       {/* ── Campaign Creation Modal ────────────────────────────── */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 backdrop-blur-sm p-4 pt-12">
-          <div className="relative w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-2xl">
+          <div className="relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#0a0e27] shadow-2xl">
             {/* Modal header */}
-            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-              <h2 className="flex items-center gap-2 text-lg font-bold text-indexa-gray-dark">
+            <div className="flex items-center justify-between border-b border-white/5 px-6 py-4">
+              <h2 className="flex items-center gap-2 text-lg font-bold text-white">
                 <Plus size={20} className="text-indexa-orange" />
                 Crear Nueva Campaña
               </h2>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                className="rounded-lg p-1.5 text-white/40 transition-colors hover:bg-white/10 hover:text-white/60"
               >
                 <X size={18} />
               </button>
@@ -944,14 +982,14 @@ export default function MarketingPage() {
             {/* Modal body */}
             <div className="max-h-[70vh] overflow-y-auto px-6 py-5 space-y-5">
               {createError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-600">{createError}</div>
+                <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-xs text-red-400">{createError}</div>
               )}
 
               {/* Campaign info */}
               <div className="space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Información de la campaña</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-white/40">Información de la campaña</h3>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600">Nombre de la campaña *</label>
+                  <label className="block text-xs font-semibold text-white/60">Nombre de la campaña *</label>
                   <input
                     type="text"
                     value={newCampaign.name}
@@ -962,7 +1000,7 @@ export default function MarketingPage() {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600">Presupuesto diario (MXN) *</label>
+                    <label className="block text-xs font-semibold text-white/60">Presupuesto diario (MXN) *</label>
                     <input
                       type="number"
                       min="20"
@@ -972,7 +1010,7 @@ export default function MarketingPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600">País objetivo</label>
+                    <label className="block text-xs font-semibold text-white/60">País objetivo</label>
                     <select
                       value={newCampaign.targetCountry}
                       onChange={(e) => setNewCampaign(p => ({ ...p, targetCountry: e.target.value }))}
@@ -988,7 +1026,7 @@ export default function MarketingPage() {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600">Edad mínima</label>
+                    <label className="block text-xs font-semibold text-white/60">Edad mínima</label>
                     <input
                       type="number"
                       min="13"
@@ -999,7 +1037,7 @@ export default function MarketingPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600">Edad máxima</label>
+                    <label className="block text-xs font-semibold text-white/60">Edad máxima</label>
                     <input
                       type="number"
                       min="13"
@@ -1013,10 +1051,10 @@ export default function MarketingPage() {
               </div>
 
               {/* Ad copy */}
-              <div className="space-y-3 border-t border-gray-100 pt-5">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Texto del anuncio</h3>
+              <div className="space-y-3 border-t border-white/5 pt-5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-white/40">Texto del anuncio</h3>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600">Texto principal</label>
+                  <label className="block text-xs font-semibold text-white/60">Texto principal</label>
                   <textarea
                     value={newCampaign.adText}
                     onChange={(e) => setNewCampaign(p => ({ ...p, adText: e.target.value }))}
@@ -1027,7 +1065,7 @@ export default function MarketingPage() {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600">Titular</label>
+                    <label className="block text-xs font-semibold text-white/60">Titular</label>
                     <input
                       type="text"
                       value={newCampaign.headline}
@@ -1037,7 +1075,7 @@ export default function MarketingPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600">Botón CTA</label>
+                    <label className="block text-xs font-semibold text-white/60">Botón CTA</label>
                     <select
                       value={newCampaign.ctaType}
                       onChange={(e) => setNewCampaign(p => ({ ...p, ctaType: e.target.value }))}
@@ -1054,7 +1092,7 @@ export default function MarketingPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600">URL de destino</label>
+                  <label className="block text-xs font-semibold text-white/60">URL de destino</label>
                   <input
                     type="url"
                     value={newCampaign.link}
@@ -1066,11 +1104,11 @@ export default function MarketingPage() {
               </div>
 
               {/* Image */}
-              <div className="space-y-3 border-t border-gray-100 pt-5">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Imagen del anuncio *</h3>
+              <div className="space-y-3 border-t border-white/5 pt-5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-white/40">Imagen del anuncio *</h3>
 
                 {adImagePreview && (
-                  <div className="relative overflow-hidden rounded-xl border border-gray-200">
+                  <div className="relative overflow-hidden rounded-xl border border-white/10">
                     <img src={adImagePreview} alt="Ad preview" className="w-full max-h-64 object-cover" />
                     <button
                       onClick={() => { setAdImageBase64(""); setAdImagePreview(""); }}
@@ -1083,17 +1121,17 @@ export default function MarketingPage() {
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   {/* Upload */}
-                  <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 p-5 text-center transition-colors hover:border-indexa-blue hover:bg-blue-50/30">
-                    <Upload size={24} className="text-gray-400" />
-                    <span className="text-xs font-semibold text-gray-600">Subir imagen</span>
-                    <span className="text-[10px] text-gray-400">JPG, PNG (recomendado 1200x628)</span>
+                  <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-white/10 bg-white/5 p-5 text-center transition-colors hover:border-indigo-500 hover:bg-indigo-500/10">
+                    <Upload size={24} className="text-white/40" />
+                    <span className="text-xs font-semibold text-white/60">Subir imagen</span>
+                    <span className="text-[10px] text-white/40">JPG, PNG (recomendado 1200x628)</span>
                     <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                   </label>
 
                   {/* Generate with AI */}
                   {savedNanoBananaKey && (
-                    <div className="flex flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600">
+                    <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/5 p-4">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-400">
                         <Wand2 size={14} /> Generar con IA
                       </div>
                       <input
@@ -1101,7 +1139,7 @@ export default function MarketingPage() {
                         value={adImagePrompt}
                         onChange={(e) => setAdImagePrompt(e.target.value)}
                         placeholder="Describe la imagen..."
-                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-purple-400"
+                        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-purple-400"
                       />
                       <button
                         onClick={handleGenerateAdImage}
@@ -1117,12 +1155,12 @@ export default function MarketingPage() {
             </div>
 
             {/* Modal footer */}
-            <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4">
-              <p className="text-[10px] text-gray-400">La campaña se creará en estado PAUSADO. Actívala cuando estés listo.</p>
+            <div className="flex items-center justify-between border-t border-white/5 px-6 py-4">
+              <p className="text-[10px] text-white/40">La campaña se creará en estado PAUSADO. Actívala cuando estés listo.</p>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="rounded-xl px-4 py-2.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100"
+                  className="rounded-xl px-4 py-2.5 text-sm font-medium text-white/50 transition-colors hover:bg-white/10"
                 >
                   Cancelar
                 </button>
