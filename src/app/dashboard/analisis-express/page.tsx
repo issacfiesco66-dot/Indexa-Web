@@ -207,10 +207,14 @@ export default function AnalisisExpressPage() {
 
   // ── Checkout handler (paywall only) ────────────────────────────
   const handleCheckout = useCallback(async () => {
+    const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER || "";
     if (!user || !sitioId) return;
+    if (!priceId) {
+      alert("Error de configuración: precio no disponible. Contacta soporte.");
+      return;
+    }
     setCheckingOut(true);
     try {
-      const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER || "";
       const token = await user.getIdToken();
       const res = await fetch("/api/checkout", {
         method: "POST",
