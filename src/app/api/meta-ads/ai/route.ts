@@ -7,12 +7,17 @@ export const maxDuration = 60;
 
 const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
 const META_GRAPH_URL = "https://graph.facebook.com/v21.0";
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-const CLAUDE_MODEL = "claude-sonnet-4-20250514";
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+
+// ── AI Model priority (free first) ─────────────────────────────────
+// 1. Gemini 2.0 Flash — free, good at tool use
+// 2. Groq Llama 3.3 70B — free fallback
+// 3. Claude Sonnet — paid premium (only if client provides key)
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 const GEMINI_MODEL = "gemini-2.0-flash";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
+const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
 const SYSTEM_PROMPT = `Eres un Senior Media Buyer especializado en Meta Ads (Facebook e Instagram). SIEMPRE responde en español.
 
@@ -490,11 +495,14 @@ export async function POST(request: NextRequest) {
     const user = await verifyIdToken(fbToken);
     if (!user) return NextResponse.json({ error: "Token inválido." }, { status: 401 });
 
-    // Anthropic key
+    // AI keys — at least one free model must be available
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const groqKey = process.env.GROQ_API_KEY;
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    if (!anthropicKey) {
+
+    if (!geminiKey && !groqKey && !anthropicKey) {
       return NextResponse.json(
-        { error: "ANTHROPIC_API_KEY no configurada. Agrégala en las variables de entorno de Vercel." },
+        { error: "No hay API keys de IA configuradas. Agrega GEMINI_API_KEY, GROQ_API_KEY o ANTHROPIC_API_KEY." },
         { status: 503 }
       );
     }
@@ -630,7 +638,7 @@ export async function POST(request: NextRequest) {
     ];
 
     type MsgContent = string | Record<string, unknown>[] ;
-    const claudeMessages: { role: "user" | "assistant"; content: MsgContent }[] = [
+    const aiMessages: { role: "user" | "assistant"; content: MsgContent }[] = [
       ...(Array.isArray(history) ? (history as { role: "user" | "assistant"; content: MsgContent }[]) : []),
       { role: "user", content: message },
     ];
@@ -639,27 +647,101 @@ export async function POST(request: NextRequest) {
     const startTime = Date.now();
     const DEADLINE_MS = 55_000;
     let lastText = "";
-    let useFallback = false;
-    // Prefer Gemini (likely already configured) then Groq
-    const fallbackKey = process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY;
-    const fallbackUrl = process.env.GROQ_API_KEY ? GROQ_URL : GEMINI_URL;
-    const fallbackModel = process.env.GROQ_API_KEY ? GROQ_MODEL : GEMINI_MODEL;
+
+    // ── Model selection: free first ────────────────────────────────
+    // Priority: Gemini (free, best tools) → Groq (free) → Claude (paid premium)
+    type AIProvider = { key: string; url: string; model: string; name: string; format: "openai" | "anthropic" };
+    const providers: AIProvider[] = [];
+    if (geminiKey) providers.push({ key: geminiKey, url: GEMINI_URL, model: GEMINI_MODEL, name: "Gemini", format: "openai" });
+    if (groqKey) providers.push({ key: groqKey, url: GROQ_URL, model: GROQ_MODEL, name: "Groq", format: "openai" });
+    if (anthropicKey) providers.push({ key: anthropicKey, url: ANTHROPIC_URL, model: CLAUDE_MODEL, name: "Claude", format: "anthropic" });
+
+    let currentProvider = providers[0];
+    let providerIdx = 0;
+
+    function switchToNextProvider(reason: string): boolean {
+      providerIdx++;
+      if (providerIdx >= providers.length) return false;
+      currentProvider = providers[providerIdx];
+      console.warn(`[meta-ads/ai] ${reason} — switching to ${currentProvider.name}`);
+      return true;
+    }
 
     // Agentic loop — up to 8 rounds with time budget
     for (let round = 0; round < 8; round++) {
       const elapsed = Date.now() - startTime;
-      if (elapsed > DEADLINE_MS) {
-        break;
-      }
+      if (elapsed > DEADLINE_MS) break;
 
       let response: Record<string, unknown>;
 
-      if (!useFallback) {
+      if (currentProvider.format === "openai") {
+        // ── OpenAI-compatible path (Gemini / Groq) ──────────────
+        const aiRes = await fetch(currentProvider.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${currentProvider.key}` },
+          body: JSON.stringify({
+            model: currentProvider.model,
+            max_tokens: 1536,
+            tools: toGroqTools(tools),
+            tool_choice: "auto",
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              ...toGroqMessages(aiMessages as AnthropicMsg[]),
+            ],
+          }),
+        });
+        const aiText = await aiRes.text();
+
+        if (!aiRes.ok) {
+          let errMsg = "";
+          try { const p = JSON.parse(aiText); errMsg = p?.error?.message || ""; } catch { /* noop */ }
+
+          // Tool call failure — retry this round without tools
+          if (errMsg.includes("Failed to call a function") || errMsg.includes("failed_generation")) {
+            console.warn(`[meta-ads/ai] ${currentProvider.name} tool call failed — retrying without tools`);
+            const retryRes = await fetch(currentProvider.url, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${currentProvider.key}` },
+              body: JSON.stringify({
+                model: currentProvider.model,
+                max_tokens: 1536,
+                messages: [
+                  { role: "system", content: SYSTEM_PROMPT + "\n\nIMPORTANTE: Las herramientas no están disponibles. Responde en texto explicando qué harías y qué info necesitas del usuario." },
+                  ...toGroqMessages(aiMessages as AnthropicMsg[]),
+                ],
+              }),
+            });
+            const retryText = await retryRes.text();
+            if (retryRes.ok) {
+              try {
+                const retryData = JSON.parse(retryText);
+                const retryMsg = (retryData.choices as Record<string, unknown>[])?.[0]?.message as { content?: string };
+                lastText = retryMsg?.content || "No pude procesar tu solicitud. Intenta de nuevo.";
+                return NextResponse.json({
+                  reply: lastText,
+                  newHistory: [...(Array.isArray(history) ? history : []), { role: "user", content: message }, { role: "assistant", content: lastText }],
+                });
+              } catch { /* fall through */ }
+            }
+          }
+
+          // Billing/rate limit — try next provider
+          if (isBillingError(aiRes.status, aiText)) {
+            if (switchToNextProvider(`${currentProvider.name} billing/quota error`)) { round--; continue; }
+          }
+          return NextResponse.json({ error: `Error de ${currentProvider.name}: ${errMsg || aiText.slice(0, 200)}` }, { status: 400 });
+        }
+        try { response = fromGroqResponse(JSON.parse(aiText)); } catch {
+          return NextResponse.json({ error: `Respuesta inválida de ${currentProvider.name}.` }, { status: 400 });
+        }
+
+      } else {
+        // ── Anthropic path (Claude) ─────────────────────────────
         const claudeRes = await fetch(ANTHROPIC_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-api-key": anthropicKey,
+            "x-api-key": currentProvider.key,
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
@@ -667,101 +749,21 @@ export async function POST(request: NextRequest) {
             max_tokens: 1536,
             system: SYSTEM_PROMPT,
             tools,
-            messages: claudeMessages,
+            messages: aiMessages,
           }),
         });
-
         const claudeText = await claudeRes.text();
 
         if (!claudeRes.ok) {
-          if (isBillingError(claudeRes.status, claudeText) && fallbackKey) {
-            const provider = process.env.GROQ_API_KEY ? "Groq" : "Gemini";
-            console.warn(`[meta-ads/ai] Claude billing/quota error — switching to ${provider} fallback`);
-            useFallback = true;
-          } else {
-            let errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${claudeText.slice(0, 300)}`;
-            try {
-              const parsed = JSON.parse(claudeText);
-              errMsg = `Error de Claude API (HTTP ${claudeRes.status}): ${parsed?.error?.message || claudeText.slice(0, 200)}`;
-            } catch { /* noop */ }
-            console.error("[meta-ads/ai] Claude error:", errMsg);
-            return NextResponse.json({ error: errMsg }, { status: 400 });
+          if (isBillingError(claudeRes.status, claudeText)) {
+            if (switchToNextProvider("Claude billing/quota error")) { round--; continue; }
           }
-        } else {
-          try {
-            response = JSON.parse(claudeText);
-          } catch {
-            return NextResponse.json({ error: "Respuesta inválida de Claude API." }, { status: 400 });
-          }
+          let errMsg = claudeText.slice(0, 200);
+          try { const p = JSON.parse(claudeText); errMsg = p?.error?.message || errMsg; } catch { /* noop */ }
+          return NextResponse.json({ error: `Error de Claude: ${errMsg}` }, { status: 400 });
         }
-      }
-
-      if (useFallback) {
-        if (!fallbackKey) {
-          return NextResponse.json(
-            { error: "Límite de créditos de Claude alcanzado. Configura GEMINI_API_KEY o GROQ_API_KEY como fallback." },
-            { status: 503 }
-          );
-        }
-        const groqRes = await fetch(fallbackUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${fallbackKey}` },
-          body: JSON.stringify({
-            model: fallbackModel,
-            max_tokens: 1536,
-            tools: toGroqTools(tools),
-            tool_choice: "auto",
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              ...toGroqMessages(claudeMessages as AnthropicMsg[]),
-            ],
-          }),
-        });
-        let fallbackText = await groqRes.text();
-        if (!groqRes.ok) {
-          let errMsg = "";
-          try { const p = JSON.parse(fallbackText); errMsg = p?.error?.message || ""; } catch { /* noop */ }
-
-          // If Groq failed to call a function, retry without tools (text-only)
-          if (errMsg.includes("Failed to call a function") || errMsg.includes("failed_generation")) {
-            console.warn("[meta-ads/ai] Groq tool call failed — retrying without tools");
-            const retryRes = await fetch(fallbackUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${fallbackKey}` },
-              body: JSON.stringify({
-                model: fallbackModel,
-                max_tokens: 1536,
-                messages: [
-                  { role: "system", content: SYSTEM_PROMPT + "\n\nIMPORTANTE: Las herramientas no están disponibles en este momento. Responde con texto explicando qué harías y qué información necesitas del usuario." },
-                  ...toGroqMessages(claudeMessages as AnthropicMsg[]),
-                ],
-              }),
-            });
-            fallbackText = await retryRes.text();
-            if (!retryRes.ok) {
-              return NextResponse.json({ error: `Error de IA fallback: ${fallbackText.slice(0, 200)}` }, { status: 400 });
-            }
-            try {
-              const retryData = JSON.parse(fallbackText);
-              const retryMsg = (retryData.choices as Record<string, unknown>[])?.[0]?.message as { content?: string };
-              lastText = retryMsg?.content || "No pude procesar tu solicitud. Intenta de nuevo.";
-              return NextResponse.json({
-                reply: lastText,
-                newHistory: [
-                  ...(Array.isArray(history) ? history : []),
-                  { role: "user", content: message },
-                  { role: "assistant", content: lastText },
-                ],
-              });
-            } catch {
-              return NextResponse.json({ error: "Respuesta inválida de IA fallback." }, { status: 400 });
-            }
-          }
-
-          return NextResponse.json({ error: `Error de IA fallback: ${errMsg || fallbackText.slice(0, 200)}` }, { status: 400 });
-        }
-        try { response = fromGroqResponse(JSON.parse(fallbackText)); } catch {
-          return NextResponse.json({ error: "Respuesta inválida de IA fallback." }, { status: 400 });
+        try { response = JSON.parse(claudeText); } catch {
+          return NextResponse.json({ error: "Respuesta inválida de Claude." }, { status: 400 });
         }
       }
 
@@ -789,7 +791,7 @@ export async function POST(request: NextRequest) {
           type: string; id: string; name: string; input: Record<string, unknown>;
         }[];
 
-        claudeMessages.push({ role: "assistant", content });
+        aiMessages.push({ role: "assistant", content });
 
         // Sequential execution with time budget
         const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
@@ -803,7 +805,7 @@ export async function POST(request: NextRequest) {
           toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
         }
 
-        claudeMessages.push({ role: "user", content: toolResults });
+        aiMessages.push({ role: "user", content: toolResults });
         continue;
       }
 
