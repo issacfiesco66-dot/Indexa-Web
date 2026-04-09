@@ -1025,7 +1025,7 @@ export async function createAd(
 
   console.log(`[createAd] Request body:`, JSON.stringify(body, null, 2));
 
-  // Step 5: Retry logic — up to 3 attempts with 10s delay for image access errors
+  // Step 5: Retry logic — up to 3 attempts
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 10_000;
 
@@ -1042,6 +1042,18 @@ export async function createAd(
       const isImageError = errMsg.toLowerCase().includes("unable to access image")
         || errMsg.toLowerCase().includes("image")
         || errMsg.includes("40002");
+      const isSourceError = errMsg.toLowerCase().includes("incorrect source field")
+        || errMsg.toLowerCase().includes("source field")
+        || errMsg.includes("landing_page_url");
+
+      // "Incorrect source field" = LEAD_GENERATION ad group rejects landing_page_url
+      // Fix: remove it and retry immediately
+      if (isSourceError && creative.landing_page_url) {
+        console.warn(`[createAd] "Incorrect source field" — removing landing_page_url and retrying...`);
+        delete creative.landing_page_url;
+        body.creatives = [creative];
+        continue;
+      }
 
       if (isImageError && attempt < MAX_RETRIES) {
         console.warn(`[createAd] Attempt ${attempt}/${MAX_RETRIES} failed (image error): ${errMsg}. Waiting ${RETRY_DELAY_MS / 1000}s before retry...`);
@@ -1049,7 +1061,7 @@ export async function createAd(
         continue;
       }
 
-      // Final attempt or non-image error — throw
+      // Final attempt or non-recoverable error — throw
       throw e;
     }
   }
