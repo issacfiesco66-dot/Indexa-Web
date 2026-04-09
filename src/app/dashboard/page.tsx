@@ -42,6 +42,7 @@ import {
   Gift,
   Link2,
   Briefcase,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import AiMagicButton from "@/components/AiMagicButton";
@@ -847,6 +848,31 @@ export default function ClientDashboardPage() {
             }}
           />
         </section>
+
+        {/* ── Diagnóstico Express CTA (for inactive users) ──────────── */}
+        {sitio.statusPago !== "activo" && (
+          <section className="mb-10">
+            <Link
+              href="/dashboard/analisis-express"
+              className="group flex items-center gap-4 rounded-2xl border-2 border-red-200 bg-gradient-to-r from-red-50 to-amber-50 px-6 py-5 transition-all hover:border-red-300 hover:shadow-lg"
+            >
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-red-100">
+                <AlertTriangle size={24} className="text-red-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-gray-900">
+                  Diagnóstico Express Gratis
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Nuestra IA analiza tu cuenta y te muestra qué está fallando en tus campañas. Toma 30 segundos.
+                </p>
+              </div>
+              <span className="hidden sm:flex items-center gap-1 rounded-full bg-red-500 px-4 py-2 text-xs font-bold text-white">
+                Analizar ahora
+              </span>
+            </Link>
+          </section>
+        )}
 
         {/* ── Subscription section ──────────────────────────────────── */}
         {sitio.statusPago !== "activo" && (
