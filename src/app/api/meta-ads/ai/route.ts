@@ -164,7 +164,11 @@ type GroqMsg = {
 function toGroqTools(anthropicTools: { name: string; description: string; input_schema: Record<string, unknown> }[]) {
   return anthropicTools.map((t) => ({
     type: "function" as const,
-    function: { name: t.name, description: t.description, parameters: t.input_schema },
+    function: {
+      name: t.name,
+      description: t.description,
+      parameters: { ...t.input_schema, additionalProperties: true },
+    },
   }));
 }
 
@@ -631,9 +635,9 @@ export async function POST(request: NextRequest) {
       { role: "user", content: message },
     ];
 
-    // Time budget: stop 15s before Vercel timeout
+    // Time budget: stop 5s before Vercel timeout
     const startTime = Date.now();
-    const DEADLINE_MS = 45_000;
+    const DEADLINE_MS = 55_000;
     let lastText = "";
     let useFallback = false;
     // Prefer Gemini (likely already configured) then Groq
@@ -713,11 +717,48 @@ export async function POST(request: NextRequest) {
             ],
           }),
         });
-        const fallbackText = await groqRes.text();
+        let fallbackText = await groqRes.text();
         if (!groqRes.ok) {
-          let errMsg = `Error de IA fallback (HTTP ${groqRes.status}): ${fallbackText.slice(0, 300)}`;
-          try { const p = JSON.parse(fallbackText); errMsg = `Error de IA fallback: ${p?.error?.message || fallbackText.slice(0, 200)}`; } catch { /* noop */ }
-          return NextResponse.json({ error: errMsg }, { status: 400 });
+          let errMsg = "";
+          try { const p = JSON.parse(fallbackText); errMsg = p?.error?.message || ""; } catch { /* noop */ }
+
+          // If Groq failed to call a function, retry without tools (text-only)
+          if (errMsg.includes("Failed to call a function") || errMsg.includes("failed_generation")) {
+            console.warn("[meta-ads/ai] Groq tool call failed — retrying without tools");
+            const retryRes = await fetch(fallbackUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${fallbackKey}` },
+              body: JSON.stringify({
+                model: fallbackModel,
+                max_tokens: 1536,
+                messages: [
+                  { role: "system", content: SYSTEM_PROMPT + "\n\nIMPORTANTE: Las herramientas no están disponibles en este momento. Responde con texto explicando qué harías y qué información necesitas del usuario." },
+                  ...toGroqMessages(claudeMessages as AnthropicMsg[]),
+                ],
+              }),
+            });
+            fallbackText = await retryRes.text();
+            if (!retryRes.ok) {
+              return NextResponse.json({ error: `Error de IA fallback: ${fallbackText.slice(0, 200)}` }, { status: 400 });
+            }
+            try {
+              const retryData = JSON.parse(fallbackText);
+              const retryMsg = (retryData.choices as Record<string, unknown>[])?.[0]?.message as { content?: string };
+              lastText = retryMsg?.content || "No pude procesar tu solicitud. Intenta de nuevo.";
+              return NextResponse.json({
+                reply: lastText,
+                newHistory: [
+                  ...(Array.isArray(history) ? history : []),
+                  { role: "user", content: message },
+                  { role: "assistant", content: lastText },
+                ],
+              });
+            } catch {
+              return NextResponse.json({ error: "Respuesta inválida de IA fallback." }, { status: 400 });
+            }
+          }
+
+          return NextResponse.json({ error: `Error de IA fallback: ${errMsg || fallbackText.slice(0, 200)}` }, { status: 400 });
         }
         try { response = fromGroqResponse(JSON.parse(fallbackText)); } catch {
           return NextResponse.json({ error: "Respuesta inválida de IA fallback." }, { status: 400 });
