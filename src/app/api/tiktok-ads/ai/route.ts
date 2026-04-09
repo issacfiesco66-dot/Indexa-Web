@@ -893,9 +893,11 @@ async function executeTool(
           return JSON.stringify({ success: false, error: `Error creando campaña: ${e instanceof Error ? e.message : String(e)}`, steps });
         }
 
-        // Step 5: Create 3 Ad Groups
+        // Step 5: Create Ad Groups (1-3 depending on budget)
         const minAgBudget = currency === "MXN" ? 200 : 20;
-        const agBudget = Math.max(Math.floor(totalBudget / 3), minAgBudget);
+        const maxAdGroups = Math.min(3, Math.floor(totalBudget / minAgBudget)) || 1;
+        const agBudget = Math.max(Math.floor(totalBudget / maxAdGroups), minAgBudget);
+        steps.push(`📊 Presupuesto: $${totalBudget}/día → ${maxAdGroups} Ad Group(s) × $${agBudget}`);
         // NOTE: LEAD_GENERATION requires Instant Forms (can't be created via API).
         // We use WEBSITE + CONVERSION goal as workaround — drives to landing page form instead.
         const optGoalMap: Record<string, string> = {
@@ -919,6 +921,17 @@ async function executeTool(
         };
         const promotionType = promoTypeMap[objective] || "WEBSITE";
 
+        // Billing event must match optimization goal
+        const billingMap: Record<string, string> = {
+          CLICK: "CPC",
+          CONVERSION: "OCPM",
+          REACH: "CPM",
+          VIDEO_VIEW: "CPV",
+          LEAD_GENERATION: "OCPM",
+          ENGAGEMENT: "OCPM",
+        };
+        const billingEvent = billingMap[optGoal] || "CPC";
+
         // Common AG params
         const agBase = {
           campaignId,
@@ -926,76 +939,47 @@ async function executeTool(
           budgetMode: "BUDGET_MODE_DAY" as const,
           optimizationGoal: optGoal,
           promotionType,
+          billingEvent,
           location_ids: locationIds.length > 0 ? locationIds : undefined,
         };
 
-        // AG1: Interest Stack
-        let ag1Id = "";
-        try {
-          const ag1 = await createAdGroup(creds, {
-            ...agBase,
-            adgroupName: `${bizName} - Interest Stack`,
-            ageGroups: ageNarrow,
-            gender,
-          });
-          ag1Id = ag1.adgroupId;
-          steps.push(`✅ AG1 Interest Stack (ID: ${ag1Id}) — $${agBudget}/día — Edad: ${ageNarrow.join(", ")} — ${locationName}`);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          errors.push(`AG1 ERROR: ${msg}`);
-          console.error(`[create_full_campaign] AG1 failed:`, msg);
-        }
-
-        // AG2: Broad/Algoritmo
-        let ag2Id = "";
-        try {
-          const ag2 = await createAdGroup(creds, {
-            ...agBase,
-            adgroupName: `${bizName} - Broad`,
-            ageGroups: ageBroad,
-            gender,
-          });
-          ag2Id = ag2.adgroupId;
-          steps.push(`✅ AG2 Broad (ID: ${ag2Id}) — $${agBudget}/día — Edad: ${ageBroad.join(", ")} — ${locationName}`);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          errors.push(`AG2 ERROR: ${msg}`);
-          console.error(`[create_full_campaign] AG2 failed:`, msg);
-        }
-
-        // AG3: Amplio General
-        let ag3Id = "";
+        // Ad Group definitions (ordered by priority)
         const ageAll = ["AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_100"];
-        try {
-          const ag3 = await createAdGroup(creds, {
-            ...agBase,
-            adgroupName: `${bizName} - Amplio General`,
-            ageGroups: ageAll,
-            gender: "GENDER_UNLIMITED",
-          });
-          ag3Id = ag3.adgroupId;
-          steps.push(`✅ AG3 Amplio (ID: ${ag3Id}) — $${agBudget}/día — Edad: 18-55+ — ${locationName}`);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          errors.push(`AG3 ERROR: ${msg}`);
-          console.error(`[create_full_campaign] AG3 failed:`, msg);
+        const agDefs = [
+          { name: `${bizName} - Interest Stack`, ageGroups: ageNarrow, gender },
+          { name: `${bizName} - Broad`, ageGroups: ageBroad, gender },
+          { name: `${bizName} - Amplio General`, ageGroups: ageAll, gender: "GENDER_UNLIMITED" },
+        ].slice(0, maxAdGroups); // Only create as many as budget allows
+
+        const agIds: string[] = [];
+        for (const [i, agDef] of agDefs.entries()) {
+          try {
+            const ag = await createAdGroup(creds, {
+              ...agBase,
+              adgroupName: agDef.name,
+              ageGroups: agDef.ageGroups,
+              gender: agDef.gender,
+            });
+            agIds.push(ag.adgroupId);
+            steps.push(`✅ AG${i + 1} "${agDef.name}" (ID: ${ag.adgroupId}) — $${agBudget}/día — ${locationName}`);
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            errors.push(`AG${i + 1} ERROR: ${msg}`);
+            console.error(`[create_full_campaign] AG${i + 1} failed:`, msg);
+          }
         }
 
-        const agCount = [ag1Id, ag2Id, ag3Id].filter(Boolean).length;
-        const totalAgBudget = agCount * agBudget;
+        const totalAgBudget = agIds.length * agBudget;
 
         return JSON.stringify({
-          success: agCount > 0,
-          campaign: { id: campaignId, name: campaignName, objective, totalDailyBudget: `$${totalAgBudget} ${currency}/día (${agCount} AGs × $${agBudget})`, currency, status: "PAUSADA" },
-          adGroups: {
-            ag1_interest: ag1Id ? { id: ag1Id, name: `${bizName} - Interest Stack`, budget: agBudget, ageGroups: ageNarrow, location: locationName } : "FALLÓ",
-            ag2_broad: ag2Id ? { id: ag2Id, name: `${bizName} - Broad`, budget: agBudget, ageGroups: ageBroad, location: locationName } : "FALLÓ",
-            ag3_wide: ag3Id ? { id: ag3Id, name: `${bizName} - Amplio General`, budget: agBudget, ageGroups: ageAll, location: locationName } : "FALLÓ",
-          },
+          success: agIds.length > 0,
+          campaign: { id: campaignId, name: campaignName, objective, totalDailyBudget: `$${totalAgBudget} ${currency}/día (${agIds.length} AGs × $${agBudget})`, currency, status: "PAUSADA" },
+          adGroups: agIds.map((id, i) => ({ id, name: agDefs[i].name, budget: agBudget, location: locationName })),
+          adGroupIds: agIds,
           steps,
           errors: errors.length > 0 ? errors : undefined,
           locationDebug: locationDebug.length > 0 ? locationDebug : undefined,
-          nextStep: ag1Id ? `Usa generate_ad_image para crear imagen, luego create_ad con adgroup_id "${ag1Id}" para crear el anuncio.` : "Los ad groups fallaron. Revisa los errores.",
+          nextStep: agIds.length > 0 ? `Usa generate_and_create_ads_batch con los adgroup_ids: ${JSON.stringify(agIds)} para crear los anuncios con imágenes.` : "Los ad groups fallaron. Revisa los errores.",
         });
       }
 
