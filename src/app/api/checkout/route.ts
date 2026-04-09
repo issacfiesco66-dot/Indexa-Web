@@ -78,12 +78,15 @@ export async function POST(request: NextRequest) {
     const existingCustomerId = sitioDoc.data.stripeCustomerId as string | undefined;
     const rawOrigin = request.headers.get("origin") || "";
     const allowedOrigins = [
-      process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx",
+      process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com",
+      "https://indexaia.com",
+      "https://www.indexaia.com",
       "https://indexa.mx",
       "https://www.indexa.mx",
+      "https://indexa-web-ten.vercel.app",
       "http://localhost:3000",
     ];
-    const origin = allowedOrigins.includes(rawOrigin) ? rawOrigin : (process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx");
+    const origin = allowedOrigins.includes(rawOrigin) ? rawOrigin : (process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com");
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "subscription",
@@ -115,6 +118,7 @@ export async function POST(request: NextRequest) {
       sessionParams.customer_email = tokenUser.email || undefined;
     }
 
+    console.log("CHECKOUT: creating session", { priceId, planId, sitioId, origin, hasCustomer: !!existingCustomerId });
     const session = await getStripe().checkout.sessions.create(sessionParams);
 
     return NextResponse.json({
@@ -122,7 +126,7 @@ export async function POST(request: NextRequest) {
       url: session.url,
     });
   } catch (err) {
-    console.error("CHECKOUT: error:", err);
+    console.error("CHECKOUT: error:", err instanceof Error ? err.message : err);
     const rawMsg = err instanceof Error ? err.message : "Error desconocido";
     const message = rawMsg.includes("No such price")
       ? "El precio seleccionado no existe en Stripe. Contacta soporte."
