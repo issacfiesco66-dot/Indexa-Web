@@ -31,7 +31,6 @@ import {
   Square,
   Search,
   Loader2,
-  MapPin,
   Eye,
   LayoutTemplate,
   Megaphone,
@@ -42,8 +41,11 @@ import {
   Copy,
   X,
   Send,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
+import ScraperPanel from "./ScraperPanel";
 
 interface RawProspecto {
   nombre?: string;
@@ -180,6 +182,8 @@ Básicamente, nosotros ponemos la 'maquinaria de guerra' y ustedes la estrategia
 
 type ProspectoFilter = "todos" | "sin_web" | "con_web" | "agencias";
 
+const ITEMS_PER_PAGE = 25;
+
 export default function ProspectosPage() {
   const [prospectos, setProspectos] = useState<ProspectoFrio[]>([]);
   const [loading, setLoading] = useState(true);
@@ -199,6 +203,8 @@ export default function ProspectosPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [prospectoFilter, setProspectoFilter] = useState<ProspectoFilter>("todos");
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // ── AI Message state ────────────────────────────────────────────────
   const [aiMsgProspecto, setAiMsgProspecto] = useState<ProspectoFrio | null>(null);
@@ -206,165 +212,31 @@ export default function ProspectosPage() {
   const [aiMsgText, setAiMsgText] = useState("");
   const [aiMsgCopied, setAiMsgCopied] = useState(false);
 
-  // ── Scraper state ──────────────────────────────────────────────────
-  const [scraperServicio, setScraperServicio] = useState("");
-  const [scraperCiudad, setScraperCiudad] = useState("");
-  const [scraperPais, setScraperPais] = useState("México");
-  const [scraperMax, setScraperMax] = useState(30);
-  const [scraperHistory, setScraperHistory] = useState<string[]>([]);
-  const [scraperRunning, setScraperRunning] = useState(false);
-  const [scraperProgress, setScraperProgress] = useState(0);
-  const [scraperMessage, setScraperMessage] = useState("");
-  const [scraperLog, setScraperLog] = useState<string[]>([]);
-  const scraperAbortRef = useRef<AbortController | null>(null);
-
-  // Strip trailing "en [location]" from service field to prevent double "en"
-  const cleanService = (s: string) => s.trim().replace(/\s+en\s+.+$/i, "").trim();
-
-  // Build the composed query in Google Maps friendly format: "Servicio en Ciudad, País"
-  const svcClean = cleanService(scraperServicio);
-  const cityClean = scraperCiudad.trim();
-  const scraperQuery = svcClean && cityClean
-    ? `${svcClean} en ${cityClean}${scraperPais.trim() ? `, ${scraperPais.trim()}` : ""}`
-    : svcClean || cityClean || "";
-  const scraperCanSearch = svcClean.length > 0 && cityClean.length > 0;
-
-  // Count existing prospectos in the same city to show duplicates indicator
-  const existingInCity = cityClean
-    ? prospectos.filter((p) => p.ciudad.toLowerCase() === cityClean.toLowerCase()).length
-    : 0;
-
-  const scraperJobRef = useRef<string | null>(null);
-  const scraperPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const getScraperBaseUrl = () => {
-    const isLocal = typeof window !== "undefined"
-      && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-    return !isLocal && process.env.NEXT_PUBLIC_SCRAPER_URL
-      ? process.env.NEXT_PUBLIC_SCRAPER_URL
-      : "";
-  };
-
-  const startScraper = useCallback(async () => {
-    const svc = cleanService(scraperServicio);
-    const city = scraperCiudad.trim();
-    const country = scraperPais.trim();
-    const q = svc && city
-      ? `${svc} en ${city}${country ? `, ${country}` : ""}`
-      : svc || city || "";
-    if (!q || scraperRunning) return;
-
-    // Save to search history (avoid duplicates, max 10)
-    setScraperHistory((prev) => {
-      const next = [q, ...prev.filter((h) => h !== q)].slice(0, 10);
-      try { localStorage.setItem("indexa_scraper_history", JSON.stringify(next)); } catch {}
-      return next;
-    });
-
-    setScraperRunning(true);
-    setScraperProgress(0);
-    setScraperMessage("Iniciando scraper...");
-    setScraperLog([]);
-
-    // Get auth token for the scraper API
-    let authToken = "";
-    try {
-      authToken = await user?.getIdToken() ?? "";
-    } catch {
-      setScraperMessage("Error: no se pudo obtener token de autenticación.");
-      setScraperRunning(false);
-      return;
-    }
-
-    const base = getScraperBaseUrl();
-    if (!base) {
-      setScraperMessage("Error: NEXT_PUBLIC_SCRAPER_URL no configurado.");
-      setScraperRunning(false);
-      return;
-    }
-
-    try {
-      // Start async job
-      const startRes = await fetch(`${base}/scrape-async`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q, max: scraperMax, token: authToken }),
-      });
-
-      if (!startRes.ok) {
-        const err = await startRes.json().catch(() => ({ detail: "Error desconocido" }));
-        setScraperMessage(`Error: ${err.detail || err.error || "No se pudo iniciar el scraper."}`);
-        setScraperRunning(false);
-        return;
-      }
-
-      const { job_id } = await startRes.json();
-      scraperJobRef.current = job_id;
-
-      // Poll for progress every 3 seconds
-      scraperPollRef.current = setInterval(async () => {
-        try {
-          const statusRes = await fetch(`${base}/scrape-status/${job_id}`);
-          if (!statusRes.ok) {
-            clearInterval(scraperPollRef.current!);
-            scraperPollRef.current = null;
-            setScraperMessage("Error al consultar estado del scraper.");
-            setScraperRunning(false);
-            return;
-          }
-
-          const data = await statusRes.json();
-          if (data.progress !== undefined) setScraperProgress(data.progress);
-          if (data.message) setScraperMessage(data.message);
-          if (data.log?.length) setScraperLog(data.log);
-
-          if (data.status === "done") {
-            clearInterval(scraperPollRef.current!);
-            scraperPollRef.current = null;
-            const r = data.result;
-            if (r) {
-              setScraperMessage(`✓ Completado: ${r.sin_web ?? 0} prospectos sin web, ${r.subidos ?? 0} subidos.`);
-            } else {
-              setScraperMessage("✓ Scraper completado.");
-            }
-            setScraperProgress(100);
-            setScraperRunning(false);
-          } else if (data.status === "error") {
-            clearInterval(scraperPollRef.current!);
-            scraperPollRef.current = null;
-            setScraperMessage(`Error: ${data.error || "Error desconocido en el scraper."}`);
-            setScraperRunning(false);
-          }
-        } catch {
-          // Network error during poll — keep trying
-        }
-      }, 3000);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error de conexión";
-      setScraperMessage(`Error: ${msg}`);
-      setScraperRunning(false);
-    }
-  }, [scraperServicio, scraperCiudad, scraperPais, scraperMax, scraperRunning, user]);
-
-  const stopScraper = useCallback(() => {
-    if (scraperPollRef.current) {
-      clearInterval(scraperPollRef.current);
-      scraperPollRef.current = null;
-    }
-    scraperJobRef.current = null;
-    setScraperRunning(false);
-    setScraperMessage("Scraper detenido.");
+  // ── Scraper running ref (for Firestore listener buffering) ──────
+  const scraperRunningRef = useRef(false);
+  const handleScraperRunningChange = useCallback((running: boolean) => {
+    scraperRunningRef.current = running;
   }, []);
 
-  // Load search history from localStorage on mount
+
+  // ── Debounce search input (300ms) ──────────────────────────────
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("indexa_scraper_history");
-      if (saved) setScraperHistory(JSON.parse(saved));
-    } catch {}
-  }, []);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  // ── Real-time listener ───────────────────────────────────────────
+  // Reset page when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [prospectoFilter]);
+
+  // ── Real-time listener (buffered during scraping) ──────────────
+  const pendingDataRef = useRef<ProspectoFrio[] | null>(null);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!db) {
       setLoading(false);
@@ -396,11 +268,33 @@ export default function ProspectosPage() {
           tipoProspecto: (raw.tipoProspecto as TipoProspecto) ?? (isAgencyCategoria(raw.categoria ?? "", raw.nombre ?? "") ? "agencia" : "negocio"),
         };
       });
-      setProspectos(data);
+
+      // During scraping: buffer updates and flush every 2s to avoid constant re-renders
+      if (scraperRunningRef.current) {
+        pendingDataRef.current = data;
+        if (!flushTimerRef.current) {
+          flushTimerRef.current = setTimeout(() => {
+            if (pendingDataRef.current) {
+              setProspectos(pendingDataRef.current);
+              pendingDataRef.current = null;
+            }
+            flushTimerRef.current = null;
+          }, 2000);
+        }
+      } else {
+        setProspectos(data);
+      }
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Import JSON ──────────────────────────────────────────────────
@@ -675,17 +569,36 @@ export default function ProspectosPage() {
   );
 
   const filteredProspectos = useMemo(() => {
-    const textFiltered = fuzzySearch(prospFuse, searchTerm, searchableProspectos);
+    const textFiltered = fuzzySearch(prospFuse, debouncedSearch, searchableProspectos);
     return textFiltered.filter((p) => {
       if (prospectoFilter === "agencias") return p.tipoProspecto === "agencia";
       if (prospectoFilter === "sin_web") return !p.tieneWeb && p.tipoProspecto !== "agencia";
       if (prospectoFilter === "con_web") return p.tieneWeb && p.tipoProspecto !== "agencia";
       return true;
     });
-  }, [prospFuse, searchTerm, searchableProspectos, prospectoFilter]);
+  }, [prospFuse, debouncedSearch, searchableProspectos, prospectoFilter]);
+
+  // ── Pagination ──────────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredProspectos.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedProspectos = useMemo(
+    () => filteredProspectos.slice((safeCurrentPage - 1) * ITEMS_PER_PAGE, safeCurrentPage * ITEMS_PER_PAGE),
+    [filteredProspectos, safeCurrentPage]
+  );
+
+  // ── Memoized counts (avoid recalculating on every render) ────────────
+  const prospectoCounts = useMemo(() => {
+    let sinWeb = 0, conWeb = 0, agencias = 0;
+    for (const p of prospectos) {
+      if (p.tipoProspecto === "agencia") { agencias++; }
+      else if (p.tieneWeb) { conWeb++; }
+      else { sinWeb++; }
+    }
+    return { sinWeb, conWeb, agencias, total: prospectos.length };
+  }, [prospectos]);
 
   // ── Selection helpers ────────────────────────────────────────────────
-  const eligibleForBulk = prospectos.filter((p) => p.status === "nuevo");
+  const eligibleForBulk = useMemo(() => prospectos.filter((p) => p.status === "nuevo"), [prospectos]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -858,7 +771,7 @@ export default function ProspectosPage() {
         <div>
           <h2 className="text-2xl font-bold text-indexa-gray-dark">Prospectos Fríos</h2>
           <p className="mt-1 text-sm text-gray-500">
-            {prospectos.length} prospecto{prospectos.length !== 1 && "s"} — {prospectos.filter(p => !p.tieneWeb && p.tipoProspecto !== "agencia").length} sin web, {prospectos.filter(p => p.tieneWeb && p.tipoProspecto !== "agencia").length} con web, {prospectos.filter(p => p.tipoProspecto === "agencia").length} agencias
+            {prospectoCounts.total} prospecto{prospectoCounts.total !== 1 && "s"} — {prospectoCounts.sinWeb} sin web, {prospectoCounts.conWeb} con web, {prospectoCounts.agencias} agencias
           </p>
         </div>
 
@@ -910,164 +823,8 @@ export default function ProspectosPage() {
         </div>
       )}
 
-      {/* ── Scraper search panel ──────────────────────────────── */}
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-100 px-5 py-4">
-          <div className="flex items-center gap-2">
-            <MapPin size={18} className="text-indexa-orange" />
-            <h3 className="text-sm font-bold text-indexa-gray-dark">Buscar Prospectos en Google Maps</h3>
-          </div>
-          <p className="mt-1 text-xs text-gray-400">
-            Busca por servicio/producto y ubicación. El sistema encontrará negocios sin sitio web y los agregará.
-          </p>
-        </div>
-
-        <div className="px-5 py-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Servicio / Producto</label>
-              <input
-                type="text"
-                value={scraperServicio}
-                onChange={(e) => setScraperServicio(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && scraperCanSearch && !scraperRunning && startScraper()}
-                placeholder="Dentistas, Tacos, Plomeros..."
-                disabled={scraperRunning}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none transition-colors focus:border-indexa-blue focus:bg-white focus:ring-2 focus:ring-indexa-blue/20 disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">Ciudad / Estado</label>
-              <input
-                type="text"
-                value={scraperCiudad}
-                onChange={(e) => setScraperCiudad(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && scraperCanSearch && !scraperRunning && startScraper()}
-                placeholder="Monterrey, CDMX, Jalisco..."
-                disabled={scraperRunning}
-                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none transition-colors focus:border-indexa-blue focus:bg-white focus:ring-2 focus:ring-indexa-blue/20 disabled:opacity-50"
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold text-gray-500">País</label>
-              <select
-                value={scraperPais}
-                onChange={(e) => setScraperPais(e.target.value)}
-                disabled={scraperRunning}
-                className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:bg-white focus:ring-2 focus:ring-indexa-blue/20 disabled:opacity-50"
-              >
-                <option value="México">México</option>
-                <option value="Colombia">Colombia</option>
-                <option value="Argentina">Argentina</option>
-                <option value="Chile">Chile</option>
-                <option value="Perú">Perú</option>
-                <option value="España">España</option>
-                <option value="Estados Unidos">Estados Unidos</option>
-                <option value="Ecuador">Ecuador</option>
-                <option value="Guatemala">Guatemala</option>
-                <option value="">Sin especificar</option>
-              </select>
-            </div>
-            <div className="flex items-end gap-2">
-              <div className="w-20">
-                <label className="mb-1.5 block text-xs font-semibold text-gray-500">Máx.</label>
-                <input
-                  type="number"
-                  value={scraperMax}
-                  onChange={(e) => setScraperMax(Math.max(1, Math.min(50, Number(e.target.value))))}
-                  min={1}
-                  max={50}
-                  disabled={scraperRunning}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-indexa-gray-dark outline-none transition-colors focus:border-indexa-blue focus:bg-white focus:ring-2 focus:ring-indexa-blue/20 disabled:opacity-50"
-                />
-              </div>
-              {scraperRunning ? (
-                <button
-                  onClick={stopScraper}
-                  className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700"
-                >
-                  <SearchX size={16} />
-                  Detener
-                </button>
-              ) : (
-                <button
-                  onClick={startScraper}
-                  disabled={!scraperCanSearch}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indexa-orange px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indexa-orange/90 disabled:opacity-40"
-                >
-                  <Search size={16} />
-                  Buscar
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Composed query preview + duplicate indicator */}
-          {scraperCanSearch && (
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <p className="text-xs text-gray-400">
-                Buscará: <span className="font-semibold text-indexa-gray-dark">&ldquo;{scraperQuery}&rdquo;</span>
-              </p>
-              {existingInCity > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-700">
-                  Ya tienes {existingInCity} prospecto{existingInCity !== 1 ? "s" : ""} en {scraperCiudad.trim()}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Search history chips */}
-          {scraperHistory.length > 0 && !scraperRunning && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-300">Recientes:</span>
-              {scraperHistory.map((h, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    const parts = h.split(", ");
-                    setScraperServicio(parts[0] || "");
-                    setScraperCiudad(parts[1] || "");
-                    setScraperPais(parts[2] || "México");
-                  }}
-                  className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-2.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-indexa-blue hover:bg-indexa-blue/5 hover:text-indexa-blue"
-                >
-                  {h}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Progress bar */}
-          {(scraperRunning || scraperProgress > 0) && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1.5 font-medium text-indexa-gray-dark">
-                  {scraperRunning && <Loader2 size={12} className="animate-spin" />}
-                  {scraperMessage}
-                </span>
-                <span className="font-bold text-indexa-orange">{scraperProgress}%</span>
-              </div>
-              <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-gray-100">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-indexa-orange to-indexa-blue transition-all duration-500 ease-out"
-                  style={{ width: `${scraperProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Live log */}
-          {scraperLog.length > 0 && (
-            <div className="mt-3 max-h-36 overflow-y-auto rounded-xl bg-gray-900 px-4 py-3">
-              {scraperLog.map((line, i) => (
-                <p key={i} className="font-mono text-[11px] leading-relaxed text-green-400">
-                  {line}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      {/* ── Scraper search panel (isolated component) ────────── */}
+      <ScraperPanel prospectos={prospectos} onRunningChange={handleScraperRunningChange} />
 
       {emailFeedback && (
         <div
@@ -1188,9 +945,9 @@ export default function ProspectosPage() {
               <X size={14} />
             </button>
           )}
-          {searchTerm && (
+          {debouncedSearch && (
             <p className="mt-1.5 text-xs text-gray-400">
-              {filteredProspectos.length} resultado{filteredProspectos.length !== 1 ? "s" : ""} para &quot;{searchTerm}&quot;
+              {filteredProspectos.length} resultado{filteredProspectos.length !== 1 ? "s" : ""} para &quot;{debouncedSearch}&quot;
             </p>
           )}
         </div>
@@ -1208,7 +965,7 @@ export default function ProspectosPage() {
                 : "bg-gray-100 text-gray-500 hover:bg-gray-200"
             }`}
           >
-            Todos ({prospectos.length})
+            Todos ({prospectoCounts.total})
           </button>
           <button
             onClick={() => setProspectoFilter("sin_web")}
@@ -1219,7 +976,7 @@ export default function ProspectosPage() {
             }`}
           >
             <Globe size={12} />
-            Sin Web ({prospectos.filter(p => !p.tieneWeb).length})
+            Sin Web ({prospectoCounts.sinWeb})
           </button>
           <button
             onClick={() => setProspectoFilter("con_web")}
@@ -1230,7 +987,7 @@ export default function ProspectosPage() {
             }`}
           >
             <Megaphone size={12} />
-            Con Web — Vender Ads ({prospectos.filter(p => p.tieneWeb && p.tipoProspecto !== "agencia").length})
+            Con Web — Vender Ads ({prospectoCounts.conWeb})
           </button>
           <button
             onClick={() => setProspectoFilter("agencias")}
@@ -1241,7 +998,7 @@ export default function ProspectosPage() {
             }`}
           >
             <Handshake size={12} />
-            Agencias ({prospectos.filter(p => p.tipoProspecto === "agencia").length})
+            Agencias ({prospectoCounts.agencias})
           </button>
         </div>
       )}
@@ -1285,7 +1042,7 @@ export default function ProspectosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredProspectos.map((p) => (
+                {paginatedProspectos.map((p) => (
                   <tr key={p.id} className={`transition-colors hover:bg-gray-50/50 ${selectedIds.has(p.id) ? "bg-indexa-blue/5" : ""}`}>
                     <td className="w-8 px-2 py-2.5">
                       {p.status === "nuevo" ? (
@@ -1426,7 +1183,7 @@ export default function ProspectosPage() {
 
           {/* ── Mobile cards ────────────────────────────────────── */}
           <div className="space-y-3 md:hidden">
-            {filteredProspectos.map((p) => (
+            {paginatedProspectos.map((p) => (
               <div key={p.id} className={`rounded-2xl border bg-white p-4 shadow-sm ${selectedIds.has(p.id) ? "border-indexa-blue/40 bg-indexa-blue/5" : "border-gray-200"}`}>
                 <div className="flex items-start justify-between gap-3">
                   {p.status === "nuevo" && (
@@ -1548,6 +1305,55 @@ export default function ProspectosPage() {
               </div>
             ))}
           </div>
+
+          {/* ── Pagination controls ──────────────────────────────── */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-5 py-3 shadow-sm">
+              <p className="text-xs text-gray-500">
+                {(safeCurrentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safeCurrentPage * ITEMS_PER_PAGE, filteredProspectos.length)} de {filteredProspectos.length}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={safeCurrentPage <= 1}
+                  className="inline-flex items-center justify-center rounded-lg border border-gray-200 p-2 text-gray-500 transition-colors hover:bg-gray-50 disabled:opacity-30"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - safeCurrentPage) <= 2)
+                  .reduce<(number | "...")[]>((acc, p, i, arr) => {
+                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("...");
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, i) =>
+                    p === "..." ? (
+                      <span key={`dot-${i}`} className="px-1 text-xs text-gray-400">...</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setCurrentPage(p as number)}
+                        className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold transition-colors ${
+                          p === safeCurrentPage
+                            ? "bg-indexa-blue text-white"
+                            : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safeCurrentPage >= totalPages}
+                  className="inline-flex items-center justify-center rounded-lg border border-gray-200 p-2 text-gray-500 transition-colors hover:bg-gray-50 disabled:opacity-30"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
