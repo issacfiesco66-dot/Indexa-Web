@@ -250,7 +250,10 @@ function TikTokAdsContent() {
     setOauthExchanging(true);
     setConnectionError("");
     try {
-      const res = await fetch(`/api/tiktok-ads/oauth?auth_code=${encodeURIComponent(code.trim())}`);
+      const idToken = await getToken();
+      const res = await fetch(`/api/tiktok-ads/oauth?auth_code=${encodeURIComponent(code.trim())}`, {
+        headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
+      });
       const data = await res.json();
       if (data?.data?.access_token) {
         setAccessToken(data.data.access_token);
@@ -294,8 +297,12 @@ function TikTokAdsContent() {
   const authHeaders = useCallback(async () => {
     const idToken = await getToken();
     if (!idToken) throw new Error("No autenticado");
-    return { Authorization: `Bearer ${idToken}` };
-  }, [getToken]);
+    return {
+      Authorization: `Bearer ${idToken}`,
+      "x-tiktok-advertiser-id": advertiserId.trim(),
+      "x-tiktok-access-token": accessToken.trim(),
+    };
+  }, [getToken, advertiserId, accessToken]);
 
   // ── Connect ────────────────────────────────────────────────────
   const handleConnect = useCallback(async () => {
@@ -307,12 +314,11 @@ function TikTokAdsContent() {
     setConnectionError("");
     try {
       const headers = await authHeaders();
-      const params = credsParams();
 
       // Load account + campaigns in parallel
       const [acctRes, campRes] = await Promise.all([
-        fetch(`/api/tiktok-ads/account?${params}`, { headers }),
-        fetch(`/api/tiktok-ads/campaigns?${params}`, { headers }),
+        fetch(`/api/tiktok-ads/account`, { headers }),
+        fetch(`/api/tiktok-ads/campaigns`, { headers }),
       ]);
 
       const acctData = await acctRes.json();
@@ -339,7 +345,7 @@ function TikTokAdsContent() {
     setError("");
     try {
       const headers = await authHeaders();
-      const res = await fetch(`/api/tiktok-ads/campaigns?${credsParams()}`, { headers });
+      const res = await fetch(`/api/tiktok-ads/campaigns`, { headers });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setCampaigns(data.campaigns || []);
@@ -356,7 +362,7 @@ function TikTokAdsContent() {
     setError("");
     try {
       const headers = await authHeaders();
-      const res = await fetch(`/api/tiktok-ads/adgroups?${credsParams()}`, { headers });
+      const res = await fetch(`/api/tiktok-ads/adgroups`, { headers });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setAdGroups(data.adGroups || []);
@@ -373,7 +379,7 @@ function TikTokAdsContent() {
     setError("");
     try {
       const headers = await authHeaders();
-      const res = await fetch(`/api/tiktok-ads/ads?${credsParams()}`, { headers });
+      const res = await fetch(`/api/tiktok-ads/ads`, { headers });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setAds(data.ads || []);
@@ -391,9 +397,7 @@ function TikTokAdsContent() {
     try {
       const headers = await authHeaders();
       const { start, end } = getDateRange(days);
-      const params = credsParams();
-      params.set("startDate", start);
-      params.set("endDate", end);
+      const params = new URLSearchParams({ startDate: start, endDate: end });
       const res = await fetch(`/api/tiktok-ads/reporting?${params}`, { headers });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -410,7 +414,7 @@ function TikTokAdsContent() {
     setError("");
     try {
       const headers = await authHeaders();
-      const res = await fetch(`/api/tiktok-ads/audiences?${credsParams()}`, { headers });
+      const res = await fetch(`/api/tiktok-ads/audiences`, { headers });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setAudiences(data.audiences || []);
@@ -426,7 +430,7 @@ function TikTokAdsContent() {
     setError("");
     try {
       const headers = await authHeaders();
-      const res = await fetch(`/api/tiktok-ads/pixels?${credsParams()}`, { headers });
+      const res = await fetch(`/api/tiktok-ads/pixels`, { headers });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setPixels(data.pixels || []);

@@ -1,7 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIClient } from "@/lib/openai";
+import { verifyIdToken, extractToken } from "@/lib/verifyAuth";
+import { createRateLimiter } from "@/lib/rateLimit";
+
+const limiter = createRateLimiter({ windowMs: 60_000, max: 10 });
 
 export async function POST(request: NextRequest) {
+  const token = extractToken(request);
+  if (!token || !(await verifyIdToken(token))) {
+    return NextResponse.json({ success: false, message: "No autorizado." }, { status: 401 });
+  }
+
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!limiter.check(ip)) {
+    return NextResponse.json({ success: false, message: "Demasiadas solicitudes." }, { status: 429 });
+  }
+
   try {
     const openai = getOpenAIClient();
 

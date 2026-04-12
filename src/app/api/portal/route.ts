@@ -52,7 +52,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const origin = request.headers.get("origin") || "https://indexa-web-ten.vercel.app";
+    const ALLOWED_ORIGINS = [
+      "https://indexa-web-ten.vercel.app",
+      "https://indexa.com.mx",
+      "https://www.indexa.com.mx",
+      "http://localhost:3000",
+    ];
+    const rawOrigin = request.headers.get("origin") || "";
+    const origin = ALLOWED_ORIGINS.includes(rawOrigin) ? rawOrigin : ALLOWED_ORIGINS[0];
 
     const portalSession = await getStripe().billingPortal.sessions.create({
       customer: stripeCustomerId,
@@ -65,9 +72,8 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("Portal error:", err);
-    const message = err instanceof Error ? err.message : "Error al crear sesión del portal.";
     return NextResponse.json(
-      { success: false, message },
+      { success: false, message: "Error al crear sesión del portal." },
       { status: 500 }
     );
   }

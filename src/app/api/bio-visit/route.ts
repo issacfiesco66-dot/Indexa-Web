@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { createRateLimiter } from "@/lib/rateLimit";
 
 const VALID_SOURCES = ["fb", "ig", "tt", "wa", "direct"] as const;
 type Source = (typeof VALID_SOURCES)[number];
 
+// Rate limit: 30 visits per minute per IP
+const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
+
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!limiter.check(ip)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const body = await req.json();
     const { sitioId, source, linkId } = body as {

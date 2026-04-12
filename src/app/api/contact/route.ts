@@ -87,26 +87,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── reCAPTCHA v3 verification ────────────────────────────────
+    // ── reCAPTCHA v3 verification (mandatory) ──────────────────────
     const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
     const recaptchaToken = (body as unknown as Record<string, unknown>).recaptchaToken;
-    if (recaptchaSecret && typeof recaptchaToken === "string" && recaptchaToken) {
-      try {
-        const captchaRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: `secret=${recaptchaSecret}&response=${recaptchaToken}`,
-        });
-        const captchaData = await captchaRes.json();
-        if (!captchaData.success || (captchaData.score !== undefined && captchaData.score < 0.3)) {
-          return NextResponse.json<ContactApiResponse>(
-            { success: false, message: "Verificación de seguridad fallida. Intenta de nuevo." },
-            { status: 403 }
-          );
-        }
-      } catch (e) {
-        console.error("reCAPTCHA verification error:", e);
+    if (!recaptchaSecret) {
+      console.error("RECAPTCHA_SECRET_KEY not configured");
+      return NextResponse.json<ContactApiResponse>(
+        { success: false, message: "Error de configuración del servidor." },
+        { status: 500 }
+      );
+    }
+    if (!recaptchaToken || typeof recaptchaToken !== "string") {
+      return NextResponse.json<ContactApiResponse>(
+        { success: false, message: "Verificación de seguridad requerida." },
+        { status: 400 }
+      );
+    }
+    try {
+      const captchaRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `secret=${recaptchaSecret}&response=${recaptchaToken}`,
+      });
+      const captchaData = await captchaRes.json();
+      if (!captchaData.success || (captchaData.score !== undefined && captchaData.score < 0.3)) {
+        return NextResponse.json<ContactApiResponse>(
+          { success: false, message: "Verificación de seguridad fallida. Intenta de nuevo." },
+          { status: 403 }
+        );
       }
+    } catch (e) {
+      console.error("reCAPTCHA verification error:", e);
+      return NextResponse.json<ContactApiResponse>(
+        { success: false, message: "Error al verificar seguridad. Intenta de nuevo." },
+        { status: 500 }
+      );
     }
 
     const { contactName, businessName, phone, email, mensaje } = body;

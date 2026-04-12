@@ -20,8 +20,8 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const advertiserId = searchParams.get("advertiserId");
-  const accessToken = searchParams.get("accessToken");
+  const advertiserId = request.headers.get("x-tiktok-advertiser-id") || searchParams.get("advertiserId");
+  const accessToken = request.headers.get("x-tiktok-access-token") || searchParams.get("accessToken");
   const startDate = searchParams.get("startDate");
   const endDate = searchParams.get("endDate");
 

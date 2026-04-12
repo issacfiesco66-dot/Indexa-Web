@@ -157,13 +157,12 @@ export default function ClientTikTokAdsPage() {
       const idToken = await getToken();
       if (!idToken) throw new Error("No autenticado");
 
-      const params = new URLSearchParams({
-        advertiserId: advertiserId.trim(),
-        accessToken: accessToken.trim(),
-      });
-
-      const res = await fetch(`/api/tiktok-ads/campaigns?${params}`, {
-        headers: { Authorization: `Bearer ${idToken}` },
+      const res = await fetch(`/api/tiktok-ads/campaigns`, {
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "x-tiktok-advertiser-id": advertiserId.trim(),
+          "x-tiktok-access-token": accessToken.trim(),
+        },
       });
 
       const data = await res.json();
@@ -206,13 +205,12 @@ export default function ClientTikTokAdsPage() {
       const idToken = await getToken();
       if (!idToken) throw new Error("No autenticado");
 
-      const params = new URLSearchParams({
-        advertiserId: advertiserId.trim(),
-        accessToken: accessToken.trim(),
-      });
-
-      const res = await fetch(`/api/tiktok-ads/campaigns?${params}`, {
-        headers: { Authorization: `Bearer ${idToken}` },
+      const res = await fetch(`/api/tiktok-ads/campaigns`, {
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "x-tiktok-advertiser-id": advertiserId.trim(),
+          "x-tiktok-access-token": accessToken.trim(),
+        },
       });
 
       const data = await res.json();

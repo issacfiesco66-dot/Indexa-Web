@@ -44,7 +44,14 @@ export function middleware(request: NextRequest) {
   ) {
     const origin = request.headers.get("origin");
     const host = request.headers.get("host");
-    if (origin && host) {
+    if (!origin) {
+      // Block requests without Origin header (prevents CSRF from non-browser clients)
+      return NextResponse.json(
+        { error: "Forbidden: missing origin" },
+        { status: 403 }
+      );
+    }
+    if (host) {
       try {
         const originHost = new URL(origin).host;
         if (originHost !== host) {
@@ -97,8 +104,9 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // If cookie exists but role is not superadmin, redirect
-    if (roleCookie && roleCookie !== "superadmin") {
+    // Require both auth cookie AND superadmin role cookie
+    // Note: role cookie is a convenience check — API routes verify server-side via Firebase Admin SDK
+    if (roleCookie !== "superadmin") {
       if (isRSC) return NextResponse.next();
       if (roleCookie === "agency") {
         return NextResponse.redirect(new URL("/agency/dashboard", request.url));

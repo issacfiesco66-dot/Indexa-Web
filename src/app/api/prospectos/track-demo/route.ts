@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createRateLimiter } from "@/lib/rateLimit";
 
 const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+
+// Rate limit: 20 demo views per minute per IP
+const limiter = createRateLimiter({ windowMs: 60_000, max: 20 });
 
 /**
  * POST /api/prospectos/track-demo
@@ -10,6 +14,10 @@ const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/dat
  * Links the view back to the corresponding prospecto_frio by demoSlug.
  */
 export async function POST(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!limiter.check(ip)) {
+    return NextResponse.json({ ok: false, message: "Too many requests" }, { status: 429 });
+  }
   if (!PROJECT_ID || !API_KEY) {
     return NextResponse.json({ ok: false }, { status: 500 });
   }

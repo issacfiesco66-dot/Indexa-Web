@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
     }
     await verifyIdToken(authHeader.split("Bearer ")[1]);
 
-    const advertiserId = request.nextUrl.searchParams.get("advertiser_id");
-    const accessToken = request.nextUrl.searchParams.get("access_token");
+    const advertiserId = request.headers.get("x-tiktok-advertiser-id") || request.nextUrl.searchParams.get("advertiser_id");
+    const accessToken = request.headers.get("x-tiktok-access-token") || request.nextUrl.searchParams.get("access_token");
 
     if (!advertiserId || !accessToken) {
       return NextResponse.json({ error: "Missing advertiser_id or access_token query params" }, { status: 400 });
