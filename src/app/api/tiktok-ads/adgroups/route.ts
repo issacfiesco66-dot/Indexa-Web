@@ -33,9 +33,8 @@ export async function GET(request: Request) {
     const result = await getAdGroups(creds, campaignId);
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido";
-    console.error("TikTok adgroups error:", message);
-    return NextResponse.json({ error: message }, { status: 502 });
+    console.error("TikTok adgroups error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al obtener grupos de anuncios de TikTok." }, { status: 502 });
   }
 }
 
@@ -67,8 +66,7 @@ export async function POST(request: Request) {
     await updateAdGroupStatus(creds, adgroupId, status);
     return NextResponse.json({ success: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido";
-    console.error("TikTok adgroup toggle error:", message);
-    return NextResponse.json({ error: message }, { status: 502 });
+    console.error("TikTok adgroup toggle error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al cambiar estado del grupo de anuncios en TikTok." }, { status: 502 });
   }
 }

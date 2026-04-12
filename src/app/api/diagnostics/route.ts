@@ -306,7 +306,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("DIAGNOSTICS: error:", err instanceof Error ? err.message : err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Error al obtener diagnóstico." },
+      { error: "Error al obtener diagnóstico." },
       { status: 500 },
     );
   }

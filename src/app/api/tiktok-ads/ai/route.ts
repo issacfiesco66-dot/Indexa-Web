@@ -1394,7 +1394,8 @@ async function executeTool(
         return `Herramienta desconocida: ${name}`;
     }
   } catch (err) {
-    return `Error al ejecutar ${name}: ${err instanceof Error ? err.message : String(err)}`;
+    console.error(`[tiktok-ads/ai] tool ${name} error:`, err instanceof Error ? err.message : err);
+    return `Error al ejecutar ${name}. Intenta de nuevo.`;
   }
 }
 
@@ -1605,8 +1606,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("[tiktok-ads/ai] unhandled error:", msg);
-    return NextResponse.json({ error: `Error del asistente: ${msg}` }, { status: 400 });
+    console.error("[tiktok-ads/ai] unhandled error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error del asistente. Intenta de nuevo." }, { status: 400 });
   }
 }

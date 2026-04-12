@@ -34,8 +34,7 @@ export async function GET(request: Request) {
     const rows = await getReporting(creds, startDate, endDate);
     return NextResponse.json({ rows });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido";
-    console.error("TikTok reporting error:", message);
-    return NextResponse.json({ error: message }, { status: 502 });
+    console.error("TikTok reporting error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al obtener reportes de TikTok." }, { status: 502 });
   }
 }

@@ -42,8 +42,7 @@ export async function POST(request: Request) {
     await updateCampaignStatus(creds, campaignId, status);
     return NextResponse.json({ success: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido";
-    console.error("TikTok toggle error:", message);
-    return NextResponse.json({ error: message }, { status: 502 });
+    console.error("TikTok toggle error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al cambiar estado de campaña en TikTok." }, { status: 502 });
   }
 }

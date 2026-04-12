@@ -118,9 +118,8 @@ export async function POST(request: NextRequest) {
 
     event = getStripe().webhooks.constructEvent(body, signature, WEBHOOK_SECRET);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Webhook verification failed.";
-    console.error("Stripe webhook verification error:", message);
-    return NextResponse.json({ error: message }, { status: 400 });
+    console.error("Stripe webhook verification error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Webhook verification failed." }, { status: 400 });
   }
 
   // ── Idempotency: skip already-processed events ─────────────────────
@@ -148,7 +147,7 @@ export async function POST(request: NextRequest) {
     const paymentOk = await activateSitio(sitioId, plan, customerId, subscriptionId);
     if (!paymentOk) {
       await logWebhookEvent(event.id, event.type, "error", { sitioId, error: "Failed to activate sitio" });
-      return NextResponse.json({ error: `Failed to activate sitio ${sitioId}` }, { status: 500 });
+      return NextResponse.json({ error: "Failed to activate sitio." }, { status: 500 });
     }
 
     await logWebhookEvent(event.id, event.type, "success", { sitioId, ownerId, plan, customerId, subscriptionId });
@@ -218,7 +217,7 @@ export async function POST(request: NextRequest) {
       const cancelOk = await cancelSitio(sitioId);
       if (!cancelOk) {
         await logWebhookEvent(event.id, event.type, "error", { sitioId, error: "Failed to cancel sitio" });
-        return NextResponse.json({ error: `Failed to cancel sitio ${sitioId}` }, { status: 500 });
+        return NextResponse.json({ error: "Failed to cancel sitio." }, { status: 500 });
       }
       await logWebhookEvent(event.id, event.type, "success", { sitioId });
     }

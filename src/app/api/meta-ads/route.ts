@@ -189,9 +189,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(data);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Error al conectar con Meta.";
-    console.error("[meta-ads GET] error:", msg);
-    return NextResponse.json({ error: msg }, { status: 502 });
+    console.error("[meta-ads GET] error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al conectar con Meta." }, { status: 502 });
   }
 }
 
@@ -467,8 +466,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: "Acción no válida." }, { status: 400 });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Error al conectar con Meta.";
-    return NextResponse.json({ error: msg }, { status: 502 });
+    console.error("[meta-ads POST] error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al ejecutar acción en Meta." }, { status: 502 });
   }
 }
 
@@ -489,7 +488,7 @@ export async function DELETE(request: NextRequest) {
     await metaPost(`${META_GRAPH_URL}/${campaignId}`, { status: "DELETED", access_token: metaToken });
     return NextResponse.json({ success: true });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Error al eliminar.";
-    return NextResponse.json({ error: msg }, { status: 502 });
+    console.error("[meta-ads DELETE] error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al eliminar campaña en Meta." }, { status: 502 });
   }
 }

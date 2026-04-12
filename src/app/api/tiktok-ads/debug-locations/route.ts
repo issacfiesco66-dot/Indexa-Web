@@ -85,6 +85,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(results, { status: 200 });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    console.error("TikTok debug-locations error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al obtener ubicaciones." }, { status: 500 });
   }
 }

@@ -150,8 +150,9 @@ export async function GET(request: NextRequest) {
       checkedAt: new Date().toISOString(),
     });
   } catch (err) {
+    console.error("CRON reminders error:", err instanceof Error ? err.message : err);
     return NextResponse.json(
-      { error: "Cron failed", detail: String(err) },
+      { error: "Cron failed." },
       { status: 500 }
     );
   }

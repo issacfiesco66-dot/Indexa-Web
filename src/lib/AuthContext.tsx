@@ -51,7 +51,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (u) {
         const token = await u.getIdToken();
-        document.cookie = `firebaseAuthToken=${token}; path=/; max-age=${60 * 60}; SameSite=Strict; Secure`;
+        // Set auth cookie via server endpoint (HttpOnly, not accessible to JS/XSS)
+        fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        }).catch(() => { /* session cookie best-effort */ });
 
         if (db) {
           try {
@@ -109,7 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAgencyId(null);
         setAgencyBranding(null);
         setAgencyName("");
-        document.cookie = "firebaseAuthToken=; path=/; max-age=0";
+        // Clear auth cookie via server endpoint (HttpOnly)
+        fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
         document.cookie = "indexa_role=; path=/; max-age=0";
       }
 

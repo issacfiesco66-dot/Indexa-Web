@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       text,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Error al generar imagen.";
-    return NextResponse.json({ error: msg }, { status: 502 });
+    console.error("[generate-image] error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al generar imagen. Intenta de nuevo." }, { status: 502 });
   }
 }

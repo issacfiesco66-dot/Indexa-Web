@@ -128,12 +128,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error("CHECKOUT: error:", err instanceof Error ? err.message : err);
-    const rawMsg = err instanceof Error ? err.message : "Error desconocido";
+    const rawMsg = err instanceof Error ? err.message : "";
     const message = rawMsg.includes("No such price")
       ? "El precio seleccionado no existe en Stripe. Contacta soporte."
       : rawMsg.includes("api_key")
-        ? "Error de autenticación con Stripe. Contacta soporte."
-        : `Error al crear sesión de pago: ${rawMsg}`;
+        ? "Error de configuración del servidor. Contacta soporte."
+        : "Error al crear sesión de pago. Intenta de nuevo.";
     return NextResponse.json(
       { success: false, message },
       { status: 500 }

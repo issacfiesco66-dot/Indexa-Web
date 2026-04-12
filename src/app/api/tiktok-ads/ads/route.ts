@@ -33,9 +33,8 @@ export async function GET(request: Request) {
     const result = await getAds(creds, adgroupId);
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido";
-    console.error("TikTok ads error:", message);
-    return NextResponse.json({ error: message }, { status: 502 });
+    console.error("TikTok ads error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al obtener anuncios de TikTok." }, { status: 502 });
   }
 }
 
@@ -67,8 +66,7 @@ export async function POST(request: Request) {
     await updateAdStatus(creds, adId, status);
     return NextResponse.json({ success: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido";
-    console.error("TikTok ad toggle error:", message);
-    return NextResponse.json({ error: message }, { status: 502 });
+    console.error("TikTok ad toggle error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al cambiar estado del anuncio en TikTok." }, { status: 502 });
   }
 }

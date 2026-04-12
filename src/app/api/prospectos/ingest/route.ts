@@ -261,10 +261,11 @@ export async function POST(request: NextRequest) {
           whatsappUrl: whatsappUrl || undefined,
         });
       } catch (err) {
+        console.error("Ingest prospect error:", nombre, err instanceof Error ? err.message : err);
         results.push({
           nombre,
           status: "error",
-          error: err instanceof Error ? err.message : "Unknown error",
+          error: "Failed to process prospect.",
         });
       }
     }
@@ -279,9 +280,9 @@ export async function POST(request: NextRequest) {
       results,
     });
   } catch (err) {
-    console.error("Ingest error:", err);
+    console.error("Ingest error:", err instanceof Error ? err.message : err);
     return NextResponse.json(
-      { success: false, message: err instanceof Error ? err.message : "Server error" },
+      { success: false, message: "Error al procesar prospectos." },
       { status: 500 }
     );
   }

@@ -32,8 +32,7 @@ export async function GET(request: Request) {
     const result = await getAudiences(creds);
     return NextResponse.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido";
-    console.error("TikTok audiences error:", message);
-    return NextResponse.json({ error: message }, { status: 502 });
+    console.error("TikTok audiences error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al obtener audiencias de TikTok." }, { status: 502 });
   }
 }

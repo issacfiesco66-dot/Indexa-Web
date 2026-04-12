@@ -35,10 +35,13 @@ export async function GET(request: Request) {
     ]);
     return NextResponse.json({ info, balance });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido";
-    console.error("TikTok account error:", message);
-    const status = message.includes("40001") || message.includes("40100") || message.includes("Access Token")
-      ? 401 : message.includes("timeout") ? 504 : 502;
-    return NextResponse.json({ error: message }, { status });
+    const rawMsg = err instanceof Error ? err.message : "";
+    console.error("TikTok account error:", rawMsg);
+    const status = rawMsg.includes("40001") || rawMsg.includes("40100") || rawMsg.includes("Access Token")
+      ? 401 : rawMsg.includes("timeout") ? 504 : 502;
+    const error = status === 401 ? "Sesión de TikTok expirada. Reconecta tu cuenta."
+      : status === 504 ? "TikTok tardó demasiado en responder. Intenta de nuevo."
+      : "Error al conectar con TikTok.";
+    return NextResponse.json({ error }, { status });
   }
 }

@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       expires_in: data.expires_in, // ~5184000 seconds = 60 days
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Error de conexión con Meta.";
-    return NextResponse.json({ error: msg }, { status: 502 });
+    console.error("[meta-ads extend-token] error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al extender token de Meta." }, { status: 502 });
   }
 }

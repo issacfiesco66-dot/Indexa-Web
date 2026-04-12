@@ -241,15 +241,15 @@ export default async function SitioPage({ params }: SitioPageProps) {
 
   return (
     <div className="min-h-screen bg-white" style={{ "--brand": colorPrincipal } as React.CSSProperties}>
-      {/* JSON-LD LocalBusiness Schema */}
+      {/* JSON-LD LocalBusiness Schema — sanitize to prevent </script> injection */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
       {/* JSON-LD BreadcrumbList Schema */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, "\\u003c") }}
       />
 
       <SitioTracker sitioId={id} slug={data.slug} />

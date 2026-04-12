@@ -32,8 +32,7 @@ export async function GET(request: Request) {
     const pixels = await getPixels(creds);
     return NextResponse.json({ pixels });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido";
-    console.error("TikTok pixels error:", message);
-    return NextResponse.json({ error: message }, { status: 502 });
+    console.error("TikTok pixels error:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Error al obtener píxeles de TikTok." }, { status: 502 });
   }
 }

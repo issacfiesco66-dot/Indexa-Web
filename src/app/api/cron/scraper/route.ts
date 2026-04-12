@@ -43,8 +43,9 @@ export async function GET(request: NextRequest) {
       triggeredAt: new Date().toISOString(),
     });
   } catch (err) {
+    console.error("CRON scraper error:", err instanceof Error ? err.message : err);
     return NextResponse.json(
-      { error: "Failed to trigger scraper", detail: String(err) },
+      { error: "Failed to trigger scraper." },
       { status: 502 }
     );
   }

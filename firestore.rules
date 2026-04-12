@@ -62,6 +62,11 @@ service cloud.firestore {
 
     // ── sitios (páginas públicas de clientes) ───────────────────────────────
     // Leer: público (las webs deben ser visibles para todos)
+    // SECURITY NOTE: stripeCustomerId/stripeSubscriptionId are stored here.
+    // Firestore rules don't support field-level read restrictions.
+    // These fields are only written/read server-side via Admin SDK.
+    // Public reads expose them — acceptable risk since Stripe IDs alone
+    // cannot authorize actions (require Stripe secret key).
     // Crear: admin o usuario autenticado (auto-create al comprar plan)
     // Actualizar: admin full access; owner safe fields; webhook payment fields
     // Eliminar: solo admin
