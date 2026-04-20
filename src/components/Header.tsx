@@ -75,6 +75,7 @@ export default function Header() {
             <a href="#soluciones" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Servicios</a>
             <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Cómo Funciona</a>
             <a href="#precios" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Precios</a>
+            <Link href="/probar" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Probar sin cuenta</Link>
             <Link href="/agencias" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Para Agencias</Link>
             <Link href="/login" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Iniciar Sesión</Link>
             <Link
