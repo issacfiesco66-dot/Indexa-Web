@@ -1,0 +1,25 @@
+{
+  "_comment": "Ciudades donde buscar funerarias. Se arma 'funeraria en <ciudad>' para cada una. Edita libre.",
+  "ciudades": [
+    "Ciudad de Mexico",
+    "Ecatepec",
+    "Nezahualcoyotl",
+    "Naucalpan",
+    "Tlalnepantla",
+    "Toluca",
+    "Cuautitlan Izcalli",
+    "Chalco",
+    "Ixtapaluca",
+    "Texcoco",
+    "Puebla",
+    "Guadalajara",
+    "Monterrey",
+    "Queretaro",
+    "Leon",
+    "Merida",
+    "Tijuana",
+    "Aguascalientes"
+  ],
+  "max_por_busqueda": 15,
+  "delay_entre_ciudades_sec": 20
+}

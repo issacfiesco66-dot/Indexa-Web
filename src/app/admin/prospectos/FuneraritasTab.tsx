@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   collection,
   query,
@@ -24,6 +24,8 @@ import {
   DatabaseZap,
   ChevronDown,
   ChevronUp,
+  Play,
+  SearchX,
 } from "lucide-react";
 
 /**
@@ -156,6 +158,29 @@ export default function FuneraritasTab() {
   const [migrateData, setMigrateData] = useState<MigrateResult | null>(null);
   const [migrateProgress, setMigrateProgress] = useState({ done: 0, total: 0 });
 
+  // Trigger del scraper (Railway)
+  const [scraperOpen, setScraperOpen] = useState(false);
+  const [scraperCiudad, setScraperCiudad] = useState("Toluca");
+  const [scraperMax, setScraperMax] = useState(15);
+  const [scraperDryRun, setScraperDryRun] = useState(false);
+  const [scraperRunning, setScraperRunning] = useState(false);
+  const [scraperProgress, setScraperProgress] = useState(0);
+  const [scraperMessage, setScraperMessage] = useState("");
+  const [scraperLog, setScraperLog] = useState<string[]>([]);
+  const [scraperResult, setScraperResult] = useState<Record<string, unknown> | null>(null);
+  const scraperJobRef = useRef<string | null>(null);
+  const scraperPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Cleanup del polling al desmontar
+  useEffect(() => {
+    return () => {
+      if (scraperPollRef.current) {
+        clearInterval(scraperPollRef.current);
+        scraperPollRef.current = null;
+      }
+    };
+  }, []);
+
   // Suscripción Firestore
   useEffect(() => {
     if (!db || !user) return;
@@ -285,6 +310,107 @@ export default function FuneraritasTab() {
     } catch {
       setFeedback({ type: "err", msg: "No se pudo copiar al portapapeles." });
     }
+  }
+
+  /** Arranca un scrape de funerarias en Railway. Poll cada 3s hasta done/error. */
+  async function startScraperFunerarias() {
+    if (!user || scraperRunning) return;
+    const ciudad = scraperCiudad.trim();
+    if (!ciudad) {
+      setFeedback({ type: "err", msg: "Ingresa una ciudad." });
+      return;
+    }
+
+    const base = process.env.NEXT_PUBLIC_SCRAPER_URL;
+    if (!base) {
+      setFeedback({
+        type: "err",
+        msg: "Falta NEXT_PUBLIC_SCRAPER_URL en Vercel (apunta al Railway scraper-service).",
+      });
+      return;
+    }
+
+    setScraperRunning(true);
+    setScraperProgress(0);
+    setScraperMessage("Iniciando scraper en Railway…");
+    setScraperLog([]);
+    setScraperResult(null);
+    setFeedback(null);
+
+    let authToken = "";
+    try {
+      authToken = await user.getIdToken();
+    } catch {
+      setScraperMessage("Error al obtener token de Firebase.");
+      setScraperRunning(false);
+      return;
+    }
+
+    try {
+      const startRes = await fetch(`${base.replace(/\/$/, "")}/scrape-funerarias-async`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ciudad,
+          max: scraperMax,
+          dry_run: scraperDryRun,
+          token: authToken,
+        }),
+      });
+
+      if (!startRes.ok) {
+        const err = await startRes.json().catch(() => ({} as Record<string, unknown>));
+        setScraperMessage(`Error: ${(err as { detail?: string }).detail ?? startRes.status}`);
+        setScraperRunning(false);
+        return;
+      }
+      const { job_id } = (await startRes.json()) as { job_id: string };
+      scraperJobRef.current = job_id;
+
+      scraperPollRef.current = setInterval(async () => {
+        try {
+          const s = await fetch(`${base.replace(/\/$/, "")}/scrape-status/${job_id}`);
+          if (!s.ok) {
+            if (scraperPollRef.current) clearInterval(scraperPollRef.current);
+            scraperPollRef.current = null;
+            setScraperMessage("Perdí conexión con el status del job.");
+            setScraperRunning(false);
+            return;
+          }
+          const data = await s.json();
+          if (typeof data.progress === "number") setScraperProgress(data.progress);
+          if (typeof data.message === "string") setScraperMessage(data.message);
+          if (Array.isArray(data.log)) setScraperLog(data.log.slice(-6));
+
+          if (data.status === "done") {
+            if (scraperPollRef.current) clearInterval(scraperPollRef.current);
+            scraperPollRef.current = null;
+            setScraperRunning(false);
+            setScraperResult(data.result ?? null);
+          } else if (data.status === "error") {
+            if (scraperPollRef.current) clearInterval(scraperPollRef.current);
+            scraperPollRef.current = null;
+            setScraperRunning(false);
+            setScraperMessage(`Falló: ${data.error ?? "error desconocido"}`);
+          }
+        } catch {
+          /* network glitch — seguimos polleando */
+        }
+      }, 3000);
+    } catch (e) {
+      console.error(e);
+      setScraperMessage(`Error de red: ${e instanceof Error ? e.message : "unknown"}`);
+      setScraperRunning(false);
+    }
+  }
+
+  function stopScraperFunerarias() {
+    if (scraperPollRef.current) {
+      clearInterval(scraperPollRef.current);
+      scraperPollRef.current = null;
+    }
+    setScraperRunning(false);
+    setScraperMessage("Polling detenido (el job de Railway puede seguir en background).");
   }
 
   /** Preview rápido (dryRun). Una sola request porque es solo reads. */
@@ -440,6 +566,135 @@ export default function FuneraritasTab() {
           {feedback.msg}
         </div>
       )}
+
+      {/* ── Ejecutar scraper (Railway) ───────────────────────────── */}
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50">
+        <button
+          onClick={() => setScraperOpen((v) => !v)}
+          className="flex w-full items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-emerald-900 hover:bg-emerald-100/60"
+        >
+          <span className="flex items-center gap-2">
+            <Play size={16} />
+            Ejecutar scraper de funerarias
+            {scraperRunning && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 ml-2">
+                <Loader2 size={12} className="animate-spin" /> corriendo…
+              </span>
+            )}
+          </span>
+          {scraperOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+
+        {scraperOpen && (
+          <div className="border-t border-emerald-200 p-4 text-xs text-emerald-900">
+            <p className="mb-3 leading-relaxed">
+              Lanza el scraper en Railway — busca funerarias en Google Maps para la ciudad indicada,
+              las registra en HI (crea token + link) y las guarda aquí con status{" "}
+              <strong>pendiente_envio</strong>. No requieres terminal.
+            </p>
+
+            <div className="grid gap-3 sm:grid-cols-3 mb-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-emerald-700 mb-1">Ciudad</label>
+                <input
+                  type="text"
+                  value={scraperCiudad}
+                  onChange={(e) => setScraperCiudad(e.target.value)}
+                  disabled={scraperRunning}
+                  placeholder="Toluca, CDMX, Monterrey..."
+                  className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-emerald-700 mb-1">Máx resultados</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={scraperMax}
+                  onChange={(e) => setScraperMax(Math.max(1, Math.min(50, Number(e.target.value) || 15)))}
+                  disabled={scraperRunning}
+                  className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
+                />
+              </div>
+              <div className="flex items-end">
+                <label className="flex items-center gap-2 text-[11px] text-emerald-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={scraperDryRun}
+                    onChange={(e) => setScraperDryRun(e.target.checked)}
+                    disabled={scraperRunning}
+                    className="h-4 w-4 rounded accent-emerald-600"
+                  />
+                  Dry-run (solo preview, no guarda)
+                </label>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {scraperRunning ? (
+                <button
+                  onClick={stopScraperFunerarias}
+                  className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-xs font-semibold text-white hover:bg-red-600"
+                >
+                  <SearchX size={14} />
+                  Detener polling
+                </button>
+              ) : (
+                <button
+                  onClick={startScraperFunerarias}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                >
+                  <Play size={14} />
+                  Ejecutar {scraperDryRun ? "(dry-run)" : ""}
+                </button>
+              )}
+            </div>
+
+            {/* Progress */}
+            {(scraperRunning || scraperProgress > 0) && (
+              <div className="mt-4 rounded-xl bg-white border border-emerald-200 p-3">
+                <div className="flex items-center justify-between text-[11px] mb-1">
+                  <span className="flex items-center gap-1.5 text-emerald-800 font-medium">
+                    {scraperRunning && <Loader2 size={11} className="animate-spin" />}
+                    {scraperMessage || "…"}
+                  </span>
+                  <span className="font-bold text-emerald-700">{scraperProgress}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-emerald-100">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                    style={{ width: `${scraperProgress}%` }}
+                  />
+                </div>
+                {scraperLog.length > 0 && (
+                  <ul className="mt-2 text-[10px] text-emerald-600 space-y-0.5 font-mono">
+                    {scraperLog.map((l, i) => (
+                      <li key={i} className="truncate">· {l}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Resultado */}
+            {scraperResult && (
+              <div className="mt-3 rounded-xl border border-emerald-300 bg-emerald-100 p-3 text-[11px] text-emerald-900">
+                <p className="font-bold mb-1">✅ Scraper terminado</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <Stat k="Extraídas" v={Number(scraperResult.extraidos ?? 0)} />
+                  <Stat k="Subidas" v={Number(scraperResult.subidos ?? 0)} />
+                  <Stat k="Duplicadas" v={Number(scraperResult.duplicados ?? 0)} />
+                  <Stat k="Opt-out" v={Number(scraperResult.opt_out ?? 0)} />
+                </div>
+                <p className="mt-2 text-emerald-700">
+                  Los leads nuevos aparecen en la lista de abajo automáticamente.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Filtros por status */}
       <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
@@ -706,6 +961,15 @@ export default function FuneraritasTab() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Stat({ k, v }: { k: string; v: number }) {
+  return (
+    <div className="rounded-md bg-white px-2 py-1 border border-emerald-200">
+      <p className="text-[9px] uppercase font-semibold text-emerald-600 tracking-wide">{k}</p>
+      <p className="font-serif text-base text-emerald-900">{v.toLocaleString("es-MX")}</p>
     </div>
   );
 }

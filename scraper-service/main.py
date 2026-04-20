@@ -47,6 +47,7 @@ _batch_running = False
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SCRAPER_SCRIPT = SCRIPT_DIR / "scraper_indexa.py"
+FUNERARIAS_SCRIPT = SCRIPT_DIR / "scraper_funerarias.py"
 
 # ── In-memory job store ──────────────────────────────────────────────
 _jobs: dict[str, dict] = {}
@@ -227,6 +228,166 @@ async def _run_scrape_job(job_id: str, query: str, max_results: int):
         logger.error(f"[job:{job_id}] Exception: {e}")
 
     job["finished_at"] = time.time()
+
+
+class FunerariasScrapeRequest(BaseModel):
+    ciudad: str
+    max: int = 15
+    dry_run: bool = False
+    token: str
+
+
+async def _run_funerarias_job(
+    job_id: str,
+    ciudad: str,
+    max_results: int,
+    dry_run: bool,
+):
+    """Background task: corre scraper_funerarias.py como subprocess y recolecta eventos JSON."""
+    job = _jobs[job_id]
+    try:
+        args = [
+            "python", str(FUNERARIAS_SCRIPT),
+            "--ciudad", ciudad,
+            "--max", str(max_results),
+            "--json-progress",
+        ]
+        if dry_run:
+            args.append("--dry-run")
+        logger.info(f"[job:{job_id}] Funerarias start: ciudad='{ciudad}' max={max_results} dry_run={dry_run}")
+
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(SCRIPT_DIR),
+        )
+        job["pid"] = proc.pid
+
+        buffer = ""
+        while True:
+            try:
+                chunk = await asyncio.wait_for(proc.stdout.read(4096), timeout=900)
+            except asyncio.TimeoutError:
+                job["status"] = "error"
+                job["error"] = "Timeout: scraper de funerarias tardó más de 15 min sin datos."
+                proc.kill()
+                break
+            if not chunk:
+                break
+            buffer += chunk.decode("utf-8", errors="replace")
+            lines = buffer.split("\n")
+            buffer = lines.pop()
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    evt = json.loads(line)
+                    if evt.get("progress") is not None:
+                        job["progress"] = evt["progress"]
+                    if evt.get("message"):
+                        job["message"] = evt["message"]
+                    if evt.get("event") == "done":
+                        job["result"] = evt
+                    job["log"].append(evt.get("message", line)[:200])
+                    if len(job["log"]) > 30:
+                        job["log"] = job["log"][-30:]
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+        if buffer.strip():
+            try:
+                evt = json.loads(buffer.strip())
+                if evt.get("event") == "done":
+                    job["result"] = evt
+                if evt.get("progress") is not None:
+                    job["progress"] = evt["progress"]
+                if evt.get("message"):
+                    job["message"] = evt["message"]
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        try:
+            stderr_data = await asyncio.wait_for(proc.stderr.read(), timeout=5)
+            if stderr_data:
+                job["stderr"] = stderr_data.decode("utf-8", errors="replace").strip()[-500:]
+        except asyncio.TimeoutError:
+            pass
+
+        await proc.wait()
+        job["exit_code"] = proc.returncode
+
+        if job["status"] != "error":
+            if proc.returncode == 0:
+                job["status"] = "done"
+                job["progress"] = 100
+                logger.info(f"[job:{job_id}] Funerarias completed successfully")
+            else:
+                job["status"] = "error"
+                job["error"] = job.get("stderr", f"Exit code {proc.returncode}")[:300]
+                logger.error(f"[job:{job_id}] Funerarias failed: exit={proc.returncode}")
+
+    except Exception as e:
+        job["status"] = "error"
+        job["error"] = str(e)[:300]
+        logger.error(f"[job:{job_id}] Funerarias exception: {e}")
+
+    job["finished_at"] = time.time()
+
+
+@app.post("/scrape-funerarias-async")
+async def scrape_funerarias_async(body: FunerariasScrapeRequest):
+    """
+    Arranca un scrape de funerarias para UNA ciudad. El scraper:
+      - Llama a HI /optouts para filtrar la blocklist
+      - Busca "funeraria en <ciudad>" en Google Maps
+      - Registra cada match en HI vía /api/leads/funeraria (obtiene token + link)
+      - Guarda en Firestore funeraria_leads con status=pendiente_envio
+
+    Respuesta: {job_id} — se consulta estado con /scrape-status/{job_id}.
+    """
+    user = verify_firebase_token(body.token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado.")
+
+    if not FUNERARIAS_SCRIPT.exists():
+        raise HTTPException(status_code=500, detail="scraper_funerarias.py no encontrado.")
+
+    ciudad = body.ciudad.strip()
+    if not ciudad or len(ciudad) > 80:
+        raise HTTPException(status_code=400, detail="Ciudad inválida.")
+
+    effective_max = min(max(body.max, 1), 50)
+
+    job_id = uuid.uuid4().hex[:12]
+    _jobs[job_id] = {
+        "status": "running",
+        "query": f"funeraria en {ciudad}",
+        "max": effective_max,
+        "progress": 0,
+        "message": "Iniciando scraper de funerarias...",
+        "log": [],
+        "result": None,
+        "error": None,
+        "stderr": None,
+        "exit_code": None,
+        "pid": None,
+        "created": time.time(),
+        "finished_at": None,
+        "kind": "funerarias",
+    }
+    _cleanup_old_jobs()
+
+    asyncio.create_task(_run_funerarias_job(job_id, ciudad, effective_max, body.dry_run))
+
+    return {
+        "job_id": job_id,
+        "status": "running",
+        "ciudad": ciudad,
+        "max": effective_max,
+        "dry_run": body.dry_run,
+    }
 
 
 @app.post("/scrape-async")
