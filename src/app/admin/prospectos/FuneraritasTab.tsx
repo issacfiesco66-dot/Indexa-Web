@@ -115,9 +115,31 @@ interface MigrateResult {
   no_phone: number;
   errors: number;
   sample: Array<{ nombre: string; phone: string; ciudad: string }>;
+  nextCursor: string | null;
 }
 
 type MigratePhase = "idle" | "scanning" | "preview" | "migrating" | "done";
+
+const BATCH_SIZE = 30;       // Coincide con DEFAULT_MIGRATE_LIMIT del endpoint
+const MAX_BATCHES = 500;     // Safety: máximo 500 batches = 15k migraciones por sesión
+
+/** Acumula stats de múltiples batches. */
+function mergeStats(a: MigrateResult, b: MigrateResult): MigrateResult {
+  return {
+    ok: true,
+    dryRun: false,
+    scanned: a.scanned + b.scanned,
+    matched: a.matched + b.matched,
+    already_migrated: a.already_migrated + b.already_migrated,
+    migrated: a.migrated + b.migrated,
+    opt_out: a.opt_out + b.opt_out,
+    already_in_funnel: a.already_in_funnel + b.already_in_funnel,
+    no_phone: a.no_phone + b.no_phone,
+    errors: a.errors + b.errors,
+    sample: a.sample,
+    nextCursor: b.nextCursor,
+  };
+}
 
 export default function FuneraritasTab() {
   const { user } = useAuth();
@@ -132,6 +154,7 @@ export default function FuneraritasTab() {
   const [migrateOpen, setMigrateOpen] = useState(false);
   const [migratePhase, setMigratePhase] = useState<MigratePhase>("idle");
   const [migrateData, setMigrateData] = useState<MigrateResult | null>(null);
+  const [migrateProgress, setMigrateProgress] = useState({ done: 0, total: 0 });
 
   // Suscripción Firestore
   useEffect(() => {
@@ -264,33 +287,116 @@ export default function FuneraritasTab() {
     }
   }
 
-  /** Llama al endpoint de migración (dryRun o real) y guarda el resultado. */
-  async function runMigrate(dryRun: boolean) {
+  /** Preview rápido (dryRun). Una sola request porque es solo reads. */
+  async function runPreview() {
     if (!user) return;
-    setMigratePhase(dryRun ? "scanning" : "migrating");
+    setMigratePhase("scanning");
     setFeedback(null);
     try {
       const token = await user.getIdToken();
       const res = await fetch("/api/funerarias/migrate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ dryRun }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ dryRun: true }),
       });
       const data: MigrateResult = await res.json();
       if (!res.ok || !data.ok) {
-        setFeedback({ type: "err", msg: `Migración falló: ${(data as unknown as { error?: string })?.error ?? res.status}` });
+        setFeedback({
+          type: "err",
+          msg: `Preview falló: ${(data as unknown as { error?: string })?.error ?? res.status}`,
+        });
         setMigratePhase("idle");
         return;
       }
       setMigrateData(data);
-      setMigratePhase(dryRun ? "preview" : "done");
+      setMigratePhase("preview");
     } catch (e) {
       console.error(e);
-      setFeedback({ type: "err", msg: "Error de red en migración." });
+      setFeedback({ type: "err", msg: "Error de red en preview." });
       setMigratePhase("idle");
+    }
+  }
+
+  /**
+   * Migración real en batches. Itera llamando al endpoint con `nextCursor`
+   * hasta que el servidor devuelva `nextCursor: null`. Actualiza la barra
+   * de progreso después de cada batch.
+   */
+  async function runFullMigrate() {
+    if (!user || !migrateData) return;
+    const totalToMigrate =
+      migrateData.matched - migrateData.already_migrated - migrateData.no_phone;
+
+    setMigratePhase("migrating");
+    setFeedback(null);
+    setMigrateProgress({ done: 0, total: totalToMigrate });
+
+    let accumulated: MigrateResult = {
+      ok: true,
+      dryRun: false,
+      scanned: 0,
+      matched: 0,
+      already_migrated: 0,
+      migrated: 0,
+      opt_out: 0,
+      already_in_funnel: 0,
+      no_phone: 0,
+      errors: 0,
+      sample: migrateData.sample,
+      nextCursor: null,
+    };
+    let cursor: string | null = null;
+
+    try {
+      const token = await user.getIdToken();
+      for (let i = 0; i < MAX_BATCHES; i++) {
+        const res = await fetch("/api/funerarias/migrate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            dryRun: false,
+            limit: BATCH_SIZE,
+            startAfterId: cursor,
+          }),
+        });
+        const data: MigrateResult = await res.json();
+        if (!res.ok || !data.ok) {
+          setFeedback({
+            type: "err",
+            msg: `Batch ${i + 1} falló: ${(data as unknown as { error?: string })?.error ?? res.status}. Se migraron ${accumulated.migrated} antes del error.`,
+          });
+          setMigrateData(accumulated);
+          setMigratePhase("done");
+          return;
+        }
+        accumulated = mergeStats(accumulated, data);
+        setMigrateProgress({
+          done: accumulated.migrated + accumulated.opt_out + accumulated.already_in_funnel + accumulated.errors,
+          total: totalToMigrate,
+        });
+        if (!data.nextCursor) {
+          // Terminamos
+          setMigrateData(accumulated);
+          setMigratePhase("done");
+          return;
+        }
+        cursor = data.nextCursor;
+      }
+      // Alcanzamos MAX_BATCHES sin terminar
+      setFeedback({
+        type: "err",
+        msg: `Safety limit: se migraron ${accumulated.migrated} en ${MAX_BATCHES} batches. Vuelve a correr para continuar.`,
+      });
+      setMigrateData(accumulated);
+      setMigratePhase("done");
+    } catch (e) {
+      console.error(e);
+      setFeedback({
+        type: "err",
+        msg: `Error de red. Migradas hasta el corte: ${accumulated.migrated}.`,
+      });
+      setMigrateData(accumulated);
+      setMigratePhase("done");
     }
   }
 
@@ -478,7 +584,7 @@ export default function FuneraritasTab() {
 
             {migratePhase === "idle" && (
               <button
-                onClick={() => runMigrate(true)}
+                onClick={runPreview}
                 className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
               >
                 <DatabaseZap size={14} />
@@ -519,7 +625,7 @@ export default function FuneraritasTab() {
                 {migrateData.matched - migrateData.already_migrated - migrateData.no_phone > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={() => runMigrate(false)}
+                      onClick={runFullMigrate}
                       className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
                     >
                       <DatabaseZap size={14} />
@@ -545,9 +651,25 @@ export default function FuneraritasTab() {
             )}
 
             {migratePhase === "migrating" && (
-              <p className="flex items-center gap-2 text-indigo-700">
-                <Loader2 size={14} className="animate-spin" /> Migrando a HI — puede tardar 1-3 min si son muchas…
-              </p>
+              <div className="space-y-2">
+                <p className="flex items-center gap-2 text-indigo-700">
+                  <Loader2 size={14} className="animate-spin" />
+                  Migrando batch por batch: {migrateProgress.done} de {migrateProgress.total}…
+                </p>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-indigo-200">
+                  <div
+                    className="h-full rounded-full bg-indigo-600 transition-all duration-500"
+                    style={{
+                      width: migrateProgress.total > 0
+                        ? `${Math.min(100, Math.round((migrateProgress.done / migrateProgress.total) * 100))}%`
+                        : "0%",
+                    }}
+                  />
+                </div>
+                <p className="text-[11px] text-indigo-500">
+                  No cierres esta pestaña. El proceso continúa por lotes de {BATCH_SIZE} para evitar timeout.
+                </p>
+              </div>
             )}
 
             {migratePhase === "done" && migrateData && (
