@@ -1,9 +1,17 @@
 "use client";
 
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { MapPin, Search, SearchX, Loader2 } from "lucide-react";
+import { MapPin, Search, SearchX, Loader2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import type { ProspectoFrio } from "@/types/lead";
+
+/**
+ * Palabras que indican que el usuario quiere scrapear funerarias.
+ * Si detectamos alguna, bloqueamos el botón y lo redirigimos al tab correcto
+ * — el scraper de Indexa los guarda en `prospectos_frios` con el pitch de
+ * páginas web, que NO es el pitch de Historias Infinitas.
+ */
+const FUNERARIA_KEYWORDS_RE = /funerar|funeral|funebr|f[uú]nebre|capilla|velatorio|velatoria|cremat|ataud|atau[dt]/i;
 
 interface ScraperPanelProps {
   prospectos: ProspectoFrio[];
@@ -58,6 +66,13 @@ export default function ScraperPanel({ prospectos, onRunningChange }: ScraperPan
   const existingInCity = useMemo(
     () => cityClean ? prospectos.filter((p) => p.ciudad.toLowerCase() === cityClean.toLowerCase()).length : 0,
     [prospectos, cityClean]
+  );
+
+  // Si el usuario escribe "funeraria" (o variantes), este scraper NO es el correcto
+  // — lo queremos en el tab "Funerarias → HI", con otro pitch y otra colección.
+  const isFunerariaLike = useMemo(
+    () => FUNERARIA_KEYWORDS_RE.test(scraperServicio),
+    [scraperServicio],
   );
 
   const getScraperBaseUrl = () => {
@@ -257,7 +272,7 @@ export default function ScraperPanel({ prospectos, onRunningChange }: ScraperPan
             ) : (
               <button
                 onClick={startScraper}
-                disabled={!scraperCanSearch}
+                disabled={!scraperCanSearch || isFunerariaLike}
                 className="inline-flex items-center gap-2 rounded-xl bg-indexa-orange px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indexa-orange/90 disabled:opacity-40"
               >
                 <Search size={16} />
@@ -266,6 +281,23 @@ export default function ScraperPanel({ prospectos, onRunningChange }: ScraperPan
             )}
           </div>
         </div>
+
+        {/* ── Guardrail: este scraper NO maneja funerarias ──────────── */}
+        {isFunerariaLike && (
+          <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-600" />
+            <div className="text-xs text-amber-900 leading-relaxed">
+              <p className="font-bold mb-1">Este scraper no es el correcto para funerarias.</p>
+              <p>
+                Las funerarias tienen un pitch distinto (nichos virtuales de Historias
+                Infinitas, no páginas web). Cambia arriba al tab{" "}
+                <strong>&ldquo;Funerarias → Historias Infinitas&rdquo;</strong> para verlas con su
+                propio flujo, y corre desde terminal:
+              </p>
+              <pre className="mt-2 rounded bg-amber-100 px-2 py-1 text-[11px] font-mono text-amber-900">python scraper_funerarias.py --ciudad &quot;{cityClean || 'Toluca'}&quot; --max {scraperMax}</pre>
+            </div>
+          </div>
+        )}
 
         {/* Composed query preview + duplicate indicator */}
         {scraperCanSearch && (
