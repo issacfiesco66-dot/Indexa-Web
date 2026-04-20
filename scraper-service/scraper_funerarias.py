@@ -161,6 +161,7 @@ def save_funeraria_lead(
     hi_lead_id: str,
     hi_token: str,
     hi_link: str,
+    vertical: str = "funeraria",
 ) -> bool:
     """Guarda un lead en Firestore con status='pendiente_envio'."""
     now = datetime.now(timezone.utc).isoformat()
@@ -171,6 +172,7 @@ def save_funeraria_lead(
         "ciudad":       {"stringValue": ciudad},
         "direccion":    {"stringValue": direccion or ""},
         "status":       {"stringValue": "pendiente_envio"},
+        "vertical":     {"stringValue": vertical},
         "hi_lead_id":   {"stringValue": hi_lead_id},
         "hi_token":     {"stringValue": hi_token},
         "hi_link":      {"stringValue": hi_link},
@@ -178,7 +180,7 @@ def save_funeraria_lead(
         "sentAt":       {"nullValue": None},
         "engagedAt":    {"nullValue": None},
         "optedOutAt":   {"nullValue": None},
-        "source":       {"stringValue": "scraper_funerarias"},
+        "source":       {"stringValue": f"scraper_{vertical}"},
     }
     try:
         res = requests.post(
@@ -217,7 +219,15 @@ class Stats:
     errores: int = 0
 
 
-def run(dry_run: bool, max_override: int | None, ciudad_filter: str | None) -> Stats:
+VALID_VERTICALS = ("funeraria", "veterinaria", "hospicio", "geriatrico")
+
+
+def run(
+    dry_run: bool,
+    max_override: int | None,
+    ciudad_filter: str | None,
+    vertical: str = "funeraria",
+) -> Stats:
     stats = Stats()
     cfg = load_config()
     ciudades = cfg["ciudades"]
@@ -278,9 +288,9 @@ def run(dry_run: bool, max_override: int | None, ciudad_filter: str | None) -> S
 
         for idx, ciudad in enumerate(ciudades):
             stats.ciudades += 1
-            query = f"funeraria en {ciudad}"
+            query = f"{vertical} en {ciudad}"
             city_progress = 10 + int((idx / total_ciudades) * 80)
-            emit_progress(city_progress, f"Scrapeando {query}", ciudad=ciudad)
+            emit_progress(city_progress, f"Scrapeando {query}", ciudad=ciudad, vertical=vertical)
             log.info("")
             log.info("=" * 60)
             log.info(f"🔎 {query}  (max {max_por_busqueda})")
@@ -326,6 +336,7 @@ def run(dry_run: bool, max_override: int | None, ciudad_filter: str | None) -> S
                     res = hi.ingest_lead(
                         business_name=nombre,
                         phone=phone,
+                        vertical=vertical,
                         city=ciudad,
                         notes=p.direccion or None,
                     )
@@ -357,6 +368,7 @@ def run(dry_run: bool, max_override: int | None, ciudad_filter: str | None) -> S
                     hi_lead_id=hi_lead_id,
                     hi_token=hi_token_v,
                     hi_link=hi_link,
+                    vertical=vertical,
                 )
                 if ok:
                     existing_phones.add(phone)
@@ -380,6 +392,9 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="No llama a HI, no escribe Firestore")
     parser.add_argument("--max", type=int, help="Sobreescribe max_por_busqueda")
     parser.add_argument("--ciudad", type=str, help="Solo una ciudad (debug)")
+    parser.add_argument("--vertical", type=str, default="funeraria",
+                        choices=list(VALID_VERTICALS),
+                        help="Tipo de negocio a scrapear (default: funeraria)")
     parser.add_argument("--json-progress", action="store_true", help="Emite progreso como JSON (Railway)")
     args = parser.parse_args()
 
@@ -387,14 +402,19 @@ def main() -> int:
     _JSON_MODE = bool(args.json_progress)
     log = setup_logger(json_mode=_JSON_MODE)
 
-    emit_progress(0, "Iniciando scraper de funerarias")
+    emit_progress(0, f"Iniciando scraper de {args.vertical}s")
     log.info("=" * 60)
-    log.info("INDEXA Scraper de Funerarias — Inicio")
+    log.info(f"INDEXA Scraper B2B — Inicio (vertical={args.vertical})")
     log.info(f"Modo: {'DRY-RUN' if args.dry_run else 'REAL'} · JSON: {_JSON_MODE}")
     log.info("=" * 60)
 
     t0 = time.time()
-    stats = run(dry_run=args.dry_run, max_override=args.max, ciudad_filter=args.ciudad)
+    stats = run(
+        dry_run=args.dry_run,
+        max_override=args.max,
+        ciudad_filter=args.ciudad,
+        vertical=args.vertical,
+    )
     elapsed = time.time() - t0
 
     log.info("")

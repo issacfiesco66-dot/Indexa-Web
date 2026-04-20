@@ -788,7 +788,7 @@ export default function ProspectosPage() {
               : "text-gray-600 hover:bg-gray-100"
           }`}
         >
-          Funerarias → Historias Infinitas
+          Partners B2B → Historias Infinitas
         </button>
       </div>
 

@@ -45,6 +45,22 @@ type FuneraritaStatus =
   | "vendido"
   | "baja";
 
+type Vertical = "funeraria" | "veterinaria" | "hospicio" | "geriatrico";
+
+const VERTICAL_LABEL: Record<Vertical, string> = {
+  funeraria: "Funeraria",
+  veterinaria: "Veterinaria",
+  hospicio: "Hospicio",
+  geriatrico: "Geriátrico",
+};
+
+const VERTICAL_BADGE: Record<Vertical, string> = {
+  funeraria:   "bg-pizarra-800 text-marfil border-pizarra-900",
+  veterinaria: "bg-emerald-700 text-white border-emerald-800",
+  hospicio:    "bg-blue-700 text-white border-blue-800",
+  geriatrico:  "bg-purple-700 text-white border-purple-800",
+};
+
 interface FuneraritaLead {
   id: string;
   nombre: string;
@@ -52,6 +68,7 @@ interface FuneraritaLead {
   ciudad: string;
   direccion?: string;
   status: FuneraritaStatus;
+  vertical: Vertical;
   hi_lead_id?: string;
   hi_token?: string;
   hi_link?: string;
@@ -86,21 +103,59 @@ const DEMO_MEMORIAL_URL =
   process.env.NEXT_PUBLIC_HI_DEMO_MEMORIAL_URL ??
   "https://historias-infinitas.com/memorial/rosa-y-fernando-ket9rc";
 
-/** Mensaje pre-armado que se copia a WhatsApp. Edita libre. */
-function buildWAMessage(nombre: string, hiLink: string): string {
+/**
+ * Configuración del pitch por vertical. Los planes y costos (MXN 4,999 → $167/nicho)
+ * son los mismos; solo cambian los precios sugeridos de reventa según tolerancia
+ * de mercado: humano duelo ≠ mascota duelo.
+ */
+const PITCH_BY_VERTICAL: Record<Vertical, {
+  descripcion: string;
+  useCase: string;
+  reventa: string;
+  utilidad: string;
+}> = {
+  funeraria: {
+    descripcion: "producto diseñado para funerarias: nichos virtuales con placa física personalizada con su logo",
+    useCase: "Cada familia recibe una placa de acero con QR que abre un memorial digital eterno — retrato IA del ser querido, historia, velas, galería. Lo dan como cierre emocional o lo venden como upsell de servicio.",
+    reventa: "$800-$1,000 MXN",
+    utilidad: "~$22,000 MXN",
+  },
+  veterinaria: {
+    descripcion: "producto diseñado para clínicas veterinarias: nichos virtuales de mascotas con placa física personalizada con el logo de su clínica",
+    useCase: "Cada familia recibe una placa de acero con QR que abre un memorial eterno de su mascota — retrato IA, historia, galería de fotos. Lo regalan en el momento del fallecimiento (cierre emocional que los hace volver para su próxima mascota) o lo venden como upsell después de la eutanasia/cremación.",
+    reventa: "$500-$800 MXN",
+    utilidad: "~$14,500 MXN",
+  },
+  hospicio: {
+    descripcion: "producto para hospicios: nichos virtuales con placa física y su logo",
+    useCase: "Las familias reciben un cierre digno del proceso de acompañamiento — memorial eterno con retrato IA, historia, galería.",
+    reventa: "$700-$900 MXN",
+    utilidad: "~$18,000 MXN",
+  },
+  geriatrico: {
+    descripcion: "producto para centros geriátricos: nichos virtuales con placa física y su logo",
+    useCase: "Las familias se llevan un recuerdo eterno del ser querido que vivió con ustedes — retrato IA, historia, galería.",
+    reventa: "$700-$900 MXN",
+    utilidad: "~$18,000 MXN",
+  },
+};
+
+/** Mensaje pre-armado que se copia a WhatsApp. Personalizado por vertical. */
+function buildWAMessage(nombre: string, hiLink: string, vertical: Vertical = "funeraria"): string {
   const nombreCorto = nombre.length > 40 ? nombre.slice(0, 40) : nombre;
+  const p = PITCH_BY_VERTICAL[vertical];
   return `${nombreCorto}, buen día. Soy Issac de Historias Infinitas (historias-infinitas.com).
 
-Tenemos un producto diseñado para funerarias: nichos virtuales con placa física personalizada con su logo.
+Tenemos un ${p.descripcion}.
 
-Cada familia recibe una placa de acero con QR que abre un memorial digital eterno — retrato IA del ser querido, historia, velas, galería. Lo dan como cierre emocional o lo venden como upsell de servicio.
+${p.useCase}
 
 👉 Así se ve en vivo (ejemplo real): ${DEMO_MEMORIAL_URL}
 
 Los números para ${nombreCorto}:
 • Paquete de 30 nichos: $4,999 MXN (costo unitario $167)
-• Precio de reventa de otras funerarias: $800-$1,000 MXN
-• Utilidad estimada por paquete: ~$22,000 MXN
+• Precio de reventa sugerido: ${p.reventa} por nicho
+• Utilidad estimada por paquete: ${p.utilidad}
 • Garantía de 30 días — reembolso total si no funciona
 • Factura CFDI + DPA bajo LFPDPPP
 
@@ -177,9 +232,13 @@ export default function FuneraritasTab() {
 
   // Trigger del scraper (Railway)
   const [scraperOpen, setScraperOpen] = useState(false);
+  const [scraperVertical, setScraperVertical] = useState<Vertical>("funeraria");
   const [scraperCiudad, setScraperCiudad] = useState("Toluca");
   const [scraperMax, setScraperMax] = useState(15);
   const [scraperDryRun, setScraperDryRun] = useState(false);
+
+  // Filtro por vertical en la tabla
+  const [verticalFilter, setVerticalFilter] = useState<Vertical | "all">("all");
   const [scraperRunning, setScraperRunning] = useState(false);
   const [scraperProgress, setScraperProgress] = useState(0);
   const [scraperMessage, setScraperMessage] = useState("");
@@ -215,6 +274,7 @@ export default function FuneraritasTab() {
             ciudad: String(r.ciudad ?? ""),
             direccion: r.direccion ?? "",
             status: (r.status ?? "pendiente_envio") as FuneraritaStatus,
+            vertical: (r.vertical ?? "funeraria") as Vertical,
             hi_lead_id: r.hi_lead_id ?? "",
             hi_token: r.hi_token ?? "",
             hi_link: r.hi_link ?? "",
@@ -250,9 +310,20 @@ export default function FuneraritasTab() {
   }, [leads]);
 
   const visible = useMemo(() => {
-    if (filter === "all") return leads;
-    return leads.filter((l) => l.status === filter);
-  }, [leads, filter]);
+    let list = leads;
+    if (filter !== "all") list = list.filter((l) => l.status === filter);
+    if (verticalFilter !== "all") list = list.filter((l) => l.vertical === verticalFilter);
+    return list;
+  }, [leads, filter, verticalFilter]);
+
+  const verticalCounts = useMemo(() => {
+    const c: Record<Vertical | "all", number> = {
+      all: leads.length,
+      funeraria: 0, veterinaria: 0, hospicio: 0, geriatrico: 0,
+    };
+    for (const l of leads) c[l.vertical] = (c[l.vertical] ?? 0) + 1;
+    return c;
+  }, [leads]);
 
   async function handleOpenWA(lead: FuneraritaLead) {
     if (!db) return;
@@ -260,7 +331,7 @@ export default function FuneraritasTab() {
       setFeedback({ type: "err", msg: "Este lead no tiene link HI todavía — re-corre el scraper." });
       return;
     }
-    const msg = buildWAMessage(lead.nombre, lead.hi_link);
+    const msg = buildWAMessage(lead.nombre, lead.hi_link, lead.vertical);
     window.open(waHref(lead.phone, msg), "_blank", "noopener,noreferrer");
   }
 
@@ -321,7 +392,7 @@ export default function FuneraritasTab() {
   async function handleCopyMessage(lead: FuneraritaLead) {
     if (!lead.hi_link) return;
     try {
-      await navigator.clipboard.writeText(buildWAMessage(lead.nombre, lead.hi_link));
+      await navigator.clipboard.writeText(buildWAMessage(lead.nombre, lead.hi_link, lead.vertical));
       setCopiedId(lead.id);
       setTimeout(() => setCopiedId((cur) => (cur === lead.id ? null : cur)), 1800);
     } catch {
@@ -372,6 +443,7 @@ export default function FuneraritasTab() {
           max: scraperMax,
           dry_run: scraperDryRun,
           token: authToken,
+          vertical: scraperVertical,
         }),
       });
 
@@ -556,9 +628,16 @@ export default function FuneraritasTab() {
       {/* Header + contador diario */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-indexa-gray-dark">Funerarias → Historias Infinitas</h2>
+          <h2 className="text-2xl font-bold text-indexa-gray-dark">Partners B2B → Historias Infinitas</h2>
           <p className="mt-1 text-sm text-gray-500">
-            {counts.total} lead{counts.total !== 1 && "s"} total — enviados hoy:{" "}
+            {counts.total} lead{counts.total !== 1 && "s"} total
+            {" — "}
+            {(Object.keys(verticalCounts) as (Vertical | "all")[])
+              .filter((v) => v !== "all" && verticalCounts[v] > 0)
+              .map((v) => `${VERTICAL_LABEL[v as Vertical]}: ${verticalCounts[v]}`)
+              .join(" · ") || "sin leads todavía"}
+            {" — "}
+            enviados hoy:{" "}
             <strong className={counts.enviadosHoy >= DAILY_LIMIT ? "text-red-600" : "text-indexa-gray-dark"}>
               {counts.enviadosHoy}/{DAILY_LIMIT}
             </strong>
@@ -610,7 +689,21 @@ export default function FuneraritasTab() {
               <strong>pendiente_envio</strong>. No requieres terminal.
             </p>
 
-            <div className="grid gap-3 sm:grid-cols-3 mb-3">
+            <div className="grid gap-3 sm:grid-cols-4 mb-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-emerald-700 mb-1">Vertical</label>
+                <select
+                  value={scraperVertical}
+                  onChange={(e) => setScraperVertical(e.target.value as Vertical)}
+                  disabled={scraperRunning}
+                  className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:opacity-50"
+                >
+                  <option value="funeraria">Funerarias</option>
+                  <option value="veterinaria">Veterinarias</option>
+                  <option value="hospicio">Hospicios</option>
+                  <option value="geriatrico">Geriátricos</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-[11px] font-semibold text-emerald-700 mb-1">Ciudad</label>
                 <input
@@ -713,6 +806,29 @@ export default function FuneraritasTab() {
         )}
       </div>
 
+      {/* Filtro por vertical */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mr-1">
+          Vertical:
+        </span>
+        {(["all", "funeraria", "veterinaria", "hospicio", "geriatrico"] as const).map((v) => {
+          const count = v === "all" ? verticalCounts.all : verticalCounts[v];
+          const active = verticalFilter === v;
+          const label = v === "all" ? "Todas" : VERTICAL_LABEL[v] + "s";
+          return (
+            <button
+              key={v}
+              onClick={() => setVerticalFilter(v)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                active ? "bg-pizarra-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {label} <span className="ml-1 opacity-75">({count})</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Filtros por status */}
       <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
         {(["pendiente_envio", "enviado", "engaged", "vendido", "baja", "all"] as const).map((f) => {
@@ -759,10 +875,13 @@ export default function FuneraritasTab() {
                 className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="truncate font-semibold text-indexa-gray-dark">{l.nombre}</h3>
                     <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${badge.classes}`}>
                       {badge.label}
+                    </span>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${VERTICAL_BADGE[l.vertical]}`}>
+                      {VERTICAL_LABEL[l.vertical]}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-gray-500">

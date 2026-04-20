@@ -230,11 +230,15 @@ async def _run_scrape_job(job_id: str, query: str, max_results: int):
     job["finished_at"] = time.time()
 
 
+VALID_VERTICALS_API = {"funeraria", "veterinaria", "hospicio", "geriatrico"}
+
+
 class FunerariasScrapeRequest(BaseModel):
     ciudad: str
     max: int = 15
     dry_run: bool = False
     token: str
+    vertical: str = "funeraria"   # funeraria | veterinaria | hospicio | geriatrico
 
 
 async def _run_funerarias_job(
@@ -242,19 +246,21 @@ async def _run_funerarias_job(
     ciudad: str,
     max_results: int,
     dry_run: bool,
+    vertical: str = "funeraria",
 ):
     """Background task: corre scraper_funerarias.py como subprocess y recolecta eventos JSON."""
     job = _jobs[job_id]
     try:
         args = [
             "python", str(FUNERARIAS_SCRIPT),
+            "--vertical", vertical,
             "--ciudad", ciudad,
             "--max", str(max_results),
             "--json-progress",
         ]
         if dry_run:
             args.append("--dry-run")
-        logger.info(f"[job:{job_id}] Funerarias start: ciudad='{ciudad}' max={max_results} dry_run={dry_run}")
+        logger.info(f"[job:{job_id}] B2B start: vertical={vertical} ciudad='{ciudad}' max={max_results} dry_run={dry_run}")
 
         proc = await asyncio.create_subprocess_exec(
             *args,
@@ -358,15 +364,22 @@ async def scrape_funerarias_async(body: FunerariasScrapeRequest):
     if not ciudad or len(ciudad) > 80:
         raise HTTPException(status_code=400, detail="Ciudad inválida.")
 
+    vertical = (body.vertical or "funeraria").strip().lower()
+    if vertical not in VALID_VERTICALS_API:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Vertical inválida. Usa una de: {sorted(VALID_VERTICALS_API)}",
+        )
+
     effective_max = min(max(body.max, 1), 50)
 
     job_id = uuid.uuid4().hex[:12]
     _jobs[job_id] = {
         "status": "running",
-        "query": f"funeraria en {ciudad}",
+        "query": f"{vertical} en {ciudad}",
         "max": effective_max,
         "progress": 0,
-        "message": "Iniciando scraper de funerarias...",
+        "message": f"Iniciando scraper de {vertical}s...",
         "log": [],
         "result": None,
         "error": None,
@@ -375,15 +388,16 @@ async def scrape_funerarias_async(body: FunerariasScrapeRequest):
         "pid": None,
         "created": time.time(),
         "finished_at": None,
-        "kind": "funerarias",
+        "kind": vertical,
     }
     _cleanup_old_jobs()
 
-    asyncio.create_task(_run_funerarias_job(job_id, ciudad, effective_max, body.dry_run))
+    asyncio.create_task(_run_funerarias_job(job_id, ciudad, effective_max, body.dry_run, vertical))
 
     return {
         "job_id": job_id,
         "status": "running",
+        "vertical": vertical,
         "ciudad": ciudad,
         "max": effective_max,
         "dry_run": body.dry_run,

@@ -71,6 +71,7 @@ class HIClient:
         self,
         business_name: str,
         phone: str,
+        vertical: str | None = None,
         city: str | None = None,
         state: str | None = None,
         google_place_id: str | None = None,
@@ -90,6 +91,7 @@ class HIClient:
             "business_name": business_name,
             "phone": phone,
         }
+        if vertical: payload["vertical"] = vertical
         if city: payload["city"] = city
         if state: payload["state"] = state
         if google_place_id: payload["google_place_id"] = google_place_id

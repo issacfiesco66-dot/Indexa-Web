@@ -44,14 +44,24 @@ export const maxDuration = 300;
  *        acumula stats
  */
 
+// Regex MISMAS que ScraperPanel/scraper_funerarias — si agregamos keywords,
+// actualizar los 3 lugares (ScraperPanel.tsx, scraper_funerarias.py, aquí).
 const FUNERARIA_KEYWORDS_RE = /funerar|funeral|funebr|f[uú]nebre|capilla|velatorio|velatoria|cremat|ataud|atau[dt]/i;
+const VETERINARIA_KEYWORDS_RE = /veterinari|vetmedi|cl[ií]nica vet|hospital vet/i;
+
 const PAGE_SIZE = 500;          // páginas de Firestore para iterar sin cargar todo en memoria
 const DEFAULT_MIGRATE_LIMIT = 30;
 
-function looksLikeFuneraria(doc: Record<string, unknown>): boolean {
+type Vertical = "funeraria" | "veterinaria" | "hospicio" | "geriatrico";
+
+/** Devuelve la vertical detectada, o null si el doc no parece B2B relevante. */
+function detectVertical(doc: Record<string, unknown>): Vertical | null {
   const nombre = typeof doc.nombre === "string" ? doc.nombre : "";
   const categoria = typeof doc.categoria === "string" ? doc.categoria : "";
-  return FUNERARIA_KEYWORDS_RE.test(`${categoria} ${nombre}`);
+  const text = `${categoria} ${nombre}`;
+  if (FUNERARIA_KEYWORDS_RE.test(text)) return "funeraria";
+  if (VETERINARIA_KEYWORDS_RE.test(text)) return "veterinaria";
+  return null;
 }
 
 function normalizeMxPhone(raw: string): string | null {
@@ -141,7 +151,8 @@ export async function POST(req: Request) {
     scanned = snap.size;
     for (const docSnap of snap.docs) {
       const data = docSnap.data();
-      if (!looksLikeFuneraria(data)) continue;
+      const vertical = detectVertical(data);
+      if (!vertical) continue;
       matched += 1;
 
       if (data.migrated_to_hi === true) {
@@ -203,7 +214,8 @@ export async function POST(req: Request) {
       cursor = docSnap.id;
 
       const data = docSnap.data();
-      if (!looksLikeFuneraria(data)) continue;
+      const vertical = detectVertical(data);
+      if (!vertical) continue;
       matched += 1;
 
       if (data.migrated_to_hi === true) {
@@ -233,9 +245,10 @@ export async function POST(req: Request) {
           body: JSON.stringify({
             business_name: nombre,
             phone,
+            vertical,
             city: ciudad || undefined,
             source: "indexa_migration",
-            notes: `Migrado de prospectos_frios (${docSnap.id})`,
+            notes: `Migrado de prospectos_frios (${docSnap.id}) como ${vertical}`,
           }),
           signal: AbortSignal.timeout(15_000),
         });
@@ -306,6 +319,7 @@ export async function POST(req: Request) {
         ciudad,
         direccion: String(data.direccion ?? ""),
         status: "pendiente_envio",
+        vertical,
         hi_lead_id,
         hi_token,
         hi_link,
