@@ -39,6 +39,14 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // ── funeraria_leads (scraper_funerarias.py → Historias Infinitas) ──────
+    // Mismo patrón que prospectos_frios: solo admin.
+    // Lo escribe el scraper autenticado como usuario admin vía REST API, y
+    // lo lee /admin/prospectos (pestaña Funerarias).
+    match /funeraria_leads/{docId} {
+      allow read, write: if isAdmin();
+    }
+
     // ── usuarios (perfiles) ─────────────────────────────────────────────────
     // Leer: el propio usuario o admin
     // Escribir: admin tiene acceso total; owner solo puede actualizar campos de integración

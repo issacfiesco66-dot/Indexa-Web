@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import ScraperPanel from "./ScraperPanel";
+import FuneraritasTab from "./FuneraritasTab";
 
 interface RawProspecto {
   nombre?: string;
@@ -187,6 +188,7 @@ const ITEMS_PER_PAGE = 25;
 export default function ProspectosPage() {
   const [prospectos, setProspectos] = useState<ProspectoFrio[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vistaProspectos, setVistaProspectos] = useState<"sin_web" | "funerarias">("sin_web");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ ok: number; fail: number } | null>(null);
   const [importError, setImportError] = useState("");
@@ -766,6 +768,34 @@ export default function ProspectosPage() {
 
   return (
     <div className="space-y-6">
+      {/* ── Tab Switcher: Sin web (Indexa) | Funerarias (HI) ──── */}
+      <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
+        <button
+          onClick={() => setVistaProspectos("sin_web")}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            vistaProspectos === "sin_web"
+              ? "bg-indexa-blue text-white"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Sin web (Indexa)
+        </button>
+        <button
+          onClick={() => setVistaProspectos("funerarias")}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
+            vistaProspectos === "funerarias"
+              ? "bg-indexa-blue text-white"
+              : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          Funerarias → Historias Infinitas
+        </button>
+      </div>
+
+      {vistaProspectos === "funerarias" ? (
+        <FuneraritasTab />
+      ) : (
+        <>
       {/* ── Header + Import ─────────────────────────────────────── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -1444,6 +1474,8 @@ export default function ProspectosPage() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
