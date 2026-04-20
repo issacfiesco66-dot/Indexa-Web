@@ -84,7 +84,7 @@ const DAILY_LIMIT = 30;
  */
 const DEMO_MEMORIAL_URL =
   process.env.NEXT_PUBLIC_HI_DEMO_MEMORIAL_URL ??
-  "https://historias-infinitas.com/m/ejemplo";
+  "https://historias-infinitas.com/memorial/rosa-y-fernando-ket9rc";
 
 /** Mensaje pre-armado que se copia a WhatsApp. Edita libre. */
 function buildWAMessage(nombre: string, hiLink: string): string {
