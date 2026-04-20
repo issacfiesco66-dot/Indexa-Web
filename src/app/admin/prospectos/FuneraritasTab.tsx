@@ -71,6 +71,21 @@ const STATUS_BADGE: Record<FuneraritaStatus, { label: string; classes: string }>
 
 const DAILY_LIMIT = 30;
 
+/**
+ * URL del nicho virtual de DEMO que se muestra en el mensaje de WhatsApp.
+ * Priority: env NEXT_PUBLIC_HI_DEMO_MEMORIAL_URL > valor hardcoded.
+ *
+ * Cómo actualizar después de crear el demo:
+ *   1. Admin entra a https://historias-infinitas.com/dashboard/new
+ *   2. Crea memorial completo con fotos + IA + bio
+ *   3. En checkout → clic en "Publicar gratis (admin)"
+ *   4. Copia la URL pública (https://historias-infinitas.com/m/<slug>)
+ *   5. Ponla como env NEXT_PUBLIC_HI_DEMO_MEMORIAL_URL en Vercel, o edita el fallback abajo.
+ */
+const DEMO_MEMORIAL_URL =
+  process.env.NEXT_PUBLIC_HI_DEMO_MEMORIAL_URL ??
+  "https://historias-infinitas.com/m/ejemplo";
+
 /** Mensaje pre-armado que se copia a WhatsApp. Edita libre. */
 function buildWAMessage(nombre: string, hiLink: string): string {
   const nombreCorto = nombre.length > 40 ? nombre.slice(0, 40) : nombre;
@@ -79,6 +94,8 @@ function buildWAMessage(nombre: string, hiLink: string): string {
 Tenemos un producto diseñado para funerarias: nichos virtuales con placa física personalizada con su logo.
 
 Cada familia recibe una placa de acero con QR que abre un memorial digital eterno — retrato IA del ser querido, historia, velas, galería. Lo dan como cierre emocional o lo venden como upsell de servicio.
+
+👉 Así se ve en vivo (ejemplo real): ${DEMO_MEMORIAL_URL}
 
 Los números para ${nombreCorto}:
 • Paquete de 30 nichos: $4,999 MXN (costo unitario $167)
