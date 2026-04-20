@@ -21,7 +21,7 @@ export function PaywallOverlay({
   sitioId,
   className = "",
 }: PaywallOverlayProps) {
-  const { user } = useAuth();
+  const { user, trial } = useAuth();
   const [checkingOut, setCheckingOut] = useState(false);
 
   const handleCheckout = useCallback(async () => {
@@ -48,7 +48,8 @@ export function PaywallOverlay({
     }
   }, [user, sitioId]);
 
-  if (!locked) return <>{children}</>;
+  // Active trial bypasses the paywall — user has full access for 14 days
+  if (!locked || trial.inTrial) return <>{children}</>;
 
   return (
     <div className={`relative overflow-hidden rounded-2xl ${className}`}>
@@ -63,6 +64,11 @@ export function PaywallOverlay({
           <p className="text-sm font-semibold text-white">
             {featureName}
           </p>
+          {trial.expired && (
+            <p className="text-xs text-amber-300/80">
+              Tu prueba de 14 días terminó. Activa un plan para continuar.
+            </p>
+          )}
           <button
             onClick={handleCheckout}
             disabled={checkingOut || !sitioId}
@@ -104,7 +110,7 @@ export function PaywallModal({
   featureName,
   sitioId,
 }: PaywallModalProps) {
-  const { user } = useAuth();
+  const { user, trial } = useAuth();
   const [checkingOut, setCheckingOut] = useState(false);
 
   const handleCheckout = useCallback(async () => {
@@ -131,6 +137,12 @@ export function PaywallModal({
     }
   }, [user, sitioId]);
 
+  // During an active trial, close the modal silently — user has full access
+  if (trial.inTrial) {
+    if (open) onClose();
+    return null;
+  }
+
   if (!open) return null;
 
   return (
@@ -152,11 +164,21 @@ export function PaywallModal({
 
           {/* Title */}
           <h3 className="mb-2 text-xl font-bold text-white">
-            Activa tu plan para continuar
+            {trial.expired ? "Tu prueba gratis terminó" : "Activa tu plan para continuar"}
           </h3>
           <p className="mb-6 text-sm text-white/50">
-            <span className="font-medium text-indigo-400">{featureName}</span>{" "}
-            requiere un plan activo.
+            {trial.expired ? (
+              <>
+                Los 14 días de prueba terminaron. Activa un plan para mantener{" "}
+                <span className="font-medium text-indigo-400">{featureName}</span> y
+                todo tu sitio publicado.
+              </>
+            ) : (
+              <>
+                <span className="font-medium text-indigo-400">{featureName}</span>{" "}
+                requiere un plan activo.
+              </>
+            )}
           </p>
 
           {/* Benefits */}

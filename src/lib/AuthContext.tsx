@@ -11,6 +11,13 @@ import { auth, db } from "@/lib/firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 import { normalizeRole, type UserRole, type AgencyBranding } from "@/types/tenant";
 
+export interface TrialStatus {
+  inTrial: boolean;
+  expired: boolean;
+  daysLeft: number;
+  endsAt: Date | null;
+}
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -18,9 +25,17 @@ interface AuthContextType {
   agencyId: string | null;
   agencyBranding: AgencyBranding | null;
   agencyName: string;
+  trial: TrialStatus;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
+
+const DEFAULT_TRIAL: TrialStatus = {
+  inTrial: false,
+  expired: false,
+  daysLeft: 0,
+  endsAt: null,
+};
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
@@ -29,9 +44,28 @@ const AuthContext = createContext<AuthContextType>({
   agencyId: null,
   agencyBranding: null,
   agencyName: "",
+  trial: DEFAULT_TRIAL,
   signIn: async () => {},
   signOut: async () => {},
 });
+
+function computeTrialStatus(
+  trialEndsAtRaw: unknown,
+  trialStatusRaw: unknown
+): TrialStatus {
+  if (typeof trialEndsAtRaw !== "string" || !trialEndsAtRaw) return DEFAULT_TRIAL;
+  const endsAt = new Date(trialEndsAtRaw);
+  if (isNaN(endsAt.getTime())) return DEFAULT_TRIAL;
+  const msLeft = endsAt.getTime() - Date.now();
+  const daysLeft = Math.max(0, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
+  const notCancelled = trialStatusRaw !== "converted" && trialStatusRaw !== "cancelled";
+  return {
+    inTrial: msLeft > 0 && notCancelled,
+    expired: msLeft <= 0 && notCancelled,
+    daysLeft,
+    endsAt,
+  };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -40,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [agencyId, setAgencyId] = useState<string | null>(null);
   const [agencyBranding, setAgencyBranding] = useState<AgencyBranding | null>(null);
   const [agencyName, setAgencyName] = useState("");
+  const [trial, setTrial] = useState<TrialStatus>(DEFAULT_TRIAL);
 
   useEffect(() => {
     if (!auth) {
@@ -65,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               const data = snap.data();
               const normalized = normalizeRole(data.role);
               setRole(normalized);
+              setTrial(computeTrialStatus(data.trialEndsAt, data.trialStatus));
               document.cookie = `indexa_role=${normalized}; path=/; max-age=${60 * 60}; SameSite=Strict; Secure`;
 
               // Resolve agency branding from agencias collection
@@ -103,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setAgencyId(resolvedAgencyId);
             } else {
               setRole("client");
+              setTrial(DEFAULT_TRIAL);
               document.cookie = `indexa_role=client; path=/; max-age=${60 * 60}; SameSite=Strict; Secure`;
             }
           } catch {
@@ -114,6 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAgencyId(null);
         setAgencyBranding(null);
         setAgencyName("");
+        setTrial(DEFAULT_TRIAL);
         // Clear auth cookie via server endpoint (HttpOnly)
         fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
         document.cookie = "indexa_role=; path=/; max-age=0";
@@ -135,10 +173,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, role, agencyId, agencyBranding, agencyName, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, role, agencyId, agencyBranding, agencyName, trial, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export const useAuth = () => useContext(AuthContext);
+export const useTrialStatus = (): TrialStatus => useContext(AuthContext).trial;

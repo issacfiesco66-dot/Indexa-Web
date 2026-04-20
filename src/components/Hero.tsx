@@ -29,10 +29,9 @@ export default function Hero() {
         </h1>
 
         <p className="hero-description animate-fade-up-delay-2 mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-white/60 sm:text-xl">
-          INDEXA es la plataforma en México que utiliza inteligencia artificial
-          para generar sitios web profesionales para PYMES en menos de 3 minutos.
-          Con SEO local automático, WhatsApp integrado y campañas de ads —
-          todo desde un solo panel.
+          Mientras tu competencia ya aparece en Google, tu negocio sigue invisible.
+          INDEXA genera tu sitio web profesional con IA en menos de 3 minutos —
+          con SEO local, WhatsApp integrado y marketing automatizado. Pruébalo 14 días gratis.
         </p>
 
         {/* CTAs */}
@@ -41,7 +40,7 @@ export default function Hero() {
             href="/registro"
             className="group relative inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indexa-orange to-orange-500 px-8 py-4 text-lg font-bold text-white shadow-2xl shadow-indexa-orange/25 transition-all hover:shadow-indexa-orange/40 hover:-translate-y-0.5"
           >
-            Comenzar Gratis
+            Prueba 14 días gratis
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-5 w-5 transition-transform group-hover:translate-x-1">
               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
             </svg>
@@ -54,8 +53,17 @@ export default function Hero() {
           </a>
         </div>
 
-        {/* Social proof link */}
-        <div className="animate-fade-up-delay-2 mt-6">
+        {/* Trust signal */}
+        <p className="animate-fade-up-delay-2 mt-4 text-sm text-white/40">
+          Sin tarjeta de crédito · Cancela cuando quieras
+        </p>
+
+        {/* Social proof + preview link */}
+        <div className="animate-fade-up-delay-2 mt-6 flex flex-col items-center gap-2 sm:flex-row sm:gap-6">
+          <a href="/probar" className="text-sm font-medium text-white/70 underline decoration-white/20 underline-offset-4 transition-colors hover:text-white">
+            Ver un preview de mi sitio sin crear cuenta →
+          </a>
+          <span className="hidden h-1 w-1 rounded-full bg-white/20 sm:block" />
           <a href="/casos-de-exito" className="text-sm font-medium text-indexa-orange/80 underline decoration-indexa-orange/30 underline-offset-4 hover:text-indexa-orange transition-colors">
             Conoce nuestros casos de éxito
           </a>

@@ -100,6 +100,20 @@ async function cancelSitio(sitioId: string): Promise<boolean> {
   } catch { return false; }
 }
 
+async function markTrialConverted(ownerId: string): Promise<boolean> {
+  try {
+    const db = getAdminDb();
+    await db.collection("usuarios").doc(ownerId).update({
+      trialStatus: "converted",
+      trialConvertedAt: new Date().toISOString(),
+    });
+    return true;
+  } catch (err) {
+    console.error("Failed to mark trial as converted:", err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
 // ── Webhook handler ──────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -148,6 +162,12 @@ export async function POST(request: NextRequest) {
     if (!paymentOk) {
       await logWebhookEvent(event.id, event.type, "error", { sitioId, error: "Failed to activate sitio" });
       return NextResponse.json({ error: "Failed to activate sitio." }, { status: 500 });
+    }
+
+    // Close the trial loop: if this user was on a 14-day trial, mark it converted
+    // so TrialBanner and PaywallGate stop treating them as a trialing user.
+    if (ownerId) {
+      await markTrialConverted(ownerId);
     }
 
     await logWebhookEvent(event.id, event.type, "success", { sitioId, ownerId, plan, customerId, subscriptionId });

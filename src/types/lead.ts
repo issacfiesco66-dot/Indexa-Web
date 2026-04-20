@@ -20,6 +20,7 @@ export interface ContactApiResponse {
 }
 
 export type LeadStatus = "nuevo" | "contactado" | "vendido";
+export type LeadType = "standard" | "b2b";
 
 export interface Lead {
   id: string;
@@ -29,6 +30,7 @@ export interface Lead {
   email: string;
   mensaje: string;
   status: LeadStatus;
+  leadType: LeadType;
   createdAt: Date | null;
 }
 

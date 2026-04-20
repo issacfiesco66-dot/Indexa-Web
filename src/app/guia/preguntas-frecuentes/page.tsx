@@ -327,7 +327,7 @@ export default function GuiaPreguntasFrecuentes() {
                 href="/registro"
                 className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indexa-orange to-orange-500 px-8 py-4 text-base font-bold text-white shadow-lg shadow-indexa-orange/25 transition-all hover:shadow-xl hover:-translate-y-0.5"
               >
-                Comenzar Gratis
+                Prueba 14 días gratis
               </Link>
               <a
                 href="https://wa.me/525622042820?text=Hola%2C%20tengo%20una%20duda%20sobre%20INDEXA"

@@ -4,9 +4,9 @@ import FAQItem, { type FAQItemData } from "./FAQItem";
 
 const FAQS: FAQItemData[] = [
   {
-    question: "¿Por qué es gratis el plan Starter?",
+    question: "¿Cómo funciona la prueba gratis de 14 días?",
     answer:
-      "Queremos que cada negocio en México tenga presencia digital profesional sin importar su presupuesto. El plan Starter incluye todo lo esencial: sitio web con IA, WhatsApp integrado y SEO básico. Cuando crezcas y necesites más herramientas como dominio propio, analíticas avanzadas o campañas de ads, puedes subir de plan sin complicaciones.",
+      "Te registras sin tarjeta de crédito y obtienes acceso completo a cualquier plan por 14 días — incluyendo sitio web generado con IA, SEO local automático, WhatsApp integrado y panel de edición. Al terminar la prueba, eliges el plan que más te convenga (desde $299 MXN/mes) para seguir con tu sitio activo. Si decides no continuar, no se te cobra nada y tu sitio queda pausado sin penalización.",
   },
   {
     question: "¿Necesito saber programar para usar INDEXA?",
@@ -148,7 +148,7 @@ export default function FAQ() {
               <path d="m3.5 18.5 3 3" />
               <path d="M2 22h4" />
             </svg>
-            Comenzar Gratis
+            Prueba 14 días gratis
           </a>
         </div>
       </div>

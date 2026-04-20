@@ -11,7 +11,7 @@ const plans = [
       "Certificado SSL incluido",
       "Soporte por email",
     ],
-    cta: "Comenzar Ahora",
+    cta: "Probar 14 días gratis",
     popular: false,
   },
   {
@@ -26,7 +26,7 @@ const plans = [
       "Soporte prioritario por WhatsApp",
       "Asesoría para optimizar tu perfil",
     ],
-    cta: "Elegir Profesional",
+    cta: "Probar 14 días gratis",
     popular: true,
   },
   {
@@ -41,7 +41,7 @@ const plans = [
       "Soporte técnico urgente",
       "Capacitación 1 a 1",
     ],
-    cta: "Elegir Enterprise",
+    cta: "Probar 14 días gratis",
     popular: false,
   },
 ];
@@ -63,6 +63,16 @@ export default function Pricing() {
           <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-500">
             Sin contratos. Cancela cuando quieras. Todas las herramientas de IA incluidas.
           </p>
+
+          {/* Trial banner */}
+          <div className="mx-auto mt-8 inline-flex items-center gap-3 rounded-full border border-indexa-orange/30 bg-indexa-orange/5 px-5 py-2.5">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="h-5 w-5 text-indexa-orange">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+            <span className="text-sm font-semibold text-indexa-gray-dark">
+              14 días gratis en cualquier plan · Sin tarjeta de crédito
+            </span>
+          </div>
         </div>
 
         <div className="mt-16 grid gap-8 lg:grid-cols-3">

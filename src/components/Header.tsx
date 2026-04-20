@@ -39,9 +39,9 @@ export default function Header() {
           <a href="#precios" className="text-sm font-medium text-white/70 hover:text-white transition-colors">
             Precios
           </a>
-          <a href="#contacto" className="text-sm font-medium text-white/70 hover:text-white transition-colors">
-            Contacto
-          </a>
+          <Link href="/agencias" className="text-sm font-medium text-white/70 hover:text-white transition-colors">
+            Para Agencias
+          </Link>
           <Link
             href="/login"
             className="text-sm font-medium text-white/70 hover:text-white transition-colors"
@@ -52,7 +52,7 @@ export default function Header() {
             href="/registro"
             className="rounded-lg bg-gradient-to-r from-indexa-orange to-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-indexa-orange/25 transition-all hover:shadow-xl hover:shadow-indexa-orange/30 hover:-translate-y-0.5"
           >
-            Comenzar Gratis
+            Prueba 14 días gratis
           </Link>
         </div>
 
@@ -75,14 +75,14 @@ export default function Header() {
             <a href="#soluciones" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Servicios</a>
             <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Cómo Funciona</a>
             <a href="#precios" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Precios</a>
-            <a href="#contacto" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Contacto</a>
+            <Link href="/agencias" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Para Agencias</Link>
             <Link href="/login" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Iniciar Sesión</Link>
             <Link
               href="/registro"
               onClick={() => setMenuOpen(false)}
               className="mt-2 rounded-lg bg-gradient-to-r from-indexa-orange to-orange-500 px-5 py-2.5 text-center text-sm font-bold text-white"
             >
-              Comenzar Gratis
+              Prueba 14 días gratis
             </Link>
           </div>
         </div>

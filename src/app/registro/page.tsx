@@ -73,11 +73,18 @@ function RegistroContent() {
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await updateProfile(cred.user, { displayName: nombre.trim() });
 
+      const TRIAL_DAYS = 14;
+      const now = new Date();
+      const trialEnds = new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+
       const userDoc: Record<string, string> = {
         role: "cliente",
         sitioId: sitioIdParam,
         displayName: nombre.trim(),
         email: email.trim(),
+        trialStartedAt: now.toISOString(),
+        trialEndsAt: trialEnds.toISOString(),
+        trialStatus: "active",
       };
 
       await setDoc(doc(db, "usuarios", cred.user.uid), userDoc);
@@ -96,6 +103,18 @@ function RegistroContent() {
         } catch {
           // Non-critical: admin can link later
         }
+      }
+
+      // Fire welcome email (best-effort — don't block signup on failure)
+      try {
+        const authToken = await cred.user.getIdToken();
+        fetch("/api/welcome", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ authToken, displayName: nombre.trim() }),
+        }).catch(() => {});
+      } catch {
+        // Best-effort
       }
 
       router.push("/dashboard");

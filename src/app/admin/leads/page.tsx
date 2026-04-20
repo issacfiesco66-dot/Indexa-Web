@@ -11,8 +11,8 @@ import {
   type Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebaseConfig";
-import type { Lead, LeadStatus } from "@/types/lead";
-import { Phone, Mail, ChevronDown } from "lucide-react";
+import type { Lead, LeadStatus, LeadType } from "@/types/lead";
+import { Phone, Mail, ChevronDown, Handshake } from "lucide-react";
 
 const STATUS_OPTIONS: { value: LeadStatus; label: string }[] = [
   { value: "nuevo", label: "Nuevo" },
@@ -78,9 +78,12 @@ function StatusDropdown({
   );
 }
 
+type TypeFilter = "all" | "standard" | "b2b";
+
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
   useEffect(() => {
     if (!db) {
@@ -100,6 +103,7 @@ export default function LeadsPage() {
           email: raw.email ?? "",
           mensaje: raw.mensaje ?? "",
           status: (raw.status as LeadStatus) ?? "nuevo",
+          leadType: (raw.leadType === "b2b" ? "b2b" : "standard") as LeadType,
           createdAt: raw.createdAt ? (raw.createdAt as Timestamp).toDate() : null,
         };
       });
@@ -109,6 +113,13 @@ export default function LeadsPage() {
 
     return unsubscribe;
   }, []);
+
+  const filtered = typeFilter === "all" ? leads : leads.filter((l) => l.leadType === typeFilter);
+  const counts = {
+    all: leads.length,
+    standard: leads.filter((l) => l.leadType === "standard").length,
+    b2b: leads.filter((l) => l.leadType === "b2b").length,
+  };
 
   const handleStatusUpdate = useCallback(async (id: string, newStatus: LeadStatus) => {
     if (!db) return;
@@ -142,36 +153,76 @@ export default function LeadsPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-indexa-gray-dark">Gestión de Leads</h2>
-        <p className="mt-1 text-sm text-gray-500">{leads.length} lead{leads.length !== 1 && "s"} en total.</p>
+        <p className="mt-1 text-sm text-gray-500">
+          {counts.all} lead{counts.all !== 1 && "s"} en total · {counts.b2b} B2B · {counts.standard} estándar.
+        </p>
+      </div>
+
+      {/* Type filter tabs */}
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            { value: "all", label: `Todos (${counts.all})` },
+            { value: "b2b", label: `B2B / Agencias (${counts.b2b})` },
+            { value: "standard", label: `Estándar (${counts.standard})` },
+          ] as { value: TypeFilter; label: string }[]
+        ).map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => setTypeFilter(tab.value)}
+            className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
+              typeFilter === tab.value
+                ? "bg-indexa-blue text-white shadow-sm"
+                : "bg-white text-gray-600 border border-gray-200 hover:border-indexa-blue/40 hover:text-indexa-blue"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {/* Responsive table wrapper — horizontal scroll on mobile */}
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] text-left text-sm">
+          <table className="w-full min-w-[780px] text-left text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-indexa-gray-light">
                 <th className="px-6 py-3.5 font-semibold text-indexa-gray-dark">Fecha</th>
-                <th className="px-6 py-3.5 font-semibold text-indexa-gray-dark">Negocio</th>
+                <th className="px-6 py-3.5 font-semibold text-indexa-gray-dark">Tipo</th>
+                <th className="px-6 py-3.5 font-semibold text-indexa-gray-dark">Negocio / Agencia</th>
                 <th className="px-6 py-3.5 font-semibold text-indexa-gray-dark">Contacto</th>
                 <th className="px-6 py-3.5 font-semibold text-indexa-gray-dark">Teléfono</th>
                 <th className="px-6 py-3.5 font-semibold text-indexa-gray-dark">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {leads.length === 0 ? (
+              {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-16 text-center text-gray-400">
-                    Aún no hay leads. Llegarán cuando alguien llene el formulario de la landing page.
+                  <td colSpan={6} className="px-6 py-16 text-center text-gray-400">
+                    {leads.length === 0
+                      ? "Aún no hay leads. Llegarán cuando alguien llene el formulario de la landing page."
+                      : "No hay leads en este filtro."}
                   </td>
                 </tr>
               ) : (
-                leads.map((lead) => (
+                filtered.map((lead) => (
                   <tr key={lead.id} className="transition-colors hover:bg-gray-50/50">
                     <td className="whitespace-nowrap px-6 py-4 text-gray-500">
                       {lead.createdAt
                         ? lead.createdAt.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })
                         : "—"}
+                    </td>
+                    <td className="px-6 py-4">
+                      {lead.leadType === "b2b" ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-bold text-indigo-700">
+                          <Handshake size={12} />
+                          B2B
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                          PYME
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 font-medium text-indexa-gray-dark">{lead.businessName}</td>
                     <td className="px-6 py-4">

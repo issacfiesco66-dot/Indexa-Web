@@ -254,6 +254,23 @@ export default async function SitioPage({ params }: SitioPageProps) {
 
       <SitioTracker sitioId={id} slug={data.slug} />
 
+      {/* Demo-claim banner: unclaimed preview inviting signup */}
+      {data.statusPago === "demo" && !data.ownerId && (
+        <div className="sticky top-0 z-40 w-full bg-gradient-to-r from-indexa-orange to-orange-500 px-4 py-3 text-white shadow-lg">
+          <div className="mx-auto flex max-w-7xl flex-col items-center justify-center gap-2 text-center sm:flex-row sm:gap-4">
+            <p className="text-sm font-semibold">
+              ✨ Este es un <strong>preview</strong> de tu sitio. Reclámalo para conservarlo y editarlo.
+            </p>
+            <Link
+              href={`/registro?sitioId=${id}`}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white px-4 py-1.5 text-sm font-bold text-indexa-orange transition hover:bg-white/90"
+            >
+              Reclamar este sitio →
+            </Link>
+          </div>
+        </div>
+      )}
+
       {whatsapp && (
         <WhatsAppButton
           sitioId={id}

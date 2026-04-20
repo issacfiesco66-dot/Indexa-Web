@@ -24,6 +24,7 @@ export default function Footer() {
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-white/30">Plataforma</h4>
             <ul className="mt-4 space-y-2.5">
+              <li><a href="/probar" className="text-sm text-white/50 hover:text-white transition-colors">Generar preview gratis</a></li>
               <li><a href="#soluciones" className="text-sm text-white/50 hover:text-white transition-colors">Sitios Web con IA</a></li>
               <li><a href="#soluciones" className="text-sm text-white/50 hover:text-white transition-colors">Marketing Automatizado</a></li>
               <li><a href="#soluciones" className="text-sm text-white/50 hover:text-white transition-colors">SEO Inteligente</a></li>
@@ -70,9 +71,10 @@ export default function Footer() {
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-white/30">Cuenta</h4>
             <ul className="mt-4 space-y-2.5">
-              <li><a href="/registro" className="text-sm text-white/50 hover:text-white transition-colors">Crear Cuenta</a></li>
+              <li><a href="/registro" className="text-sm text-white/50 hover:text-white transition-colors">Prueba Gratis 14 días</a></li>
               <li><a href="/login" className="text-sm text-white/50 hover:text-white transition-colors">Iniciar Sesión</a></li>
-              <li><a href="#contacto" className="text-sm text-white/50 hover:text-white transition-colors">Contacto</a></li>
+              <li><a href="/agencias" className="text-sm text-white/50 hover:text-white transition-colors">Para Agencias</a></li>
+              <li><a href="#contacto" className="text-sm text-white/50 hover:text-white transition-colors">Contacto B2B</a></li>
             </ul>
           </div>
 

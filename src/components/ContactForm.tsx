@@ -58,9 +58,9 @@ export default function ContactForm() {
     setServerMessage("");
 
     try {
-      const recaptchaToken = await executeRecaptcha("contact_form");
+      const recaptchaToken = await executeRecaptcha("contact_b2b_form");
 
-      const res = await fetch("/api/contact", {
+      const res = await fetch("/api/contact-b2b", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -84,12 +84,12 @@ export default function ContactForm() {
 
       // Send data to WhatsApp
       const waMsg = [
-        `🚀 *Nuevo lead desde INDEXA*`,
-        `👤 *Nombre:* ${formData.contactName.trim()}`,
-        `🏪 *Negocio:* ${formData.businessName.trim()}`,
+        `🤝 *Nuevo lead B2B / Agencia desde INDEXA*`,
+        `👤 *Contacto:* ${formData.contactName.trim()}`,
+        `🏢 *Agencia / Empresa:* ${formData.businessName.trim()}`,
         `📞 *Tel:* ${formData.phone.trim()}`,
         `📧 *Email:* ${formData.email.trim()}`,
-        formData.mensaje.trim() ? `💬 *Mensaje:* ${formData.mensaje.trim()}` : "",
+        formData.mensaje.trim() ? `💬 *Contexto:* ${formData.mensaje.trim()}` : "",
       ].filter(Boolean).join("\n");
       window.open(`https://wa.me/525622042820?text=${encodeURIComponent(waMsg)}`, "_blank");
 
@@ -107,15 +107,21 @@ export default function ContactForm() {
     }`;
 
   return (
-    <section id="contacto" className="bg-white py-20 sm:py-28">
+    <section id="contacto" className="bg-gradient-to-b from-white to-indexa-gray-light/50 py-20 sm:py-28">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl">
           <div className="text-center">
-            <h2 className="text-3xl font-extrabold text-indexa-blue sm:text-4xl">
-              Cotiza tu Sitio Web
+            <span className="inline-block rounded-full bg-indexa-blue/10 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-indexa-blue">
+              Para Agencias y Socios
+            </span>
+            <h2 className="mt-4 text-3xl font-extrabold text-indexa-blue sm:text-4xl">
+              ¿Eres agencia o manejas +10 clientes?
             </h2>
             <p className="mt-4 text-lg text-indexa-gray-dark">
-              Déjanos tus datos y un asesor se pondrá en contacto contigo en menos de 24 horas.
+              Escala tu operación con INDEXA. Panel multi-cliente, onboarding en minutos y descuentos por volumen. Agenda una demo personalizada.
+            </p>
+            <p className="mt-3 text-sm text-gray-500">
+              ¿Buscas un sitio web para tu propio negocio? <a href="/registro" className="font-semibold text-indexa-orange hover:underline">Empieza tu prueba gratis de 14 días →</a>
             </p>
           </div>
 
@@ -179,14 +185,14 @@ export default function ContactForm() {
 
                 <div>
                   <label htmlFor="businessName" className="block text-sm font-semibold text-indexa-gray-dark">
-                    Nombre del Negocio *
+                    Nombre de la Agencia o Empresa *
                   </label>
                   <input
                     id="businessName"
                     type="text"
                     value={formData.businessName}
                     onChange={(e) => handleChange("businessName", e.target.value)}
-                    placeholder="Ej. Tacos Don Pepe"
+                    placeholder="Ej. Agencia Crece Digital"
                     className={inputClasses("businessName")}
                   />
                   {errors.businessName && (
@@ -233,14 +239,14 @@ export default function ContactForm() {
 
               <div>
                 <label htmlFor="mensaje" className="block text-sm font-semibold text-indexa-gray-dark">
-                  Mensaje <span className="font-normal text-gray-400">(opcional)</span>
+                  ¿Cuántos clientes manejas actualmente? <span className="font-normal text-gray-400">(opcional)</span>
                 </label>
                 <textarea
                   id="mensaje"
                   rows={3}
                   value={formData.mensaje}
                   onChange={(e) => handleChange("mensaje", e.target.value)}
-                  placeholder="Cuéntanos brevemente qué necesitas..."
+                  placeholder="Ej. Manejo 25 cuentas de PYMES en CDMX y busco una herramienta escalable..."
                   className={`${inputClasses("mensaje")} resize-none`}
                 />
               </div>
@@ -259,7 +265,7 @@ export default function ContactForm() {
                     Enviando...
                   </span>
                 ) : (
-                  "Cotizar mi Sitio"
+                  "Agendar demo B2B"
                 )}
               </button>
             </form>

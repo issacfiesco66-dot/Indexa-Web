@@ -1,16 +1,16 @@
 const steps = [
   {
     number: "01",
-    title: "Crea tu cuenta gratis",
+    title: "Inicia tu prueba de 14 días",
     description:
-      "Regístrate en segundos. No necesitas tarjeta de crédito ni conocimientos técnicos para empezar.",
+      "Regístrate en segundos. Sin tarjeta de crédito, sin conocimientos técnicos. Empieza a probar la plataforma completa hoy mismo.",
     gradient: "from-indexa-orange to-amber-400",
   },
   {
     number: "02",
-    title: "Elige tu plan y personaliza",
+    title: "Genera tu sitio con IA",
     description:
-      "Selecciona el plan ideal para tu negocio. Nuestra IA genera tu sitio web profesional al instante.",
+      "Elige un plan y nuestra IA crea tu sitio web profesional en minutos. Personaliza todo desde un panel visual — sin código.",
     gradient: "from-blue-500 to-cyan-400",
   },
   {
@@ -77,11 +77,12 @@ export default function HowItWorks() {
             href="/registro"
             className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indexa-orange to-orange-500 px-8 py-4 text-lg font-bold text-white shadow-2xl shadow-indexa-orange/20 transition-all hover:shadow-indexa-orange/30 hover:-translate-y-0.5"
           >
-            Crear mi cuenta ahora
+            Iniciar prueba gratis
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="h-5 w-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
             </svg>
           </a>
+          <p className="mt-4 text-sm text-white/40">14 días gratis · Sin tarjeta de crédito</p>
         </div>
       </div>
     </section>
