@@ -1,10 +1,14 @@
 # Python scraper (only runs locally / Windows Task Scheduler)
 scraper_indexa.py
+scraper_funerarias.py
+hi_client.py
 scripts/
 config_busqueda.json
+config_funerarias.json
 ejecutar_scraper.bat
 prospectos_output.json
 logs_scraper.txt
+logs_funerarias.txt
 INSTRUCCIONES_AUTOMATIZACION.md
 
 # Firebase service account
