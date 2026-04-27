@@ -96,53 +96,56 @@ function generateSlug(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
-// Mensajes WhatsApp — diseño "dolor primero, decisión rápida".
-// Reglas: máx ~60 palabras, una sola pregunta al final, sin viñetas largas,
-// sin saludos burocráticos. Primera línea = nombre + dolor verificable.
-// NO usar claims fabricados ("a 2 km a la redonda") ni frases pasivo-agresivas
-// ("Ustedes no"). El receptor las detecta como copy enlatado en 3 segundos.
-// Todos los inputs se normalizan adentro (acentos, ciudades) — el caller pasa
-// los valores raw del scraper sin preprocesarlos.
+// Mensajes WhatsApp — estructura "hook + presentación + CTA".
+// 3 partes en orden:
+//   L1 — Nombre + dolor verificable (gancho que retiene los primeros 5s).
+//   L2 — Presentación: "Soy Isaac de INDEXA, [una frase de qué hacemos]".
+//   L3 — Oferta concreta + UN solo CTA en pregunta.
+// Reglas: ≤80 palabras totales. Sin claims fabricados ("a 2 km"). Sin frases
+// pasivo-agresivas ("Ustedes no"). Inputs se normalizan adentro (acentos,
+// ciudades, nombre del negocio) — el caller pasa raw del scraper.
+
+const PITCH_INDEXA = "ayudamos a negocios locales en México a aparecer arriba en Google y a recibir clientes por WhatsApp";
 
 function generateProspectingMessage(businessName: string, demoUrl: string): string {
   const nombre = normalizeNombreNegocio(businessName);
-  return `${nombre} — los busqué en Google y no aparecen. Eso significa que cada cliente que hoy busca lo que ustedes venden se lo está llevando su competencia.
+  return `${nombre} — los busqué en Google y no aparecen. Cada cliente que hoy busca lo que ustedes venden se lo está llevando su competencia.
 
-Les armé una demo de cómo se vería su sitio + WhatsApp directo:
+Soy Isaac de INDEXA, ${PITCH_INDEXA}. Les armé una demo de cómo se vería su sitio:
 ${demoUrl}
 
-Si les late, los primeros 3 meses corren por nuestra cuenta. ¿La revisan?`;
+Si les gusta, los primeros 3 meses corren por nuestra cuenta. ¿La revisan?`;
 }
 
 const ADS_MESSAGES = [
-  // Variante 1 — claim verificable: "busqué en Google y aparecen otros antes que tú"
+  // Variante 1 — claim verificable + presentación
   (nombre: string, ciudad: string, categoria: string) => {
     const zona = ciudad || "su zona";
-    const sector = categoria || "lo que ofrecen";
+    const sector = categoria || "lo que ustedes ofrecen";
     const queryPiece = categoria ? `"${sector} en ${zona}"` : `lo que ustedes venden`;
-    return `${nombre} — busqué ${queryPiece} en Google y aparecen otros antes que ustedes. Cada persona que hoy busca eso desde el celular está llamando al primero, no a ustedes.
+    return `${nombre} — busqué ${queryPiece} en Google y aparecen otros antes que ustedes. Cada persona que busca eso desde el celular está llamando al primero.
 
-Demo de anuncio local desde $50/día, lo prenden y apagan desde el celular sin agencia.
+Soy Isaac de INDEXA, ${PITCH_INDEXA}. Les puedo armar una campaña local desde $50/día que ustedes prenden y apagan desde el celular, sin agencia.
 
-¿Les paso el link?`;
+¿Les paso una demo de cómo se vería para ${nombre}?`;
   },
-  // Variante 2 — diagnóstico suave, sin agresión
+  // Variante 2 — diagnóstico suave + presentación
   (nombre: string, ciudad: string, categoria: string) => {
     const sector = categoria || "su giro";
     const zona = ciudad || "su ciudad";
     return `${nombre} — vi su negocio en Maps. Su sitio está bien, pero hoy no salen en Facebook ni TikTok cuando alguien en ${zona} busca ${sector} desde el celular.
 
-Eso se arregla en 3 días con anuncios locales desde $50/día. Sin agencia, sin contratos.
+Soy Isaac de INDEXA, ${PITCH_INDEXA}. Eso se arregla en 3 días con anuncios locales desde $50/día (sin agencia, sin contratos).
 
 ¿Les muestro la demo?`;
   },
-  // Variante 3 — pregunta que califica + oferta de bajo riesgo
+  // Variante 3 — pregunta calificadora + presentación + riesgo cero
   (nombre: string, ciudad: string, categoria: string) => {
     const sector = categoria || "su giro";
     const zona = ciudad || "su zona";
     return `${nombre} — pregunta directa: ¿cuántos clientes nuevos por WhatsApp les llegan a la semana?
 
-Si son menos de 10, es porque no salen en Facebook/Instagram cuando la gente de ${zona} busca ${sector}. Lo arreglamos con $50/día. Los primeros 7 días los pago yo — si no llega nadie, no paga nada.
+Soy Isaac de INDEXA, ${PITCH_INDEXA}. Si son menos de 10, es porque no salen en Facebook/Instagram cuando la gente de ${zona} busca ${sector}. Los primeros 7 días los pago yo — si no llega nadie, no paga nada.
 
 ¿Les paso la demo?`;
   },
@@ -162,9 +165,9 @@ function generateAgencyMessage(nombre: string, ciudad: string, categoria: string
   const sector = normalizeCategoria(categoria) || "marketing digital";
   return `${cleanNombre} — vi su trabajo de ${sector} en ${zona} y voy directo: no vengo a venderles pauta.
 
-Tenemos un motor que detecta diariamente cientos de negocios con brechas digitales en su ciudad y arma el mensaje en un clic. Lo pueden rentar en marca blanca y revenderlo como software propio.
+Soy Isaac de INDEXA. Tenemos un motor que detecta diariamente cientos de negocios con brechas digitales en su ciudad y arma el mensaje de prospección en un clic. Lo pueden rentar en marca blanca y revenderlo como software propio de ${cleanNombre}.
 
-¿Les paso una demo de 3 min con prospectos reales para ${cleanNombre}?`;
+¿Les paso una demo de 3 min con prospectos reales detectados hoy?`;
 }
 
 type ProspectoFilter = "todos" | "sin_web" | "con_web" | "agencias";

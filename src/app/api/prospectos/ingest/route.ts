@@ -41,9 +41,9 @@ function buildWhatsAppUrl(telefono: string, nombre: string, demoUrl: string): st
   const digits = telefono.replace(/[^\d+]/g, "");
   const num = digits.startsWith("+") ? digits : `+52${digits}`;
   const cleanNombre = normalizeNombreNegocio(nombre);
-  const message = `${cleanNombre} — busqué su negocio en Google y no aparece. Cada cliente que hoy busca lo que ustedes venden se lo lleva su competencia.
+  const message = `${cleanNombre} — busqué su negocio en Google y no aparece. Cada cliente que hoy busca lo que ustedes venden se lo está llevando su competencia.
 
-Les armé esta demo con su sitio + WhatsApp directo:
+Soy Isaac de INDEXA, ayudamos a negocios locales en México a aparecer arriba en Google y a recibir clientes por WhatsApp. Les armé una demo de su sitio:
 ${demoUrl}
 
 Los primeros 3 meses corren por nuestra cuenta. ¿La revisan?`;

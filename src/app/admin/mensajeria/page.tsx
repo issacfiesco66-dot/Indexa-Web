@@ -43,10 +43,13 @@ interface MessageTemplate {
   buildMessage: (nombre: string, ciudad: string, categoria: string, demoUrl: string) => string;
 }
 
-// Templates "dolor primero, decisión rápida". Inputs raw del scraper se
-// normalizan adentro de cada buildMessage (acentos, ciudades, capitalización)
-// porque sin esto el mensaje sale con typos tipo "reparacion de lavadoras
-// en mexicalli" que matan credibilidad en 3 segundos.
+// Templates "hook + presentación + CTA". Estructura en 3 partes:
+//   L1 — Nombre + dolor verificable
+//   L2 — Presentación: "Soy Isaac de INDEXA, [qué hacemos]"
+//   L3 — Oferta + UN solo CTA
+// Inputs raw del scraper se normalizan adentro (acentos, ciudades, nombre).
+const PITCH_INDEXA_MSG = "ayudamos a negocios locales en México a aparecer arriba en Google y a recibir clientes por WhatsApp";
+
 const MESSAGE_TEMPLATES: MessageTemplate[] = [
   {
     id: "directo",
@@ -56,9 +59,10 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     hoverColor: "hover:bg-blue-700",
     buildMessage: (nombreRaw, _ciudad, _cat, url) => {
       const nombre = normalizeNombreNegocio(nombreRaw);
-      return `${nombre} — los busqué en Google y no aparecen. Cada cliente que hoy busca lo que ustedes venden se lo lleva su competencia.
+      return `${nombre} — los busqué en Google y no aparecen. Cada cliente que hoy busca lo que ustedes venden se lo está llevando su competencia.
 
-Demo lista de su sitio + WhatsApp directo: ${url}
+Soy Isaac de INDEXA, ${PITCH_INDEXA_MSG}. Les armé una demo de su sitio:
+${url}
 
 Primeros 3 meses por nuestra cuenta. ¿La revisan?`;
     },
@@ -75,7 +79,8 @@ Primeros 3 meses por nuestra cuenta. ¿La revisan?`;
       const sector = normalizeCategoria(categoriaRaw) || "lo que ustedes ofrecen";
       return `${nombre} — 8 de cada 10 personas en ${zona} buscan ${sector} desde el celular antes de ir. Si no salen ahí, van con la competencia.
 
-Su propuesta personalizada: ${url}
+Soy Isaac de INDEXA, ${PITCH_INDEXA_MSG}. Les armé una propuesta personalizada:
+${url}
 
 ¿La vemos juntos en 5 minutos?`;
     },
@@ -89,9 +94,10 @@ Su propuesta personalizada: ${url}
     buildMessage: (nombreRaw, ciudadRaw, _cat, url) => {
       const nombre = normalizeNombreNegocio(nombreRaw);
       const zona = normalizeCiudad(ciudadRaw) || "su zona";
-      return `${nombre} — esta semana estamos activando gratis 3 meses del sistema completo (sitio + WhatsApp + anuncios) a negocios en ${zona}. Sin tarjeta, sin contrato.
+      return `${nombre} — esta semana estoy activando gratis 3 meses del sistema completo (sitio + WhatsApp + anuncios) a negocios en ${zona}. Sin tarjeta, sin contrato.
 
-Su demo: ${url}
+Soy Isaac de INDEXA, ${PITCH_INDEXA_MSG}. Su demo está aquí:
+${url}
 
 ¿Lo activamos hoy?`;
     },
@@ -108,9 +114,9 @@ Su demo: ${url}
       const sector = normalizeCategoria(categoriaRaw) || "marketing digital";
       return `${nombre} — vi su trabajo de ${sector} en ${zona} y voy directo: no vengo a venderles pauta.
 
-Tenemos un motor que detecta diariamente cientos de negocios con brechas digitales en su ciudad y arma el mensaje en un clic. Lo pueden rentar en marca blanca y revenderlo como software propio.
+Soy Isaac de INDEXA. Tenemos un motor que detecta diariamente cientos de negocios con brechas digitales en su ciudad y arma el mensaje de prospección en un clic. Lo pueden rentar en marca blanca y revenderlo como software propio de ${nombre}.
 
-¿Les paso una demo de 3 min con prospectos reales para ${nombre}?`;
+¿Les paso una demo de 3 min con prospectos reales detectados hoy?`;
     },
   },
 ];

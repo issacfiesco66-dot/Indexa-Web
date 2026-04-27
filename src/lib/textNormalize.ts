@@ -309,11 +309,16 @@ export function normalizeCiudad(raw: string | undefined | null): string {
   if (!raw) return "";
   const trimmed = String(raw).trim();
   if (!trimmed) return "";
-  const lookupKey = stripAccents(trimmed.toLowerCase());
+  // Algunas entradas vienen como "Mexicali, México" o "Tijuana, B.C." o
+  // "CDMX, México". Para WhatsApp queremos solo la primera parte (la ciudad).
+  // El estado/país sobra y suena verboso.
+  const cityOnly = trimmed.split(",")[0]!.trim();
+  if (!cityOnly) return "";
+  const lookupKey = stripAccents(cityOnly.toLowerCase());
   const fix = CIUDADES_FIX[lookupKey];
   if (fix) return fix;
   // Fallback: title case respetando conectores
-  return titleCaseEs(trimmed);
+  return titleCaseEs(cityOnly);
 }
 
 /**
