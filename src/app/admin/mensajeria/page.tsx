@@ -29,6 +29,7 @@ import {
   X,
 } from "lucide-react";
 import { createFuseSearch, fuzzySearch, normalizePhone } from "@/lib/searchUtils";
+import { normalizeCategoria, normalizeCiudad, normalizeNombreNegocio } from "@/lib/textNormalize";
 
 // ── Message templates ──────────────────────────────────────────────────
 type MessageType = "directo" | "educativo" | "gancho" | "agencia";
@@ -42,9 +43,10 @@ interface MessageTemplate {
   buildMessage: (nombre: string, ciudad: string, categoria: string, demoUrl: string) => string;
 }
 
-// Templates "dolor primero, decisión rápida". Cada variante ataca un dolor
-// distinto en la primera línea: invisibilidad, FOMO, riesgo cero, o socio
-// estratégico. Máx ~60 palabras cada una, una sola pregunta al final.
+// Templates "dolor primero, decisión rápida". Inputs raw del scraper se
+// normalizan adentro de cada buildMessage (acentos, ciudades, capitalización)
+// porque sin esto el mensaje sale con typos tipo "reparacion de lavadoras
+// en mexicalli" que matan credibilidad en 3 segundos.
 const MESSAGE_TEMPLATES: MessageTemplate[] = [
   {
     id: "directo",
@@ -52,12 +54,14 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     icon: Zap,
     color: "bg-blue-600 text-white",
     hoverColor: "hover:bg-blue-700",
-    buildMessage: (nombre, _ciudad, _cat, url) =>
-      `${nombre} — los busqué en Google y no aparecen. Cada cliente que hoy busca lo que ustedes venden se lo lleva su competencia.
+    buildMessage: (nombreRaw, _ciudad, _cat, url) => {
+      const nombre = normalizeNombreNegocio(nombreRaw);
+      return `${nombre} — los busqué en Google y no aparecen. Cada cliente que hoy busca lo que ustedes venden se lo lleva su competencia.
 
 Demo lista de su sitio + WhatsApp directo: ${url}
 
-Primeros 3 meses por nuestra cuenta. ¿La revisan?`,
+Primeros 3 meses por nuestra cuenta. ¿La revisan?`;
+    },
   },
   {
     id: "educativo",
@@ -65,12 +69,16 @@ Primeros 3 meses por nuestra cuenta. ¿La revisan?`,
     icon: BookOpen,
     color: "bg-amber-500 text-white",
     hoverColor: "hover:bg-amber-600",
-    buildMessage: (nombre, ciudad, categoria, url) =>
-      `${nombre} — 8 de cada 10 personas en ${ciudad || "su zona"} buscan ${categoria || "lo que ustedes ofrecen"} desde el celular antes de ir. Si no salen ahí, van con la competencia.
+    buildMessage: (nombreRaw, ciudadRaw, categoriaRaw, url) => {
+      const nombre = normalizeNombreNegocio(nombreRaw);
+      const zona = normalizeCiudad(ciudadRaw) || "su zona";
+      const sector = normalizeCategoria(categoriaRaw) || "lo que ustedes ofrecen";
+      return `${nombre} — 8 de cada 10 personas en ${zona} buscan ${sector} desde el celular antes de ir. Si no salen ahí, van con la competencia.
 
 Su propuesta personalizada: ${url}
 
-¿La vemos juntos en 5 minutos?`,
+¿La vemos juntos en 5 minutos?`;
+    },
   },
   {
     id: "gancho",
@@ -78,12 +86,15 @@ Su propuesta personalizada: ${url}
     icon: Gift,
     color: "bg-green-600 text-white",
     hoverColor: "hover:bg-green-700",
-    buildMessage: (nombre, ciudad, _cat, url) =>
-      `${nombre} — esta semana estamos activando gratis 3 meses del sistema completo (sitio + WhatsApp + anuncios) a negocios en ${ciudad || "su zona"}. Sin tarjeta, sin contrato.
+    buildMessage: (nombreRaw, ciudadRaw, _cat, url) => {
+      const nombre = normalizeNombreNegocio(nombreRaw);
+      const zona = normalizeCiudad(ciudadRaw) || "su zona";
+      return `${nombre} — esta semana estamos activando gratis 3 meses del sistema completo (sitio + WhatsApp + anuncios) a negocios en ${zona}. Sin tarjeta, sin contrato.
 
 Su demo: ${url}
 
-¿Lo activamos hoy?`,
+¿Lo activamos hoy?`;
+    },
   },
   {
     id: "agencia",
@@ -91,9 +102,10 @@ Su demo: ${url}
     icon: Handshake,
     color: "bg-indigo-600 text-white",
     hoverColor: "hover:bg-indigo-700",
-    buildMessage: (nombre, ciudad, categoria, _url) => {
-      const zona = ciudad || "su ciudad";
-      const sector = categoria || "marketing digital";
+    buildMessage: (nombreRaw, ciudadRaw, categoriaRaw, _url) => {
+      const nombre = normalizeNombreNegocio(nombreRaw);
+      const zona = normalizeCiudad(ciudadRaw) || "su ciudad";
+      const sector = normalizeCategoria(categoriaRaw) || "marketing digital";
       return `${nombre} — vi su trabajo de ${sector} en ${zona} y voy directo: no vengo a venderles pauta.
 
 Tenemos un motor que detecta diariamente cientos de negocios con brechas digitales en su ciudad y arma el mensaje en un clic. Lo pueden rentar en marca blanca y revenderlo como software propio.

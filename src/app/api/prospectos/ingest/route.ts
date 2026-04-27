@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createRateLimiter } from "@/lib/rateLimit";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { Timestamp } from "firebase-admin/firestore";
+import { normalizeNombreNegocio } from "@/lib/textNormalize";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,7 +40,8 @@ function safeEqual(a: string, b: string): boolean {
 function buildWhatsAppUrl(telefono: string, nombre: string, demoUrl: string): string {
   const digits = telefono.replace(/[^\d+]/g, "");
   const num = digits.startsWith("+") ? digits : `+52${digits}`;
-  const message = `${nombre} — busqué su negocio en Google y no aparece. Cada cliente que hoy busca lo que ustedes venden se lo lleva su competencia.
+  const cleanNombre = normalizeNombreNegocio(nombre);
+  const message = `${cleanNombre} — busqué su negocio en Google y no aparece. Cada cliente que hoy busca lo que ustedes venden se lo lleva su competencia.
 
 Les armé esta demo con su sitio + WhatsApp directo:
 ${demoUrl}

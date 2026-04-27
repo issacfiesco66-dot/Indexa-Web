@@ -45,6 +45,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
+import { normalizeCategoria, normalizeCiudad, normalizeNombreNegocio } from "@/lib/textNormalize";
 import ScraperPanel from "./ScraperPanel";
 import FuneraritasTab from "./FuneraritasTab";
 
@@ -97,10 +98,15 @@ function generateSlug(name: string): string {
 
 // Mensajes WhatsApp — diseño "dolor primero, decisión rápida".
 // Reglas: máx ~60 palabras, una sola pregunta al final, sin viñetas largas,
-// sin saludos burocráticos. La primera línea debe ser un disparador, no un "hola".
+// sin saludos burocráticos. Primera línea = nombre + dolor verificable.
+// NO usar claims fabricados ("a 2 km a la redonda") ni frases pasivo-agresivas
+// ("Ustedes no"). El receptor las detecta como copy enlatado en 3 segundos.
+// Todos los inputs se normalizan adentro (acentos, ciudades) — el caller pasa
+// los valores raw del scraper sin preprocesarlos.
 
 function generateProspectingMessage(businessName: string, demoUrl: string): string {
-  return `${businessName} — los busqué en Google y no aparecen. Eso significa que cada cliente que hoy busca lo que ustedes venden se lo está llevando su competencia.
+  const nombre = normalizeNombreNegocio(businessName);
+  return `${nombre} — los busqué en Google y no aparecen. Eso significa que cada cliente que hoy busca lo que ustedes venden se lo está llevando su competencia.
 
 Les armé una demo de cómo se vería su sitio + WhatsApp directo:
 ${demoUrl}
@@ -109,49 +115,56 @@ Si les late, los primeros 3 meses corren por nuestra cuenta. ¿La revisan?`;
 }
 
 const ADS_MESSAGES = [
-  // Variante 1 — amenaza competitiva, directa
+  // Variante 1 — claim verificable: "busqué en Google y aparecen otros antes que tú"
   (nombre: string, ciudad: string, categoria: string) => {
     const zona = ciudad || "su zona";
-    const sector = categoria || "su giro";
-    return `${nombre} — su competencia de ${sector} en ${zona} ya está apareciendo en Facebook e Instagram a 2 km a la redonda. Ustedes no.
+    const sector = categoria || "lo que ofrecen";
+    const queryPiece = categoria ? `"${sector} en ${zona}"` : `lo que ustedes venden`;
+    return `${nombre} — busqué ${queryPiece} en Google y aparecen otros antes que ustedes. Cada persona que hoy busca eso desde el celular está llamando al primero, no a ustedes.
 
-Les armé una demo de campaña local desde $50/día, que ustedes prenden o apagan desde el celular. Sin agencia, sin contratos.
+Demo de anuncio local desde $50/día, lo prenden y apagan desde el celular sin agencia.
 
 ¿Les paso el link?`;
   },
-  // Variante 2 — diagnóstico suave + fricción cero
+  // Variante 2 — diagnóstico suave, sin agresión
   (nombre: string, ciudad: string, categoria: string) => {
     const sector = categoria || "su giro";
-    return `${nombre} — vi su web y está bien. El problema no es ese: hoy no se están mostrando a la gente que anda a unas cuadras buscando ${sector} desde el celular.
+    const zona = ciudad || "su ciudad";
+    return `${nombre} — vi su negocio en Maps. Su sitio está bien, pero hoy no salen en Facebook ni TikTok cuando alguien en ${zona} busca ${sector} desde el celular.
 
-Eso lo arreglamos en 3 días con anuncios locales desde $50/día (sin agencia).
+Eso se arregla en 3 días con anuncios locales desde $50/día. Sin agencia, sin contratos.
 
 ¿Les muestro la demo?`;
   },
-  // Variante 3 — pérdida concreta + riesgo cero
+  // Variante 3 — pregunta que califica + oferta de bajo riesgo
   (nombre: string, ciudad: string, categoria: string) => {
-    const sector = categoria || "su sector";
-    return `${nombre} — otros de ${sector} en su zona ya están corriendo Facebook y TikTok local. Cada día que pasa se quedan con clientes que deberían tocarles a ustedes.
+    const sector = categoria || "su giro";
+    const zona = ciudad || "su zona";
+    return `${nombre} — pregunta directa: ¿cuántos clientes nuevos por WhatsApp les llegan a la semana?
 
-Los primeros 7 días los pago yo. Si no funciona, no paga nada.
+Si son menos de 10, es porque no salen en Facebook/Instagram cuando la gente de ${zona} busca ${sector}. Lo arreglamos con $50/día. Los primeros 7 días los pago yo — si no llega nadie, no paga nada.
 
-¿Les comparto la demo?`;
+¿Les paso la demo?`;
   },
 ];
 
 function generateAdsMessage(nombre: string, ciudad: string, categoria: string): string {
+  const cleanNombre = normalizeNombreNegocio(nombre);
+  const cleanCiudad = normalizeCiudad(ciudad);
+  const cleanCategoria = normalizeCategoria(categoria);
   const variant = ADS_MESSAGES[Math.floor(Math.random() * ADS_MESSAGES.length)];
-  return variant(nombre, ciudad, categoria);
+  return variant(cleanNombre, cleanCiudad, cleanCategoria);
 }
 
 function generateAgencyMessage(nombre: string, ciudad: string, categoria: string): string {
-  const zona = ciudad || "su ciudad";
-  const sector = categoria || "marketing digital";
-  return `${nombre} — vi su trabajo de ${sector} en ${zona} y voy directo: no vengo a venderles pauta.
+  const cleanNombre = normalizeNombreNegocio(nombre);
+  const zona = normalizeCiudad(ciudad) || "su ciudad";
+  const sector = normalizeCategoria(categoria) || "marketing digital";
+  return `${cleanNombre} — vi su trabajo de ${sector} en ${zona} y voy directo: no vengo a venderles pauta.
 
 Tenemos un motor que detecta diariamente cientos de negocios con brechas digitales en su ciudad y arma el mensaje en un clic. Lo pueden rentar en marca blanca y revenderlo como software propio.
 
-¿Les paso una demo de 3 min con prospectos reales para ${nombre}?`;
+¿Les paso una demo de 3 min con prospectos reales para ${cleanNombre}?`;
 }
 
 type ProspectoFilter = "todos" | "sin_web" | "con_web" | "agencias";
