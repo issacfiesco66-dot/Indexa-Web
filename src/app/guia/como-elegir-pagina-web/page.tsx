@@ -22,15 +22,15 @@ const jsonLd = {
   publisher: { "@type": "Organization", name: "INDEXA" },
   datePublished: "2026-03-01",
   dateModified: "2026-03-27",
-  mainEntityOfPage: "https://indexa.mx/guia/como-elegir-pagina-web",
+  mainEntityOfPage: "https://indexaia.com/guia/como-elegir-pagina-web",
 };
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   itemListElement: [
-    { "@type": "ListItem", position: 1, name: "INDEXA", item: "https://indexa.mx" },
-    { "@type": "ListItem", position: 2, name: "Guías", item: "https://indexa.mx/guia" },
+    { "@type": "ListItem", position: 1, name: "INDEXA", item: "https://indexaia.com" },
+    { "@type": "ListItem", position: 2, name: "Guías", item: "https://indexaia.com/guia" },
     { "@type": "ListItem", position: 3, name: "Cómo Elegir tu Página Web" },
   ],
 };

@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { buildIndustryServiceSchema } from "@/lib/seoSchemas";
 
-const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx";
+const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 const SITE_URL = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
 
 export const metadata: Metadata = {
@@ -59,6 +60,13 @@ const faqJsonLd = {
   ],
 };
 
+const serviceJsonLd = buildIndustryServiceSchema({
+  industryName: "dentistas y consultorios dentales",
+  serviceType: "Página web para consultorios dentales y dentistas",
+  pagePath: "/sitio-web-dentista",
+  audienceType: "Consultorios dentales y dentistas en México",
+});
+
 const servicios = [
   "Limpieza dental y profilaxis", "Ortodoncia y brackets", "Blanqueamiento dental",
   "Implantes dentales", "Endodoncia (nervios)", "Extracciones", "Prótesis dentales", "Odontopediatría",
@@ -76,6 +84,7 @@ export default function SitioWebDentista() {
           publisher: { "@type": "Organization", name: "INDEXA", url: SITE_URL },
         }) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }} />
 
         <section className="relative overflow-hidden bg-[#050816] pt-32 pb-24">
           <div className="absolute top-1/3 left-1/4 h-[500px] w-[500px] rounded-full bg-indexa-blue/20 blur-[120px]" />

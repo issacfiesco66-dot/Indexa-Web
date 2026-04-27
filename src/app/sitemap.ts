@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { listCollectionFields } from "@/lib/firestoreRest";
 
-const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx";
+const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 const SITE_URL = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

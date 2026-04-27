@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx";
+const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 const SITE_URL = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
 
 export default function robots(): MetadataRoute.Robots {

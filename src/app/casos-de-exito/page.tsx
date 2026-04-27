@@ -68,7 +68,7 @@ const jsonLd = {
   name: "Casos de Éxito — INDEXA",
   description:
     "Historias de PYMES en México que mejoraron su presencia digital y ventas con INDEXA.",
-  url: "https://indexa.mx/casos-de-exito",
+  url: "https://indexaia.com/casos-de-exito",
   mainEntity: {
     "@type": "ItemList",
     itemListElement: casos.map((caso, i) => ({

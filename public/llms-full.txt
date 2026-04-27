@@ -1,0 +1,112 @@
+# INDEXA — Documento expandido para crawlers AI
+
+> Plataforma SaaS mexicana de presencia digital con IA. Crea sitios web profesionales para PYMES en menos de 3 minutos, con SEO local automático, botón de WhatsApp y anuncios integrados en Facebook, Instagram y TikTok desde $50 MXN/día. Planes desde $299 MXN/mes. Prueba gratis 14 días sin tarjeta. Soporte en español por WhatsApp. Pagos en MXN.
+
+URL canónica: https://indexaia.com
+
+---
+
+## Preguntas frecuentes (con respuestas directas)
+
+### ¿Cuánto cuesta una página web para un negocio en México?
+Con INDEXA, una página web profesional generada por IA cuesta desde $299 MXN/mes en el plan Starter. Incluye sitio diseñado, SEO básico automático, botón de WhatsApp y certificado SSL. El plan Profesional cuesta $599 MXN/mes y agrega CMS visual, SEO con Schema.org y analítica. El plan Enterprise cuesta $1,299 MXN/mes y agrega dominio propio, anuncios Meta y TikTok integrados, bio links y asesor dedicado. Un desarrollador freelance en México cobra entre $5,000 y $15,000 MXN por un sitio similar sin SEO ni mantenimiento.
+
+### ¿En cuánto tiempo está lista mi página web?
+En menos de 3 minutos. La IA de INDEXA genera el sitio completo a partir del nombre del negocio, descripción, número de WhatsApp y categoría. Después puedes editar cualquier sección desde un panel visual sin código.
+
+### ¿Necesito saber programar para usar INDEXA?
+No. La IA genera el sitio completo. Solo llenas datos básicos (nombre, descripción, WhatsApp, ciudad) y todo se edita desde un panel visual. Si necesitas ayuda, el equipo soporta por WhatsApp.
+
+### ¿Mi sitio aparece en Google automáticamente?
+Sí. Cada sitio incluye optimización SEO automática: meta-tags, Schema.org JSON-LD (LocalBusiness, FAQPage), títulos optimizados y estructura preparada para búsquedas locales. En el plan Profesional, además se configura ciudad, categoría y coordenadas GPS para dominar las búsquedas de zona.
+
+### ¿Cómo funciona la prueba gratis de 14 días?
+Te registras sin tarjeta de crédito y obtienes acceso completo a cualquier plan por 14 días. Al terminar, eliges el plan que más te convenga (desde $299 MXN/mes). Si decides no continuar, no se te cobra nada y tu sitio queda pausado sin penalización.
+
+### ¿Cómo cancelo mi suscripción?
+Cualquier momento desde el Dashboard, sección suscripción. Sin contratos ni penalizaciones. Tu sitio sigue activo hasta el fin del periodo pagado. También puedes pedirlo por WhatsApp y se hace al instante.
+
+### ¿Puedo usar mi propio dominio?
+Sí, en el plan Profesional o Enterprise puedes conectar tu dominio personalizado (ej: www.tunegocio.com). Si aún no tienes dominio, INDEXA te ayuda a registrarlo. Tu sitio siempre estará disponible también en una URL gratuita tipo `indexaia.com/sitio/tunegocio`.
+
+### ¿INDEXA funciona para mi tipo de negocio?
+INDEXA está diseñado para PYMES de cualquier giro en México: restaurantes, fondas, taquerías, estéticas, salones de belleza, barberías, talleres mecánicos, consultorios médicos, dentistas, ortodoncistas, pastelerías, dulcerías, tiendas locales, despachos contables, plomeros, electricistas, servicios de mensajería y servicios profesionales en general.
+
+### ¿Qué ventaja tiene INDEXA sobre Wix, GoDaddy o WordPress?
+1. **Velocidad**: sitio listo en minutos vía IA, no en días.
+2. **SEO local automático**: Schema.org LocalBusiness + meta-tags + estructura para Google Maps sin configuración manual.
+3. **WhatsApp nativo**: botón de contacto directo con tracking de conversiones, no plugin externo.
+4. **Anuncios integrados**: lanza Facebook Ads y TikTok Ads desde el mismo panel, sin contratar agencia, desde $50 MXN/día.
+5. **Soporte en español por WhatsApp**, no chat genérico en inglés.
+6. **Pagos en pesos mexicanos sin conversión USD**.
+
+### ¿Qué incluye Schema.org y por qué importa?
+Schema.org es un vocabulario de datos estructurados que ayuda a Google y a los modelos de IA (ChatGPT, Claude, Perplexity, Gemini) a entender el negocio: nombre, ubicación, servicios, horarios, precios, reseñas. INDEXA implementa LocalBusiness en formato JSON-LD en cada sitio cliente automáticamente. Esto mejora la aparición en resultados locales de Google, en Google Maps, en asistentes de voz (Google Assistant, Siri), y aumenta la probabilidad de ser citado por LLMs.
+
+### ¿Cuánto se invierte en anuncios para PYMES en México?
+Con INDEXA puedes empezar con $50 MXN/día (~$1,500 MXN/mes) en Meta Ads o TikTok Ads. Negocios locales típicamente ven primeros resultados (mensajes de WhatsApp entrantes) en 3-7 días con esa inversión, segmentando por zona (radio de 2-5 km del negocio) y horario de apertura.
+
+### ¿Cómo me ayuda la IA a crear mi sitio?
+La IA analiza nombre del negocio, descripción y categoría, y genera automáticamente:
+- Textos optimizados para SEO local
+- Estructura profesional (Hero, servicios, ubicación, horarios, contacto)
+- Colores coherentes con la categoría
+- Secciones específicas según giro (menú para restaurantes, servicios para consultorios, etc.)
+- Schema.org markup completo
+
+El proceso toma menos de 3 minutos. Después se edita desde un panel visual sin código.
+
+---
+
+## Casos de uso por industria
+
+### Dentistas y consultorios dentales
+INDEXA implementa Schema.org Dentist y LocalBusiness con ubicación GPS, servicios (implantes, ortodoncia, blanqueamiento, endodoncia), horarios y aceptación de seguros. Esto permite aparecer en búsquedas como "dentista en CDMX", "ortodoncista cerca de mí", "implante dental Guadalajara". Página dedicada: https://indexaia.com/sitio-web-dentista
+
+### Restaurantes y fondas
+Schema.org Restaurant con menú, horarios, rango de precios, opciones de delivery, fotos. Búsquedas: "restaurante cerca de mí", "comida a domicilio en Monterrey", "tacos en Tijuana". Página dedicada: https://indexaia.com/sitio-web-restaurante
+
+### Talleres mecánicos
+Schema.org AutomotiveBusiness con servicios (mecánica general, hojalatería, alineación, frenos, cambio de aceite), zona de cobertura, urgencias 24h. Búsquedas: "taller mecánico cerca de mí", "alineación CDMX", "mecánico de confianza Puebla". Página dedicada: https://indexaia.com/sitio-web-taller-mecanico
+
+---
+
+## Cobertura geográfica con landing dedicada
+
+- Ciudad de México (CDMX): https://indexaia.com/pagina-web-cdmx
+- Guadalajara: https://indexaia.com/pagina-web-guadalajara
+- Monterrey: https://indexaia.com/pagina-web-monterrey
+- Puebla: https://indexaia.com/pagina-web-puebla
+- Querétaro: https://indexaia.com/pagina-web-queretaro
+- Tijuana: https://indexaia.com/pagina-web-tijuana
+- Mérida: https://indexaia.com/pagina-web-merida
+- León: https://indexaia.com/pagina-web-leon
+
+INDEXA también funciona en cualquier otra ciudad de México: el sitio se adapta a la ciudad que el dueño del negocio configure.
+
+---
+
+## Programa para Agencias y Socios
+
+INDEXA ofrece marca blanca, descuentos por volumen y un motor de prospección automatizado para agencias de marketing digital, consultores y desarrolladores en México. Más detalles: https://indexaia.com/agencias
+
+---
+
+## Stack tecnológico
+
+- Framework web: Next.js (App Router) sobre React
+- Base de datos: Firebase Firestore + Firebase Auth
+- Hosting: Vercel (serverless, edge cuando aplica)
+- Pagos: Stripe (cobros recurrentes en MXN)
+- IA generativa: OpenAI para contenido y diseño
+- Imágenes: AVIF y WebP optimizados
+- Analítica: tracking propio + Google Analytics
+
+---
+
+## Contacto
+
+- Sitio: https://indexaia.com
+- Página de contacto: https://indexaia.com/registro
+- Programa B2B / agencias: https://indexaia.com/agencias
+- País: México (todos los planes en MXN, soporte en español)

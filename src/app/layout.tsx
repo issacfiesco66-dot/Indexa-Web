@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
-// Force all pages to dynamic rendering — workaround for Next.js 16 workStore bug
-// https://github.com/vercel/next.js/issues/XXXXX
-export const dynamic = "force-dynamic";
+// NOTA: el `export const dynamic = "force-dynamic"` global se removió porque
+// rompía SSG/ISR para AI crawlers (GPTBot, ClaudeBot, PerplexityBot priorizan
+// respuestas rápidas/cacheables). Las rutas autenticadas ya declaran su propio
+// `dynamic` cuando lo necesitan (admin, dashboard, agency, webhooks).
 
 const inter = Inter({
   variable: "--font-inter",
@@ -12,7 +13,7 @@ const inter = Inter({
   display: "swap",
 });
 
-const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx";
+const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 const SITE_URL = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
 
 export const metadata: Metadata = {

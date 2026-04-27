@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { buildCityServiceSchema } from "@/lib/seoSchemas";
 
-const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx";
+const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 const SITE_URL = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
 
 export const metadata: Metadata = {
@@ -57,6 +58,11 @@ const faqJsonLd = {
   ],
 };
 
+const serviceJsonLd = buildCityServiceSchema({
+  cityName: "Monterrey",
+  pagePath: "/pagina-web-monterrey",
+});
+
 export default function PaginaWebMonterrey() {
   return (
     <>
@@ -64,6 +70,7 @@ export default function PaginaWebMonterrey() {
       <main className="bg-white">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }} />
 
         <section className="relative overflow-hidden bg-[#050816] pt-32 pb-24">
           <div className="absolute top-1/3 left-1/4 h-[500px] w-[500px] rounded-full bg-indexa-blue/20 blur-[120px]" />

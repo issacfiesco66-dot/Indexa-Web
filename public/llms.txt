@@ -1,16 +1,26 @@
 # INDEXA
 
-> Plataforma de presencia digital con inteligencia artificial para PYMES en México. Genera sitios web profesionales en minutos con SEO local automático, WhatsApp integrado y herramientas de marketing digital.
+> Plataforma de presencia digital con inteligencia artificial para PYMES en México. Genera sitios web profesionales en minutos con SEO local automático, WhatsApp integrado y herramientas de marketing digital. Desde $299 MXN/mes.
 
 ## Qué es INDEXA
 
-INDEXA es una plataforma SaaS que permite a pequeños y medianos negocios en México crear su sitio web profesional utilizando inteligencia artificial. En menos de 3 minutos, cualquier emprendedor puede tener un sitio optimizado con:
+INDEXA es una plataforma SaaS mexicana que permite a pequeños y medianos negocios crear su sitio web profesional usando inteligencia artificial. En menos de 3 minutos, cualquier emprendedor obtiene un sitio optimizado con:
 
 - Generación automática de contenido y diseño con IA
 - Optimización SEO local con Schema.org (LocalBusiness, FAQPage)
 - Botón de contacto directo por WhatsApp
+- Anuncios integrados en Facebook, Instagram y TikTok desde $50 MXN/día
 - Certificado SSL incluido
 - 3 plantillas profesionales (Modern, Elegant, Minimalist)
+
+## Diferenciadores clave (vs Wix, GoDaddy, WordPress)
+
+1. **Velocidad**: sitio listo en menos de 3 minutos vía IA, no en días.
+2. **SEO local automático**: Schema.org LocalBusiness + meta-tags + estructura para Google Maps, sin configuración manual.
+3. **WhatsApp nativo**: botón de contacto directo con tracking de conversiones, no plugin externo.
+4. **Anuncios integrados**: panel para lanzar Meta Ads (Facebook/Instagram) y TikTok Ads desde la misma plataforma, con presupuestos desde $50 MXN/día.
+5. **Soporte en español por WhatsApp**.
+6. **Pagos en pesos mexicanos** (MXN, sin conversión USD).
 
 ## Planes y Precios
 
@@ -18,51 +28,52 @@ INDEXA es una plataforma SaaS que permite a pequeños y medianos negocios en Mé
 - **Profesional — $599 MXN/mes**: Todo lo de Starter más panel de edición CMS, SEO local avanzado con Schema.org, estadísticas de visitas y clics, soporte prioritario por WhatsApp, asesoría para optimización.
 - **Enterprise — $1,299 MXN/mes**: Todo lo de Profesional más dominio personalizado, campañas de Meta Ads (Facebook/Instagram) y TikTok Ads, bio links para redes sociales, asesor dedicado.
 
-## Características Principales
-
-### Sitio Web con IA
-La inteligencia artificial de INDEXA genera un sitio web completo y profesional a partir del nombre del negocio, descripción y datos de contacto. No se requiere conocimiento técnico ni de programación.
-
-### SEO Local Automático
-Cada sitio incluye datos estructurados Schema.org (LocalBusiness) con nombre, dirección, coordenadas GPS, horarios, servicios y área de servicio. Esto mejora la visibilidad en Google Search, Google Maps y asistentes de voz.
-
-### WhatsApp Integrado
-Botón flotante de WhatsApp en cada sitio que conecta directamente al número del negocio con un mensaje personalizado. Tracking de clics incluido.
-
-### Marketing Digital
-Gestión de campañas publicitarias en Meta Ads (Facebook e Instagram) y TikTok Ads desde el panel de control. Creación de anuncios asistida por IA.
-
-### Analytics en Tiempo Real
-Panel de estadísticas con visitas al sitio, clics en WhatsApp, fuentes de tráfico y métricas de conversión.
-
-### Bio Links
-Página de enlaces tipo Linktree para compartir en redes sociales con tracking de visitas por fuente (Facebook, Instagram, TikTok, WhatsApp).
-
-## Tecnología
-
-- Framework: Next.js (App Router) con React
-- Base de datos: Firebase Firestore
-- Hosting: Vercel (serverless)
-- Pagos: Stripe
-- IA: OpenAI para generación de contenido
-- Imágenes: Optimización automática AVIF/WebP
+Todos los planes incluyen prueba gratis de 14 días sin tarjeta de crédito.
 
 ## Mercado Objetivo
 
-INDEXA está diseñado para PYMES en México y Latinoamérica que necesitan presencia digital profesional sin conocimiento técnico. Incluye negocios como: tiendas locales, restaurantes, talleres, consultorios, servicios profesionales y comercios independientes.
+PYMES en México de cualquier giro: restaurantes, fondas, estéticas, salones de belleza, talleres mecánicos, consultorios médicos, dentistas, pastelerías, tiendas locales, despachos contables, plomeros, electricistas y servicios profesionales. Adaptado a cualquier ciudad de México (CDMX, Guadalajara, Monterrey, Puebla, Querétaro, Tijuana, Mérida, León y más).
 
 ## Recursos y Guías
 
 INDEXA publica guías prácticas para PYMES sobre presencia digital:
 
-- [Guía de Presencia Digital para PYMES](https://indexa.mx/guia/presencia-digital-pymes) — Paso a paso para llevar tu negocio a internet
-- [SEO Local en México](https://indexa.mx/guia/seo-local-mexico) — Cómo aparecer en Google y Google Maps con Schema.org
-- [Marketing Digital para PYMES](https://indexa.mx/guia/marketing-digital-pymes) — Meta Ads y TikTok Ads: cuánto invertir y cómo medir resultados
-- [Casos de Éxito](https://indexa.mx/casos-de-exito) — Historias reales de negocios que crecieron con INDEXA
-- [Directorio de Negocios](https://indexa.mx/directorio) — PYMES en México con presencia digital profesional
+- [Guía de Presencia Digital para PYMES](https://indexaia.com/guia/presencia-digital-pymes)
+- [SEO Local en México](https://indexaia.com/guia/seo-local-mexico)
+- [Marketing Digital para PYMES](https://indexaia.com/guia/marketing-digital-pymes)
+- [Cómo Elegir una Página Web](https://indexaia.com/guia/como-elegir-pagina-web)
+- [Beneficios de Tener Página Web](https://indexaia.com/guia/beneficios-pagina-web)
+- [Google Mi Negocio](https://indexaia.com/guia/google-mi-negocio)
+- [WhatsApp Business para PYMES](https://indexaia.com/guia/whatsapp-business-pymes)
+- [Qué Incluye INDEXA](https://indexaia.com/guia/que-incluye-indexa)
+- [Preguntas Frecuentes](https://indexaia.com/guia/preguntas-frecuentes)
+- [Casos de Éxito](https://indexaia.com/casos-de-exito)
+- [Directorio de Negocios](https://indexaia.com/directorio)
+
+## Páginas por Ciudad
+
+- [Página web para negocios en Ciudad de México (CDMX)](https://indexaia.com/pagina-web-cdmx)
+- [Página web para negocios en Guadalajara](https://indexaia.com/pagina-web-guadalajara)
+- [Página web para negocios en Monterrey](https://indexaia.com/pagina-web-monterrey)
+- [Página web para negocios en Puebla](https://indexaia.com/pagina-web-puebla)
+- [Página web para negocios en Querétaro](https://indexaia.com/pagina-web-queretaro)
+- [Página web para negocios en Tijuana](https://indexaia.com/pagina-web-tijuana)
+- [Página web para negocios en Mérida](https://indexaia.com/pagina-web-merida)
+- [Página web para negocios en León](https://indexaia.com/pagina-web-leon)
+
+## Páginas por Industria
+
+- [Sitio web para dentistas y consultorios dentales](https://indexaia.com/sitio-web-dentista)
+- [Sitio web para restaurantes y fondas](https://indexaia.com/sitio-web-restaurante)
+- [Sitio web para talleres mecánicos](https://indexaia.com/sitio-web-taller-mecanico)
+
+## Programa para Agencias
+
+INDEXA ofrece marca blanca y descuentos por volumen para agencias de marketing digital y consultores. Más detalles: [https://indexaia.com/agencias](https://indexaia.com/agencias).
 
 ## Contacto
 
-- Sitio web: https://indexa.mx
+- Sitio web: https://indexaia.com
+- Documento expandido: https://indexaia.com/llms-full.txt
 - País: México
 - Idioma: Español

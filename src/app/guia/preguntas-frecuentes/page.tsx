@@ -3,7 +3,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
-const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx";
+const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 const SITE_URL = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
 
 export const metadata: Metadata = {
@@ -231,7 +231,7 @@ export default function GuiaPreguntasFrecuentes() {
           <p>
             El dominio es tu dirección en internet, por ejemplo <code>tunegocio.com</code>.
             Es lo que las personas escriben en el navegador para llegar a tu sitio.
-            INDEXA te proporciona una URL gratuita tipo <code>indexa.mx/sitio/tunegocio</code>.
+            INDEXA te proporciona una URL gratuita tipo <code>indexaia.com/sitio/tunegocio</code>.
             Si quieres tu propio dominio personalizado, lo puedes contratar por separado.
           </p>
 

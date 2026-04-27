@@ -17,7 +17,7 @@ const jsonLd = {
   name: "Directorio de Negocios — INDEXA",
   description:
     "Directorio de PYMES en México con presencia digital profesional, organizadas por ciudad y categoría.",
-  url: "https://indexa.mx/directorio",
+  url: "https://indexaia.com/directorio",
 };
 
 interface SitioEntry {

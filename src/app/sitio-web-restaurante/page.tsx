@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { buildIndustryServiceSchema } from "@/lib/seoSchemas";
 
-const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa.mx";
+const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 const SITE_URL = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
 
 export const metadata: Metadata = {
@@ -68,6 +69,13 @@ const faqJsonLd = {
   ],
 };
 
+const serviceJsonLd = buildIndustryServiceSchema({
+  industryName: "restaurantes y fondas",
+  serviceType: "Página web para restaurantes y negocios de comida",
+  pagePath: "/sitio-web-restaurante",
+  audienceType: "Restaurantes y negocios de comida en México",
+});
+
 const beneficios = [
   { titulo: "Menú digital siempre actualizado", desc: "Edita tus platillos, precios y promociones desde el panel sin necesitar un programador.", icono: "🍽️" },
   { titulo: "Aparece en 'restaurante cerca de mí'", desc: "SEO local automático con Schema.org Restaurant para dominar las búsquedas de tu zona.", icono: "📍" },
@@ -84,6 +92,7 @@ export default function SitioWebRestaurante() {
       <main className="bg-white">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceJsonLd) }} />
 
         {/* Hero */}
         <section className="relative overflow-hidden bg-[#050816] pt-32 pb-24">
