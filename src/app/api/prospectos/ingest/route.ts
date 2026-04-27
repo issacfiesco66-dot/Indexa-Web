@@ -1,77 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createRateLimiter } from "@/lib/rateLimit";
+import { getAdminDb } from "@/lib/firebaseAdmin";
+import { Timestamp } from "firebase-admin/firestore";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const limiter = createRateLimiter({ windowMs: 60_000, max: 20 });
 
-const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 const INGEST_SECRET = process.env.INGEST_WEBHOOK_SECRET;
 
-// ── Firestore REST helpers ──────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────
 
 function generateSlug(name: string): string {
   return name
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 }
 
-function toFirestoreValue(v: unknown): Record<string, unknown> {
-  if (typeof v === "string") return { stringValue: v };
-  if (typeof v === "number") return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-  if (typeof v === "boolean") return { booleanValue: v };
-  if (v === null) return { nullValue: null };
-  if (Array.isArray(v)) return { arrayValue: { values: v.map(toFirestoreValue) } };
-  return { stringValue: String(v) };
-}
-
-function toFirestoreFields(obj: Record<string, unknown>): Record<string, unknown> {
-  const fields: Record<string, unknown> = {};
-  for (const [k, val] of Object.entries(obj)) {
-    fields[k] = toFirestoreValue(val);
+/**
+ * Constant-time comparison for the bearer secret. Avoids leaking the secret
+ * length or content via timing side-channel.
+ */
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
-  return fields;
-}
-
-async function createDoc(collection: string, docId: string, data: Record<string, unknown>): Promise<boolean> {
-  const fields = toFirestoreFields(data);
-  const res = await fetch(`${BASE_URL}/${collection}?documentId=${docId}&key=${API_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fields }),
-  });
-  return res.ok;
-}
-
-async function updateDoc(collection: string, docId: string, data: Record<string, unknown>): Promise<boolean> {
-  const fields = toFirestoreFields(data);
-  const fieldPaths = Object.keys(data).map((k) => `updateMask.fieldPaths=${k}`).join("&");
-  const res = await fetch(`${BASE_URL}/${collection}/${docId}?${fieldPaths}&key=${API_KEY}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fields }),
-  });
-  return res.ok;
-}
-
-async function docExists(collection: string, field: string, value: string): Promise<boolean> {
-  const res = await fetch(`${BASE_URL}:runQuery?key=${API_KEY}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      structuredQuery: {
-        from: [{ collectionId: collection }],
-        where: { fieldFilter: { field: { fieldPath: field }, op: "EQUAL", value: { stringValue: value } } },
-        limit: 1,
-      },
-    }),
-  });
-  if (!res.ok) return false;
-  const results = await res.json();
-  return results.length > 0 && !!results[0].document;
+  return diff === 0;
 }
 
 // ── WhatsApp message builder ────────────────────────────────────────────
@@ -79,15 +39,12 @@ async function docExists(collection: string, field: string, value: string): Prom
 function buildWhatsAppUrl(telefono: string, nombre: string, demoUrl: string): string {
   const digits = telefono.replace(/[^\d+]/g, "");
   const num = digits.startsWith("+") ? digits : `+52${digits}`;
-  const message = `Hola, ¿qué tal? Soy Isaac de INDEXA.
+  const message = `${nombre} — busqué su negocio en Google y no aparece. Cada cliente que hoy busca lo que ustedes venden se lo lleva su competencia.
 
-Encontré *${nombre}* y me tomé la libertad de crear una demo gratuita de cómo se vería su presencia digital profesional:
+Les armé esta demo con su sitio + WhatsApp directo:
+${demoUrl}
 
-👉 ${demoUrl}
-
-Incluye: sitio web, botón de WhatsApp directo, y aparecer en Google cuando busquen lo que ustedes venden.
-
-Los primeros 3 meses corren por nuestra cuenta, sin contratos ni letra chiquita. ¿Les gustaría activarlo?`;
+Los primeros 3 meses corren por nuestra cuenta. ¿La revisan?`;
 
   return `https://wa.me/${num}?text=${encodeURIComponent(message)}`;
 }
@@ -115,17 +72,24 @@ export async function POST(request: NextRequest) {
   }
 
   // Auth: validate webhook secret (mandatory)
-  if (!INGEST_SECRET) {
-    return NextResponse.json({ success: false, message: "Server misconfigured: INGEST_WEBHOOK_SECRET not set." }, { status: 500 });
+  if (!INGEST_SECRET || INGEST_SECRET.length < 32) {
+    return NextResponse.json(
+      { success: false, message: "Server misconfigured: INGEST_WEBHOOK_SECRET no seteado o muy corto (mín 32 chars)." },
+      { status: 500 }
+    );
   }
   const authHeader = request.headers.get("authorization") || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (token !== INGEST_SECRET) {
+  if (!token || !safeEqual(token, INGEST_SECRET)) {
     return NextResponse.json({ success: false, message: "Unauthorized." }, { status: 401 });
   }
 
-  if (!PROJECT_ID || !API_KEY) {
-    return NextResponse.json({ success: false, message: "Firebase config missing." }, { status: 500 });
+  let db;
+  try {
+    db = getAdminDb();
+  } catch (err) {
+    console.error("Ingest: Firebase Admin no inicializado:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ success: false, message: "Firebase Admin no inicializado." }, { status: 500 });
   }
 
   try {
@@ -150,6 +114,9 @@ export async function POST(request: NextRequest) {
       error?: string;
     }[] = [];
 
+    const prospectosCol = db.collection("prospectos_frios");
+    const sitiosCol = db.collection("sitios");
+
     for (const p of prospectos) {
       if (!p.nombre || typeof p.nombre !== "string" || p.nombre.trim().length < 2) {
         results.push({ nombre: p.nombre || "?", status: "error", error: "Invalid nombre" });
@@ -161,19 +128,24 @@ export async function POST(request: NextRequest) {
       const prospectoId = `ingest_${slug}_${Date.now()}`;
 
       try {
-        // 1. Check if prospecto with same phone already exists
+        // 1. Dedup por teléfono (Admin SDK bypassa rules — corrige bug previo
+        //    donde la consulta REST anónima siempre devolvía false porque
+        //    `prospectos_frios` requiere admin)
         if (p.telefono) {
           const phoneDigits = p.telefono.replace(/\D/g, "");
           if (phoneDigits.length >= 10) {
-            const exists = await docExists("prospectos_frios", "telefono", p.telefono);
-            if (exists) {
+            const existing = await prospectosCol
+              .where("telefono", "==", p.telefono)
+              .limit(1)
+              .get();
+            if (!existing.empty) {
               results.push({ nombre, status: "duplicate" });
               continue;
             }
           }
         }
 
-        // 2. Create prospecto document
+        // 2. Crear documento de prospecto
         const prospectoData: Record<string, unknown> = {
           nombre,
           slug,
@@ -183,7 +155,7 @@ export async function POST(request: NextRequest) {
           categoria: p.categoria || "",
           ciudad: p.ciudad || "",
           status: "contactado",
-          importedAt: new Date().toISOString(),
+          importedAt: Timestamp.now(),
           tieneWeb: p.tieneWeb ?? false,
           tipoProspecto: p.tipoProspecto || "negocio",
           whatsappCount: 0,
@@ -193,16 +165,16 @@ export async function POST(request: NextRequest) {
           source: "webhook_ingest",
         };
 
-        const prospOk = await createDoc("prospectos_frios", prospectoId, prospectoData);
-        if (!prospOk) {
-          results.push({ nombre, status: "error", error: "Failed to create prospecto" });
-          continue;
-        }
+        await prospectosCol.doc(prospectoId).set(prospectoData);
 
-        // 3. Auto-generate demo site
+        // 3. Auto-generar sitio demo si no existe
         let demoUrl = "";
         const demoSlug = slug;
-        const sitioExists = await docExists("sitios", "slug", demoSlug);
+        const sitioSnap = await sitiosCol
+          .where("slug", "==", demoSlug)
+          .limit(1)
+          .get();
+        const sitioExists = !sitioSnap.empty;
 
         if (!sitioExists) {
           const sitioData: Record<string, unknown> = {
@@ -232,22 +204,22 @@ export async function POST(request: NextRequest) {
             googleMapsUrl: "",
             ofertasActivas: [],
             bioLinks: [],
+            createdAt: Timestamp.now(),
           };
 
-          await createDoc("sitios", demoSlug, sitioData);
+          await sitiosCol.doc(demoSlug).set(sitioData);
           demoUrl = `${siteOrigin}/sitio/${demoSlug}`;
 
-          // Update prospecto with demoSlug
-          await updateDoc("prospectos_frios", prospectoId, {
+          await prospectosCol.doc(prospectoId).update({
             demoSlug,
             status: "demo_generada",
           });
         } else {
           demoUrl = `${siteOrigin}/sitio/${demoSlug}`;
-          await updateDoc("prospectos_frios", prospectoId, { demoSlug });
+          await prospectosCol.doc(prospectoId).update({ demoSlug });
         }
 
-        // 4. Build WhatsApp URL for auto-notification
+        // 4. WhatsApp URL
         let whatsappUrl = "";
         if (p.telefono) {
           whatsappUrl = buildWhatsAppUrl(p.telefono, nombre, demoUrl);

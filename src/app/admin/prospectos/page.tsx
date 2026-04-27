@@ -95,64 +95,47 @@ function generateSlug(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
+// Mensajes WhatsApp — diseño "dolor primero, decisión rápida".
+// Reglas: máx ~60 palabras, una sola pregunta al final, sin viñetas largas,
+// sin saludos burocráticos. La primera línea debe ser un disparador, no un "hola".
+
 function generateProspectingMessage(businessName: string, demoUrl: string): string {
-  return `Hola, ${businessName}. Soy de INDEXA. Busqué su negocio en Google y no aparecen — eso significa que cada día están perdiendo clientes que terminan eligiendo a su competencia. Ya les armé una propuesta personalizada: incluye sitio web profesional que aparece en Google, botón de WhatsApp para recibir clientes al instante, y un panel para lanzar anuncios en Facebook y TikTok segmentados por su zona (desde $50 al día). Negocios similares están consiguiendo 20-30 clientes nuevos al mes con esto. Revísenla aquí: ${demoUrl}. Los primeros meses van por nuestra cuenta para que vean resultados antes de pagar. ¿Tienen 2 minutos?`;
+  return `${businessName} — los busqué en Google y no aparecen. Eso significa que cada cliente que hoy busca lo que ustedes venden se lo está llevando su competencia.
+
+Les armé una demo de cómo se vería su sitio + WhatsApp directo:
+${demoUrl}
+
+Si les late, los primeros 3 meses corren por nuestra cuenta. ¿La revisan?`;
 }
 
 const ADS_MESSAGES = [
-  // Variant 1: Competitor threat + structured benefits
+  // Variante 1 — amenaza competitiva, directa
   (nombre: string, ciudad: string, categoria: string) => {
     const zona = ciudad || "su zona";
     const sector = categoria || "su giro";
-    return `Hola, soy de INDEXA. Vi que ${nombre} en ${zona} ya tiene presencia digital y eso es genial, pero noté algo: su competencia directa de ${sector} está apareciendo en el muro de Facebook e Instagram de gente que vive a menos de 2km de ustedes.
+    return `${nombre} — su competencia de ${sector} en ${zona} ya está apareciendo en Facebook e Instagram a 2 km a la redonda. Ustedes no.
 
-Les preparé una propuesta rápida para que sean ustedes quienes aparezcan ahí:
+Les armé una demo de campaña local desde $50/día, que ustedes prenden o apagan desde el celular. Sin agencia, sin contratos.
 
-*Publicidad Local:* Anuncios que solo ven personas en su zona (en el horario que ustedes abren).
-
-*Control Total:* Ustedes deciden cuánto invertir (desde $50 al día) y lo activan o apagan con un botón.
-
-*Resultados Reales:* El botón del anuncio lleva directo a su WhatsApp para pedidos o consultas.
-
-Sin agencias y sin contratos. ¿Me permiten enviarles el link de la demo de cómo se vería ${nombre} con esta tecnología activada?`;
+¿Les paso el link?`;
   },
-  // Variant 2: Results-first + social proof
+  // Variante 2 — diagnóstico suave + fricción cero
   (nombre: string, ciudad: string, categoria: string) => {
-    const zona = ciudad || "su zona";
-    const sector = categoria || "negocios locales";
-    return `Hola, soy de INDEXA. Estamos trabajando con ${sector} en ${zona} y quería compartirles algo que está funcionando muy bien.
+    const sector = categoria || "su giro";
+    return `${nombre} — vi su web y está bien. El problema no es ese: hoy no se están mostrando a la gente que anda a unas cuadras buscando ${sector} desde el celular.
 
-Vi que ${nombre} ya tiene presencia en internet — eso los pone adelante del 80% de negocios de la zona. El siguiente paso que está dando resultados es aparecer en el celular de clientes potenciales que están cerca de ustedes.
+Eso lo arreglamos en 3 días con anuncios locales desde $50/día (sin agencia).
 
-Así funciona:
-
-*Segmentación por zona:* Sus anuncios solo los ven personas a pocas cuadras de su negocio.
-
-*Desde $50 al día:* Ustedes ponen el presupuesto que quieran y lo ajustan cuando quieran.
-
-*WhatsApp directo:* Cada persona que toca su anuncio les cae directo al WhatsApp. Sin formularios, sin esperas.
-
-*Sin agencia:* Todo lo controlan ustedes desde su celular en un panel muy sencillo.
-
-¿Les puedo enviar una demo personalizada de cómo se vería una campaña para ${nombre}? Son 3 minutos y no tiene ningún costo.`;
+¿Les muestro la demo?`;
   },
-  // Variant 3: Urgency + risk removal
+  // Variante 3 — pérdida concreta + riesgo cero
   (nombre: string, ciudad: string, categoria: string) => {
-    const zona = ciudad || "su zona";
     const sector = categoria || "su sector";
-    return `Hola, soy de INDEXA. Investigando ${sector} en ${zona} encontré a ${nombre} y vi que ya tienen página web — eso habla muy bien de ustedes.
+    return `${nombre} — otros de ${sector} en su zona ya están corriendo Facebook y TikTok local. Cada día que pasa se quedan con clientes que deberían tocarles a ustedes.
 
-Les escribo porque detectamos que otros negocios de ${sector} en su zona ya están corriendo anuncios pagados en Facebook y TikTok, y eso les puede estar quitando clientes que deberían llegar a ustedes.
+Los primeros 7 días los pago yo. Si no funciona, no paga nada.
 
-La buena noticia es que con nuestra plataforma pueden hacer lo mismo, pero sin depender de una agencia:
-
-*Anuncios hiperlocales:* Solo los ve gente que está cerca de su negocio, en los horarios que ustedes elijan.
-
-*Presupuesto flexible:* Empiezan desde $50 al día y lo pueden pausar cuando quieran.
-
-*Contacto inmediato:* El cliente toca el anuncio y les llega un mensaje directo a WhatsApp.
-
-Sin contratos, sin letra chiquita, y los primeros 7 días de campaña corren por nuestra cuenta. ¿Me permiten enviarles el link de cómo se vería esto para ${nombre}?`;
+¿Les comparto la demo?`;
   },
 ];
 
@@ -162,23 +145,13 @@ function generateAdsMessage(nombre: string, ciudad: string, categoria: string): 
 }
 
 function generateAgencyMessage(nombre: string, ciudad: string, categoria: string): string {
-  const zona = ciudad || "CDMX";
-  const sector = categoria || "Agencia Marketing Digital";
-  return `Hola, ¿qué tal, equipo de ${nombre}? Soy Isaac, de INDEXA.
+  const zona = ciudad || "su ciudad";
+  const sector = categoria || "marketing digital";
+  return `${nombre} — vi su trabajo de ${sector} en ${zona} y voy directo: no vengo a venderles pauta.
 
-Estuve revisando su portafolio en ${zona} y me llamó mucho la atención su enfoque en ${sector}. Les escribo porque, más que una agencia, somos una plataforma de infraestructura y estamos buscando socios tecnológicos en la zona para escalar su prospección.
+Tenemos un motor que detecta diariamente cientos de negocios con brechas digitales en su ciudad y arma el mensaje en un clic. Lo pueden rentar en marca blanca y revenderlo como software propio.
 
-Sabemos que ustedes ya dominan el tema de pauta, por eso no vengo a ofrecerles publicidad. Vengo a mostrarles el 'Motor de Inteligencia de Mercado' que desarrollamos para que agencias como la suya multipliquen su facturación sin esfuerzo operativo:
-
-*Detección Automática de Oportunidades:* Nuestro sistema identifica en tiempo real negocios con brechas digitales críticas en toda ${zona}, entregándoles cientos de prospectos pre-calificados diariamente.
-
-*Abordaje de 'Un Solo Clic':* El sistema procesa la información de cada negocio y genera un mensaje personalizado de alto impacto. Con un solo botón, ustedes disparan la propuesta directa, lista para cerrar.
-
-*Infraestructura de Marca Blanca:* Pueden rentar nuestra plataforma, ponerle el logo de ${nombre} y ofrecérsela a sus clientes como un software propio de la agencia.
-
-Básicamente, nosotros ponemos la 'maquinaria de guerra' y ustedes la estrategia de cierre.
-
-¿Me permiten enviarles una demo visual de cómo nuestro sistema está detectando oportunidades para ${nombre} justo ahora? Es un acceso de 3 minutos y no tiene costo.`;
+¿Les paso una demo de 3 min con prospectos reales para ${nombre}?`;
 }
 
 type ProspectoFilter = "todos" | "sin_web" | "con_web" | "agencias";

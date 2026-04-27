@@ -11,13 +11,13 @@ export const dynamic = "force-dynamic";
 const limiter = createRateLimiter({ windowMs: 60_000, max: 3 });
 
 export async function GET(request: NextRequest) {
-  // ── Auth check ────────────────────────────────────────────────
+  // ── Auth check — Bearer header ONLY. Tokens en query string se loguean
+  //    en proxies, history del browser y headers Referer. Nunca aceptarlos.
   const authHeader = request.headers.get("authorization") || "";
-  const token = (authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null)
-    ?? request.nextUrl.searchParams.get("token");
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
   if (!token) {
-    return new Response(JSON.stringify({ error: "No autorizado. Se requiere token." }), {
+    return new Response(JSON.stringify({ error: "No autorizado. Se requiere Bearer token en header Authorization." }), {
       status: 401,
       headers: { "Content-Type": "application/json" },
     });
@@ -51,14 +51,31 @@ export async function GET(request: NextRequest) {
   }
 
   const query = request.nextUrl.searchParams.get("query");
-  const max = request.nextUrl.searchParams.get("max") || "20";
+  const maxRaw = request.nextUrl.searchParams.get("max") || "20";
 
-  if (!query) {
-    return new Response(JSON.stringify({ error: "Missing query parameter" }), {
+  if (!query || query.length < 1 || query.length > 100) {
+    return new Response(JSON.stringify({ error: "query inválido (1-100 caracteres)" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  // Whitelist: letras (con acentos), dígitos, espacios, coma, punto, guion, &
+  if (!/^[\p{L}\p{N}\s,.\-&]+$/u.test(query)) {
+    return new Response(JSON.stringify({ error: "query contiene caracteres no permitidos" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const maxNum = parseInt(maxRaw, 10);
+  if (!Number.isFinite(maxNum) || maxNum < 1 || maxNum > 50) {
+    return new Response(JSON.stringify({ error: "max debe ser entero entre 1 y 50" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  const max = String(maxNum);
 
   const encoder = new TextEncoder();
   const projectRoot = path.resolve(process.cwd());

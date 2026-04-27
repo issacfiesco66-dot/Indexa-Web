@@ -13,6 +13,7 @@ from pathlib import Path
 
 import logging
 
+import requests as http_requests
 from fastapi import FastAPI, Header, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -67,6 +68,49 @@ def verify_firebase_token(token: str) -> dict | None:
         return None
 
 
+def verify_firebase_admin(token: str) -> dict | None:
+    """
+    Verifica el ID token Y consulta Firestore para confirmar que el usuario
+    tiene rol 'admin' o 'superadmin' en /usuarios/{uid}.
+
+    Usa el propio ID token del usuario para leer su documento — las reglas
+    Firestore permiten `allow read: if isOwner(userId) || isAdmin();`,
+    así que no requiere service account.
+
+    Devuelve el dict del usuario (con 'role' agregado) o None si no es admin.
+    """
+    user = verify_firebase_token(token)
+    if not user:
+        return None
+    uid = user.get("uid") or user.get("user_id") or user.get("sub")
+    if not uid or not FIREBASE_PROJECT_ID:
+        return None
+    try:
+        url = (
+            f"https://firestore.googleapis.com/v1/projects/{FIREBASE_PROJECT_ID}"
+            f"/databases/(default)/documents/usuarios/{uid}"
+        )
+        res = http_requests.get(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        if res.status_code != 200:
+            logger.warning(
+                f"verify_firebase_admin: Firestore GET /usuarios/{uid} -> {res.status_code}"
+            )
+            return None
+        fields = (res.json() or {}).get("fields", {}) or {}
+        role = (fields.get("role") or {}).get("stringValue", "")
+        if role not in ("admin", "superadmin"):
+            return None
+        user["role"] = role
+        return user
+    except Exception as e:
+        logger.warning(f"verify_firebase_admin error: {e}")
+        return None
+
+
 def _cleanup_old_jobs():
     """Remove oldest jobs if over MAX_JOBS."""
     if len(_jobs) <= MAX_JOBS:
@@ -85,8 +129,11 @@ async def health():
 
 
 @app.get("/debug-memory")
-async def debug_memory():
-    """Show memory info for diagnosing OOM issues."""
+async def debug_memory(authorization: str = Header("")):
+    """Show memory info for diagnosing OOM issues. Protegido con CRON_SECRET."""
+    token = authorization.replace("Bearer ", "") if authorization.startswith("Bearer ") else authorization
+    if not CRON_SECRET or token != CRON_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized.")
     import resource
     
     # Cgroup memory limit (actual container limit)
@@ -353,9 +400,9 @@ async def scrape_funerarias_async(body: FunerariasScrapeRequest):
 
     Respuesta: {job_id} — se consulta estado con /scrape-status/{job_id}.
     """
-    user = verify_firebase_token(body.token)
+    user = verify_firebase_admin(body.token)
     if not user:
-        raise HTTPException(status_code=401, detail="Token inválido o expirado.")
+        raise HTTPException(status_code=403, detail="Acceso denegado: se requiere rol admin/superadmin.")
 
     if not FUNERARIAS_SCRIPT.exists():
         raise HTTPException(status_code=500, detail="scraper_funerarias.py no encontrado.")
@@ -407,13 +454,19 @@ async def scrape_funerarias_async(body: FunerariasScrapeRequest):
 @app.post("/scrape-async")
 async def scrape_async(body: ScrapeRequest):
     """Start a scrape job in the background. Returns job_id to poll."""
-    # Validate Firebase token
-    user = verify_firebase_token(body.token)
+    # Validar token Y rol admin (no cualquier usuario logueado puede gastar
+    # CPU/RAM del servicio de Railway).
+    user = verify_firebase_admin(body.token)
     if not user:
-        raise HTTPException(status_code=401, detail="Token inválido o expirado.")
+        raise HTTPException(status_code=403, detail="Acceso denegado: se requiere rol admin/superadmin.")
 
     if not SCRAPER_SCRIPT.exists():
         raise HTTPException(status_code=500, detail="scraper_indexa.py not found.")
+
+    # Validar query: longitud y caracteres permitidos
+    query = (body.query or "").strip()
+    if not query or len(query) > 100:
+        raise HTTPException(status_code=400, detail="query inválido (1-100 caracteres).")
 
     # Cap max at 50
     effective_max = min(max(body.max, 1), 50)
@@ -421,7 +474,7 @@ async def scrape_async(body: ScrapeRequest):
     job_id = uuid.uuid4().hex[:12]
     _jobs[job_id] = {
         "status": "running",
-        "query": body.query,
+        "query": query,
         "max": effective_max,
         "progress": 0,
         "message": "Iniciando scraper...",
@@ -437,7 +490,7 @@ async def scrape_async(body: ScrapeRequest):
     _cleanup_old_jobs()
 
     # Fire and forget
-    asyncio.create_task(_run_scrape_job(job_id, body.query, effective_max))
+    asyncio.create_task(_run_scrape_job(job_id, query, effective_max))
 
     return {"job_id": job_id, "status": "running", "max": effective_max}
 

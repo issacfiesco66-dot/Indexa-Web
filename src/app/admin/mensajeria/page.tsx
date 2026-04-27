@@ -42,6 +42,9 @@ interface MessageTemplate {
   buildMessage: (nombre: string, ciudad: string, categoria: string, demoUrl: string) => string;
 }
 
+// Templates "dolor primero, decisión rápida". Cada variante ataca un dolor
+// distinto en la primera línea: invisibilidad, FOMO, riesgo cero, o socio
+// estratégico. Máx ~60 palabras cada una, una sola pregunta al final.
 const MESSAGE_TEMPLATES: MessageTemplate[] = [
   {
     id: "directo",
@@ -50,7 +53,11 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     color: "bg-blue-600 text-white",
     hoverColor: "hover:bg-blue-700",
     buildMessage: (nombre, _ciudad, _cat, url) =>
-      `Hola, ${nombre}. Soy de INDEXA. Busqué su negocio en Google y no aparecen — eso significa que cada día están perdiendo clientes que terminan yendo con la competencia. Les armé una propuesta completa: sitio web profesional que aparece en Google, botón de WhatsApp para recibir clientes al instante, y un panel donde pueden lanzar anuncios en Facebook y TikTok desde $50 pesos al día. Revísenla aquí: ${url}. Los primeros meses van sin costo. ¿Tienen 2 minutos para verla?`,
+      `${nombre} — los busqué en Google y no aparecen. Cada cliente que hoy busca lo que ustedes venden se lo lleva su competencia.
+
+Demo lista de su sitio + WhatsApp directo: ${url}
+
+Primeros 3 meses por nuestra cuenta. ¿La revisan?`,
   },
   {
     id: "educativo",
@@ -59,7 +66,11 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     color: "bg-amber-500 text-white",
     hoverColor: "hover:bg-amber-600",
     buildMessage: (nombre, ciudad, categoria, url) =>
-      `Buen día, ${nombre}. Dato importante: el 78% de las personas en ${ciudad || "su zona"} buscan ${categoria || "negocios locales"} desde su celular antes de ir. Si no aparecen en internet, esos clientes van directo a su competencia. Les creamos un sistema llave en mano: sitio web que aparece en Google, WhatsApp integrado para recibir pedidos, y un panel para correr anuncios en Facebook, Instagram y TikTok segmentados por colonia. Negocios similares están consiguiendo 20-30 clientes nuevos al mes. Vean su propuesta personalizada: ${url}. ¿Lo revisamos juntos?`,
+      `${nombre} — 8 de cada 10 personas en ${ciudad || "su zona"} buscan ${categoria || "lo que ustedes ofrecen"} desde el celular antes de ir. Si no salen ahí, van con la competencia.
+
+Su propuesta personalizada: ${url}
+
+¿La vemos juntos en 5 minutos?`,
   },
   {
     id: "gancho",
@@ -68,7 +79,11 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     color: "bg-green-600 text-white",
     hoverColor: "hover:bg-green-700",
     buildMessage: (nombre, ciudad, _cat, url) =>
-      `Hola, ${nombre}. Soy de INDEXA y tengo algo para ustedes: estamos activando gratis los primeros 3 meses de nuestro sistema completo a negocios en ${ciudad || "su zona"}. Incluye: sitio web profesional, aparecer en Google cuando busquen lo que ustedes venden, WhatsApp directo para cerrar ventas, y un panel para lanzar anuncios en Facebook y TikTok con presupuestos desde $50 al día. ¿Por qué gratis? Porque confiamos en que cuando vean los resultados, se van a querer quedar. Aquí está su propuesta: ${url}. Cero riesgo, cero contratos, cero letra chiquita. ¿Cuándo les queda bien una llamada de 5 minutos?`,
+      `${nombre} — esta semana estamos activando gratis 3 meses del sistema completo (sitio + WhatsApp + anuncios) a negocios en ${ciudad || "su zona"}. Sin tarjeta, sin contrato.
+
+Su demo: ${url}
+
+¿Lo activamos hoy?`,
   },
   {
     id: "agencia",
@@ -77,23 +92,13 @@ const MESSAGE_TEMPLATES: MessageTemplate[] = [
     color: "bg-indigo-600 text-white",
     hoverColor: "hover:bg-indigo-700",
     buildMessage: (nombre, ciudad, categoria, _url) => {
-      const zona = ciudad || "CDMX";
-      const sector = categoria || "Agencia Marketing Digital";
-      return `Hola, ¿qué tal, equipo de ${nombre}? Soy Isaac, de INDEXA.
+      const zona = ciudad || "su ciudad";
+      const sector = categoria || "marketing digital";
+      return `${nombre} — vi su trabajo de ${sector} en ${zona} y voy directo: no vengo a venderles pauta.
 
-Estuve revisando su portafolio en ${zona} y me llamó mucho la atención su enfoque en ${sector}. Les escribo porque, más que una agencia, somos una plataforma de infraestructura y estamos buscando socios tecnológicos en la zona para escalar su prospección.
+Tenemos un motor que detecta diariamente cientos de negocios con brechas digitales en su ciudad y arma el mensaje en un clic. Lo pueden rentar en marca blanca y revenderlo como software propio.
 
-Sabemos que ustedes ya dominan el tema de pauta, por eso no vengo a ofrecerles publicidad. Vengo a mostrarles el 'Motor de Inteligencia de Mercado' que desarrollamos para que agencias como la suya multipliquen su facturación sin esfuerzo operativo:
-
-*Detección Automática de Oportunidades:* Nuestro sistema identifica en tiempo real negocios con brechas digitales críticas en toda ${zona}, entregándoles cientos de prospectos pre-calificados diariamente.
-
-*Abordaje de 'Un Solo Clic':* El sistema procesa la información de cada negocio y genera un mensaje personalizado de alto impacto. Con un solo botón, ustedes disparan la propuesta directa, lista para cerrar.
-
-*Infraestructura de Marca Blanca:* Pueden rentar nuestra plataforma, ponerle el logo de ${nombre} y ofrecérsela a sus clientes como un software propio de la agencia.
-
-Básicamente, nosotros ponemos la 'maquinaria de guerra' y ustedes la estrategia de cierre.
-
-¿Me permiten enviarles una demo visual de cómo nuestro sistema está detectando oportunidades para ${nombre} justo ahora? Es un acceso de 3 minutos y no tiene costo.`;
+¿Les paso una demo de 3 min con prospectos reales para ${nombre}?`;
     },
   },
 ];

@@ -26,19 +26,11 @@ interface ProspectoForReminder {
 }
 
 function buildReminderMessage(nombre: string, demoUrl: string): string {
-  return `Hola, ¿qué tal? Soy Isaac de INDEXA.
+  return `${nombre} — vi que abrieron la demo hace un par de días. ¿Quedó alguna duda?
 
-Notamos que revisaste la demo de *${nombre}* 👀
+Los 3 meses gratis siguen reservados, pero solo para esta semana. La demo: ${demoUrl}
 
-¿Tienes alguna duda para activar tus 3 meses gratis? Te recordamos que incluye:
-✅ Sitio web profesional
-✅ Aparecer en Google
-✅ Botón de WhatsApp directo
-✅ Panel de ofertas con IA
-
-Sin contratos ni letra chiquita. Aquí está tu demo: ${demoUrl}
-
-¿Cuándo te queda bien una llamada rápida de 5 minutos?`;
+¿Lo activamos hoy?`;
 }
 
 export async function GET(request: NextRequest) {
