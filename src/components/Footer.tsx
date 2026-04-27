@@ -92,9 +92,6 @@ export default function Footer() {
           <p className="text-xs text-white/30">
             &copy; {currentYear} INDEXA. Todos los derechos reservados.
           </p>
-          <p className="text-xs text-white/20">
-            Potenciado por Inteligencia Artificial
-          </p>
         </div>
       </div>
     </footer>
