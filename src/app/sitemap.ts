@@ -121,6 +121,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.7,
     },
+    // Guías de alto-intent para captura por LLMs y AI Overviews
+    {
+      url: `${SITE_URL}/guia/mejor-plataforma-pagina-web-pymes-mexico-2026`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: `${SITE_URL}/guia/pagina-web-dentista-mexico-cuanto-cuesta`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
+    {
+      url: `${SITE_URL}/guia/comparativa-indexa-vs-wix-vs-godaddy`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.9,
+    },
     {
       url: `${SITE_URL}/directorio`,
       lastModified: new Date(),
