@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAdminDb } from "@/lib/firebaseAdmin";
+import { Timestamp } from "firebase-admin/firestore";
 
-export const runtime = "edge";
+// Nota: cambiamos de runtime "edge" a "nodejs" porque firebase-admin requiere
+// el runtime Node (usa módulos como crypto, fs). El cron antes estaba "edge"
+// pero la query Firestore se hacía REST anónimo y siempre fallaba con 403
+// (las reglas de prospectos_frios exigen isAdmin()). Bug pre-existente.
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-const API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
 /**
  * Vercel Cron Job — runs daily, finds prospectos who:
@@ -42,38 +44,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!PROJECT_ID || !API_KEY) {
-    return NextResponse.json({ error: "Firebase config missing" }, { status: 500 });
+  let db;
+  try {
+    db = getAdminDb();
+  } catch (err) {
+    console.error("CRON reminders: Firebase Admin no inicializado:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Firebase Admin no inicializado" }, { status: 500 });
   }
 
   try {
-    // Find prospectos with demo views but no reminder sent yet
-    // Query: firstDemoViewAt exists AND reminderSentAt does not exist
-    // Firestore REST doesn't support "field exists" directly,
-    // so we query for status = "demo_generada" and filter in code.
-    const queryRes = await fetch(`${BASE_URL}:runQuery?key=${API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: "prospectos_frios" }],
-          where: {
-            fieldFilter: {
-              field: { fieldPath: "status" },
-              op: "EQUAL",
-              value: { stringValue: "demo_generada" },
-            },
-          },
-          limit: 200,
-        },
-      }),
-    });
+    // Buscar prospectos con demo_generada (Admin SDK bypassa rules — antes
+    // se hacía REST anónimo y siempre fallaba 403)
+    const snap = await db
+      .collection("prospectos_frios")
+      .where("status", "==", "demo_generada")
+      .limit(200)
+      .get();
 
-    if (!queryRes.ok) {
-      return NextResponse.json({ error: "Firestore query failed" }, { status: 500 });
-    }
-
-    const results = await queryRes.json();
     const siteOrigin = process.env.NEXT_PUBLIC_SITE_URL || "https://indexa-web-ten.vercel.app";
     const now = Date.now();
     const HOURS_24 = 24 * 60 * 60 * 1000;
@@ -85,54 +72,41 @@ export async function GET(request: NextRequest) {
       whatsappUrl: string;
     }[] = [];
 
-    for (const r of results) {
-      if (!r.document) continue;
+    for (const docSnap of snap.docs) {
+      const data = docSnap.data();
+      const firstView = typeof data.firstDemoViewAt === "string" ? data.firstDemoViewAt : "";
+      const reminderSent = typeof data.reminderSentAt === "string" ? data.reminderSentAt : "";
+      const telefono = typeof data.telefono === "string" ? data.telefono : "";
+      const nombre = typeof data.nombre === "string" ? data.nombre : "";
+      const demoSlug = typeof data.demoSlug === "string" ? data.demoSlug : "";
 
-      const fields = r.document.fields || {};
-      const firstView = fields.firstDemoViewAt?.stringValue;
-      const reminderSent = fields.reminderSentAt?.stringValue;
-      const telefono = fields.telefono?.stringValue;
-      const nombre = fields.nombre?.stringValue;
-      const demoSlug = fields.demoSlug?.stringValue;
-
-      // Skip if no demo view, no phone, already reminded, or no demo
+      // Skip si falta info, ya se recordó, o no hay demo
       if (!firstView || !telefono || reminderSent || !demoSlug || !nombre) continue;
 
-      // Check timing: 24-72 hours since first view
+      // Ventana 24-72h desde la primera vista
       const viewTime = new Date(firstView).getTime();
+      if (Number.isNaN(viewTime)) continue;
       const elapsed = now - viewTime;
-
       if (elapsed < HOURS_24 || elapsed > HOURS_72) continue;
 
-      // Build reminder
-      const docName = r.document.name as string;
-      const docId = docName.split("/").pop()!;
       const demoUrl = `${siteOrigin}/sitio/${demoSlug}`;
       const digits = telefono.replace(/[^\d+]/g, "");
       const num = digits.startsWith("+") ? digits : `+52${digits}`;
       const message = buildReminderMessage(nombre, demoUrl);
       const whatsappUrl = `https://wa.me/${num}?text=${encodeURIComponent(message)}`;
 
-      reminders.push({ prospectoId: docId, nombre, whatsappUrl });
+      reminders.push({ prospectoId: docSnap.id, nombre, whatsappUrl });
 
-      // Mark reminder as sent
-      const updateFields = {
-        reminderSentAt: { stringValue: new Date().toISOString() },
-        nivelSeguimiento: {
-          integerValue: String(
-            (parseInt(fields.nivelSeguimiento?.integerValue || "0", 10) || 0) + 1
-          ),
-        },
-      };
-
-      await fetch(
-        `${BASE_URL}/prospectos_frios/${docId}?updateMask.fieldPaths=reminderSentAt&updateMask.fieldPaths=nivelSeguimiento&key=${API_KEY}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fields: updateFields }),
-        }
-      );
+      // Marcar recordatorio enviado
+      const currentNivel = typeof data.nivelSeguimiento === "number" ? data.nivelSeguimiento : 0;
+      try {
+        await docSnap.ref.update({
+          reminderSentAt: Timestamp.now().toDate().toISOString(),
+          nivelSeguimiento: currentNivel + 1,
+        });
+      } catch (updateErr) {
+        console.error("CRON reminders: error actualizando", docSnap.id, updateErr instanceof Error ? updateErr.message : updateErr);
+      }
     }
 
     return NextResponse.json({
