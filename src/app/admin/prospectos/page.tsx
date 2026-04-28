@@ -111,10 +111,10 @@ function generateProspectingMessage(businessName: string, demoUrl: string): stri
   const nombre = normalizeNombreNegocio(businessName);
   return `${nombre} — los busqué en Google y no aparecen. Cada cliente que hoy busca lo que ustedes venden se lo está llevando su competencia.
 
-Soy Isaac de INDEXA, ${PITCH_INDEXA}. Les armé una demo de cómo se vería su sitio:
+Soy Isaac de INDEXA, ${PITCH_INDEXA}. Les armé una demo de cómo se vería su sitio (sin compromiso, sin tarjeta):
 ${demoUrl}
 
-Si les gusta, los primeros 3 meses corren por nuestra cuenta. ¿La revisan?`;
+¿La revisan y me dicen qué les parece?`;
 }
 
 const ADS_MESSAGES = [
@@ -139,15 +139,15 @@ Soy Isaac de INDEXA, ${PITCH_INDEXA}. Eso se arregla en 3 días con anuncios loc
 
 ¿Les muestro la demo?`;
   },
-  // Variante 3 — pregunta calificadora + presentación + riesgo cero
+  // Variante 3 — pregunta calificadora + presentación + CTA
   (nombre: string, ciudad: string, categoria: string) => {
     const sector = categoria || "su giro";
     const zona = ciudad || "su zona";
     return `${nombre} — pregunta directa: ¿cuántos clientes nuevos por WhatsApp les llegan a la semana?
 
-Soy Isaac de INDEXA, ${PITCH_INDEXA}. Si son menos de 10, es porque no salen en Facebook/Instagram cuando la gente de ${zona} busca ${sector}. Los primeros 7 días los pago yo — si no llega nadie, no paga nada.
+Soy Isaac de INDEXA, ${PITCH_INDEXA}. Si son menos de 10, es porque no salen en Facebook/Instagram cuando la gente de ${zona} busca ${sector}. Tenemos campañas locales desde $50/día que ustedes prenden y apagan desde el celular, sin agencia.
 
-¿Les paso la demo?`;
+¿Les paso la demo de 2 min?`;
   },
 ];
 
