@@ -187,6 +187,11 @@ export default function ProspectosPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkFeedback, setBulkFeedback] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+  const [waBulkRunning, setWaBulkRunning] = useState(false);
+  const [waBulkFeedback, setWaBulkFeedback] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
+  const [waModalOpen, setWaModalOpen] = useState(false);
+  const [waPromoText, setWaPromoText] = useState("");
+  const [waExpiryDate, setWaExpiryDate] = useState("");
   const [demoRunning, setDemoRunning] = useState(false);
   const [demoProgress, setDemoProgress] = useState({ current: 0, total: 0, nombre: "" });
   const [demoFeedback, setDemoFeedback] = useState<{ type: "ok" | "err"; msg: string } | null>(null);
@@ -652,6 +657,45 @@ export default function ProspectosPage() {
     }
   }, [user, selectedIds, prospectos]);
 
+  // ── WhatsApp Masivo ──────────────────────────────────────────────────
+  const handleBulkWhatsApp = useCallback(async () => {
+    if (!user || selectedIds.size === 0) return;
+    if (!waPromoText.trim() || !waExpiryDate.trim()) {
+      setWaBulkFeedback({ type: "err", msg: "Faltan datos: promoción y fecha de vencimiento." });
+      return;
+    }
+    setWaBulkRunning(true);
+    setWaBulkFeedback(null);
+    try {
+      const token = await user.getIdToken();
+      const selected = prospectos.filter((p) => selectedIds.has(p.id));
+      const payload = selected.map((p) => ({
+        id: p.id,
+        nombre: p.nombre,
+        telefono: p.telefono,
+        bodyVars: [p.nombre, waPromoText.trim(), waExpiryDate.trim()],
+      }));
+
+      const res = await fetch("/api/prospectos/whatsapp-masivo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prospectos: payload, authToken: token }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setWaBulkFeedback({ type: "ok", msg: data.message });
+        setSelectedIds(new Set());
+        setWaModalOpen(false);
+      } else {
+        setWaBulkFeedback({ type: "err", msg: data.message });
+      }
+    } catch {
+      setWaBulkFeedback({ type: "err", msg: "Error de conexión al ejecutar WhatsApp masivo." });
+    } finally {
+      setWaBulkRunning(false);
+    }
+  }, [user, selectedIds, prospectos, waPromoText, waExpiryDate]);
+
   // ── Generar Demos Masivas ────────────────────────────────────────────
   const handleGenerateDemos = useCallback(async () => {
     if (!user || selectedIds.size === 0) return;
@@ -871,6 +915,19 @@ export default function ProspectosPage() {
         </div>
       )}
 
+      {waBulkFeedback && (
+        <div
+          className={`flex items-center gap-3 rounded-xl border px-5 py-3 text-sm ${
+            waBulkFeedback.type === "ok"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {waBulkFeedback.type === "ok" ? <MessageCircle size={18} /> : <AlertCircle size={18} />}
+          {waBulkFeedback.msg}
+        </div>
+      )}
+
       {/* ── Demo generation feedback ───────────────────────────────── */}
       {demoFeedback && (
         <div
@@ -931,7 +988,7 @@ export default function ProspectosPage() {
             </button>
             <button
               onClick={handleBulkProspect}
-              disabled={bulkRunning || demoRunning}
+              disabled={bulkRunning || demoRunning || waBulkRunning}
               className="inline-flex items-center gap-2 rounded-xl bg-indexa-blue px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-indexa-blue/90 disabled:opacity-60"
             >
               {bulkRunning ? (
@@ -941,6 +998,111 @@ export default function ProspectosPage() {
               )}
               {bulkRunning ? "Procesando..." : "Prospección Masiva"}
             </button>
+            <button
+              onClick={() => {
+                setWaBulkFeedback(null);
+                setWaModalOpen(true);
+              }}
+              disabled={bulkRunning || demoRunning || waBulkRunning}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {waBulkRunning ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <MessageCircle size={16} />
+              )}
+              {waBulkRunning ? "Enviando WhatsApp..." : "WhatsApp Masivo"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: WhatsApp Masivo (variables de plantilla) ─────────── */}
+      {waModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => !waBulkRunning && setWaModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100">
+                  <MessageCircle size={18} className="text-emerald-700" />
+                </div>
+                <h3 className="text-lg font-bold text-indexa-gray-dark">WhatsApp Masivo</h3>
+              </div>
+              <button
+                onClick={() => setWaModalOpen(false)}
+                disabled={waBulkRunning}
+                className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-40"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <p className="mt-3 text-sm text-gray-500">
+              Se enviará la plantilla aprobada a <strong className="text-indexa-gray-dark">{selectedIds.size}</strong> prospecto{selectedIds.size !== 1 && "s"} (los que tengan teléfono y no hayan pedido baja).
+            </p>
+
+            <div className="mt-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-indexa-gray-dark">
+                  Promoción <span className="font-normal text-gray-400">(variable {`{{2}}`})</span>
+                </label>
+                <textarea
+                  value={waPromoText}
+                  onChange={(e) => setWaPromoText(e.target.value)}
+                  placeholder="Ej. 30% de descuento en sitio web + dominio gratis por 1 año"
+                  rows={3}
+                  className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-indexa-gray-dark">
+                  Vence el <span className="font-normal text-gray-400">(variable {`{{3}}`})</span>
+                </label>
+                <input
+                  type="text"
+                  value={waExpiryDate}
+                  onChange={(e) => setWaExpiryDate(e.target.value)}
+                  placeholder="Ej. 30 de mayo de 2026"
+                  className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                <strong>Vista previa del mensaje:</strong>
+                <p className="mt-1.5 leading-relaxed">
+                  Hola <em>[nombre]</em>, te escribe el equipo de INDEXA. Quedaste en que te avisáramos cuando tuviéramos novedades, así que aquí va: <strong>{waPromoText || "[promoción]"}</strong>. Esta oferta vence el <strong>{waExpiryDate || "[fecha]"}</strong>. ¿Te interesa que te mandemos los detalles?
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setWaModalOpen(false)}
+                disabled={waBulkRunning}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-100 disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleBulkWhatsApp}
+                disabled={waBulkRunning || !waPromoText.trim() || !waExpiryDate.trim()}
+                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {waBulkRunning ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Send size={16} />
+                )}
+                {waBulkRunning ? "Enviando..." : `Enviar a ${selectedIds.size}`}
+              </button>
+            </div>
           </div>
         </div>
       )}

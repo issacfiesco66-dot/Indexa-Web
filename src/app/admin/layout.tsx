@@ -95,7 +95,11 @@ function AdminShell({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, [user]);
 
-  if (loading || (!authSettled && !isLoginPage)) {
+  // Login page never gets the admin shell — render bare so it can handle
+  // its own redirects (logged-in users get bounced to /admin/dashboard).
+  if (isLoginPage) return <>{children}</>;
+
+  if (loading || !authSettled) {
     return (
       <div className="flex h-screen items-center justify-center bg-indexa-gray-light">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-indexa-blue border-t-transparent" />
@@ -104,7 +108,6 @@ function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
-    if (isLoginPage) return <>{children}</>;
     return null;
   }
 
