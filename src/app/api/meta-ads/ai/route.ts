@@ -657,7 +657,7 @@ async function executeTool(
         const bizName = input.business_name as string;
         const bizDescription = (input.business_description as string) || bizName;
         const pageId = input.page_id as string;
-        let objective = (input.objective as string) || "OUTCOME_AWARENESS";
+        const objective = (input.objective as string) || "OUTCOME_AWARENESS";
         const totalBudget = (input.daily_budget_mxn as number) || 200;
         const landingPageUrl = (input.landing_page_url as string) || "";
         const country = (input.country as string) || "MX";
@@ -947,6 +947,8 @@ export async function POST(request: NextRequest) {
     if (!message || !metaToken || !adAccountId) {
       return NextResponse.json({ error: "Faltan parámetros: message, metaToken, adAccountId." }, { status: 400 });
     }
+    const safeMetaToken = metaToken;
+    const safeAdAccountId = adAccountId;
 
     // Optional context injection for specialized flows (e.g. post-payment diagnostics)
     const safeContext = typeof context === "string" ? context.slice(0, 2000) : "";
@@ -1233,7 +1235,7 @@ export async function POST(request: NextRequest) {
         if (parsed.toolCalls.length > 0) {
           const tc = parsed.toolCalls[0];
           debugLog.push(`Gemini tool: ${tc.name}`);
-          const toolResult = await executeTool(tc.name, tc.args, metaToken, adAccountId, reqSitioId);
+          const toolResult = await executeTool(tc.name, tc.args, safeMetaToken, safeAdAccountId, reqSitioId);
           aiMessages.push({
             role: "assistant",
             content: [
@@ -1278,7 +1280,7 @@ export async function POST(request: NextRequest) {
           const toolBlock = content.find((c) => c.type === "tool_use");
           if (toolBlock?.name) {
             debugLog.push(`Claude tool: ${toolBlock.name}`);
-            const toolResult = await executeTool(toolBlock.name, toolBlock.input || {}, metaToken, adAccountId, reqSitioId);
+            const toolResult = await executeTool(toolBlock.name, toolBlock.input || {}, safeMetaToken, safeAdAccountId, reqSitioId);
             aiMessages.push({ role: "assistant", content: content as Record<string, unknown>[] });
             aiMessages.push({ role: "user", content: [{ type: "tool_result", tool_use_id: toolBlock.id, content: toolResult }] as Record<string, unknown>[] });
             return true; // Continue loop
@@ -1352,50 +1354,6 @@ export async function POST(request: NextRequest) {
       }
 
       break; // All providers failed
-
-      response = response!;
-
-      // Capture text from this response
-      const contentBlocks = (response.content as { type: string; text?: string }[]) || [];
-      const textBlock = contentBlocks.find((c) => c.type === "text");
-      if (textBlock?.text) lastText = textBlock.text;
-
-      if (response.stop_reason === "end_turn") {
-        return NextResponse.json({
-          reply: lastText,
-          newHistory: [
-            ...(Array.isArray(history) ? history : []),
-            { role: "user", content: message },
-            { role: "assistant", content: lastText },
-          ],
-        });
-      }
-
-      if (response.stop_reason === "tool_use") {
-        const content = (response.content as Record<string, unknown>[]) || [];
-        const toolBlocks = content.filter((c) => c.type === "tool_use") as {
-          type: string; id: string; name: string; input: Record<string, unknown>;
-        }[];
-
-        aiMessages.push({ role: "assistant", content });
-
-        // Sequential execution with time budget
-        const toolResults: { type: string; tool_use_id: string; content: string }[] = [];
-        for (const block of toolBlocks) {
-          const toolElapsed = Date.now() - startTime;
-          if (toolElapsed > DEADLINE_MS) {
-            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: "Tiempo agotado." });
-            continue;
-          }
-          const result = await executeTool(block.name, block.input, metaToken, adAccountId, reqSitioId);
-          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
-        }
-
-        aiMessages.push({ role: "user", content: toolResults });
-        continue;
-      }
-
-      break;
     }
 
     const debugInfo = debugLog.length > 0 ? `\n\n_Debug: ${debugLog.join(" → ")}_` : "";

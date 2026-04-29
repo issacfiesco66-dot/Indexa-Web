@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createRateLimiter } from "@/lib/rateLimit";
+import { verifyIdToken } from "@/lib/verifyAuth";
 
 /**
- * /api/auth/session — Sets/clears the firebaseAuthToken cookie with HttpOnly flag.
+ * /api/auth/session sets/clears the firebaseAuthToken cookie with HttpOnly flag.
  *
- * POST: Set the cookie (receives token in JSON body)
- * DELETE: Clear the cookie (sign-out)
- *
- * The HttpOnly flag prevents JavaScript from reading the cookie,
- * protecting it from XSS attacks. The cookie is only accessible
- * to the server (middleware, API routes).
+ * POST: Set the cookie after verifying the Firebase ID token.
+ * DELETE: Clear the cookie (sign-out).
  */
 
 const limiter = createRateLimiter({ windowMs: 60_000, max: 30 });
@@ -28,9 +25,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Token requerido." }, { status: 400 });
     }
 
-    // Basic token format validation (Firebase ID tokens are JWTs)
-    if (token.split(".").length !== 3) {
-      return NextResponse.json({ error: "Formato de token inválido." }, { status: 400 });
+    const verified = await verifyIdToken(token);
+    if (!verified) {
+      return NextResponse.json({ error: "Token invalido." }, { status: 401 });
     }
 
     const isSecure = process.env.NODE_ENV === "production";
@@ -38,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     response.cookies.set("firebaseAuthToken", token, {
       path: "/",
-      maxAge: 60 * 60, // 1 hour
+      maxAge: 60 * 60,
       httpOnly: true,
       secure: isSecure,
       sameSite: "strict",
@@ -46,7 +43,7 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch {
-    return NextResponse.json({ error: "Error al establecer sesión." }, { status: 500 });
+    return NextResponse.json({ error: "Error al establecer sesion." }, { status: 500 });
   }
 }
 

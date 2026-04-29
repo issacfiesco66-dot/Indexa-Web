@@ -450,6 +450,12 @@ export default function ProspectosPage() {
 
   // ── AI-generated prospecting message ──────────────────────────────
   const handleGenerateAiMessage = useCallback(async (prospecto: ProspectoFrio) => {
+    if (!user) {
+      setAiMsgProspecto(prospecto);
+      setAiMsgText("Error: inicia sesion de nuevo para usar IA.");
+      return;
+    }
+
     setAiMsgProspecto(prospecto);
     setAiMsgLoading(true);
     setAiMsgText("");
@@ -462,9 +468,10 @@ export default function ProspectosPage() {
     if (!prospecto.email) problemas.push("Sin correo electrónico de contacto visible");
 
     try {
+      const token = await user.getIdToken();
       const res = await fetch("/api/ai/generate-prospecting-message", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           nombreNegocio: prospecto.nombre,
           industria: prospecto.categoria || "Negocio local",
@@ -485,7 +492,7 @@ export default function ProspectosPage() {
     } finally {
       setAiMsgLoading(false);
     }
-  }, []);
+  }, [user]);
 
   const handleSendAiWhatsApp = useCallback(() => {
     if (!aiMsgProspecto || !aiMsgText) return;

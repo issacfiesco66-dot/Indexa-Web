@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIClient } from "@/lib/openai";
 import { createRateLimiter } from "@/lib/rateLimit";
+import { readLimitedJson } from "@/lib/apiSecurity";
 
-const limiter = createRateLimiter({ windowMs: 60_000, max: 20 });
+const limiter = createRateLimiter({ windowMs: 60_000, max: 10 });
 
 interface ChatRequest {
   messages: { role: "user" | "assistant"; content: string }[];
@@ -17,6 +18,47 @@ interface ChatRequest {
     horarios: string;
   };
   modo: "demo" | "live";
+}
+
+function cleanText(value: unknown, maxLength: number): string {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function normalizeChatRequest(data: unknown): ChatRequest | null {
+  if (!data || typeof data !== "object") return null;
+  const d = data as Record<string, unknown>;
+  const sitioRaw = d.sitio as Record<string, unknown> | undefined;
+  if (!sitioRaw || typeof sitioRaw !== "object") return null;
+
+  const rawMessages = Array.isArray(d.messages) ? d.messages : [];
+  const messages = rawMessages
+    .filter((m): m is { role: "user" | "assistant"; content: string } => {
+      if (!m || typeof m !== "object") return false;
+      const item = m as Record<string, unknown>;
+      return (item.role === "user" || item.role === "assistant") && typeof item.content === "string";
+    })
+    .slice(-10)
+    .map((m) => ({ role: m.role, content: cleanText(m.content, 1000) }))
+    .filter((m) => m.content.length > 0);
+
+  const servicios = Array.isArray(sitioRaw.servicios)
+    ? sitioRaw.servicios.filter((s): s is string => typeof s === "string").slice(0, 12).map((s) => cleanText(s, 120))
+    : [];
+
+  const sitio = {
+    nombre: cleanText(sitioRaw.nombre, 120),
+    categoria: cleanText(sitioRaw.categoria, 100),
+    ciudad: cleanText(sitioRaw.ciudad, 100),
+    servicios,
+    descripcion: cleanText(sitioRaw.descripcion, 800),
+    direccion: cleanText(sitioRaw.direccion, 200),
+    whatsapp: cleanText(sitioRaw.whatsapp, 30),
+    horarios: cleanText(sitioRaw.horarios, 300),
+  };
+
+  const modo = d.modo === "demo" ? "demo" : "live";
+  if (!messages.length || !sitio.nombre) return null;
+  return { messages, sitio, modo };
 }
 
 function buildSystemPrompt(sitio: ChatRequest["sitio"], modo: string): string {
@@ -101,10 +143,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const openai = getOpenAIClient();
-    const body: ChatRequest = await request.json();
-    const { messages, sitio, modo } = body;
+    const parsed = await readLimitedJson(request);
+    if (!parsed.ok) return parsed.response;
+    const body = normalizeChatRequest(parsed.data);
 
-    if (!messages?.length || !sitio?.nombre) {
+    if (!body) {
       return NextResponse.json(
         { success: false, message: "Faltan parámetros." },
         { status: 400 }
@@ -112,6 +155,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Limit conversation history to last 10 messages to control token usage
+    const { messages, sitio, modo } = body;
     const recentMessages = messages.slice(-10);
 
     const systemPrompt = buildSystemPrompt(sitio, modo || "live");

@@ -5,6 +5,7 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Loader2, Sparkles, ArrowRight, Clock, ShieldCheck } from "lucide-react";
+import { useRecaptcha } from "@/lib/useRecaptcha";
 
 const CATEGORY_OPTIONS = [
   "Restaurante",
@@ -36,6 +37,7 @@ export default function ProbarPage() {
   const [whatsapp, setWhatsapp] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const { executeRecaptcha } = useRecaptcha();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -52,6 +54,7 @@ export default function ProbarPage() {
 
     setSubmitting(true);
     try {
+      const recaptchaToken = await executeRecaptcha("preview_generate");
       const res = await fetch("/api/preview/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -60,6 +63,7 @@ export default function ProbarPage() {
           categoria: categoria.trim(),
           ciudad: ciudad.trim(),
           whatsapp: whatsapp.trim(),
+          recaptchaToken,
         }),
       });
       const data: PreviewResponse = await res.json();

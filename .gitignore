@@ -42,6 +42,7 @@ serviceAccountKey.json
 .claude/
 
 # Python scraper outputs
+.venv/
 scripts/__pycache__/
 scripts/*.json
 !scripts/requirements.txt
@@ -49,6 +50,9 @@ __pycache__/
 *.pyc
 prospectos_output.json
 logs_scraper.txt
+logs_funerarias.txt
+debug_*.png
+tmp-*.cjs
 
 # vercel
 .vercel

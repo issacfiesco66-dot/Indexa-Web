@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { createRateLimiter } from "@/lib/rateLimit";
+import { readLimitedJson, verifyRecaptchaToken } from "@/lib/apiSecurity";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ interface PreviewBody {
   categoria: string;
   ciudad: string;
   whatsapp: string;
+  recaptchaToken?: string;
 }
 
 function slugify(text: string): string {
@@ -107,11 +109,21 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json().catch(() => null);
+    const parsed = await readLimitedJson<PreviewBody>(request);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
     if (!validate(body)) {
       return NextResponse.json(
         { success: false, message: "Datos inválidos. Verifica todos los campos." },
         { status: 400 }
+      );
+    }
+
+    const captcha = await verifyRecaptchaToken(body.recaptchaToken, "preview_generate");
+    if (!captcha.ok) {
+      return NextResponse.json(
+        { success: false, message: captcha.message },
+        { status: captcha.status }
       );
     }
 
