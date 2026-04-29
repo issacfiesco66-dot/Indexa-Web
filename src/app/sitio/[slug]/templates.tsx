@@ -46,7 +46,7 @@ function IndexaFooterCredit() {
   return (
     <p className="text-xs text-white/40">
       Sitio creado por{" "}
-      <a href="https://www.indexa.com.mx" target="_blank" rel="noopener noreferrer" className="font-semibold text-white/60 hover:text-white/80">
+      <a href="https://indexaia.com" target="_blank" rel="noopener noreferrer" className="font-semibold text-white/60 hover:text-white/80">
         INDEXA
       </a>{" "}
       — Presencia digital para PYMES

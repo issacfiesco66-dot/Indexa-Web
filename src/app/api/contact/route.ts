@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 2. Correo de confirmación al cliente ──────────────────────
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.indexa.com.mx";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
     const waNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5215512345678";
     const signupUrl = `${siteUrl}/registro`;
     const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(`Hola, soy ${contactName.trim()} de ${businessName.trim()}. Acabo de solicitar información en INDEXA y quiero activar mi sitio web.`)}`;
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
           </div>
           <div style="background-color: #002366; padding: 20px; text-align: center;">
             <p style="color: rgba(255,255,255,0.6); font-size: 12px; margin: 0;">
-              &copy; ${new Date().getFullYear()} INDEXA | www.indexa.com.mx
+              &copy; ${new Date().getFullYear()} INDEXA | indexaia.com
             </p>
           </div>
         </div>

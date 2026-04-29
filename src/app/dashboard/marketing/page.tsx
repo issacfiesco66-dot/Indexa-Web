@@ -481,7 +481,7 @@ export default function MarketingPage() {
           ageMax: newCampaign.ageMax,
           adText: newCampaign.adText,
           adHeadline: newCampaign.headline,
-          adLink: newCampaign.link || "https://indexa.com.mx",
+          adLink: newCampaign.link || "https://indexaia.com",
           ctaType: newCampaign.ctaType,
           imageBase64: adImageBase64,
         }),

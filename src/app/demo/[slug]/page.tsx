@@ -328,7 +328,7 @@ export default async function DemoPage({ params }: DemoPageProps) {
       <footer className="border-t border-gray-100 bg-white py-8">
         <div className="mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
           <p className="text-sm text-gray-400">
-            Demo creada por <a href="https://www.indexa.com.mx" target="_blank" rel="noopener noreferrer" className="font-semibold text-indexa-blue hover:underline">INDEXA</a> — Presencia digital para PYMES.
+            Demo creada por <a href="https://indexaia.com" target="_blank" rel="noopener noreferrer" className="font-semibold text-indexa-blue hover:underline">INDEXA</a> — Presencia digital para PYMES.
           </p>
         </div>
       </footer>

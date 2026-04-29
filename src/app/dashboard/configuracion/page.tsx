@@ -575,7 +575,7 @@ export default function ConfiguracionPage() {
                 <div className="h-2.5 w-2.5 rounded-full bg-yellow-400" />
                 <div className="h-2.5 w-2.5 rounded-full bg-green-400" />
                 <div className="ml-3 flex-1 rounded-md bg-white px-3 py-0.5 text-[10px] text-gray-400 truncate">
-                  indexa.com.mx/sitio/{sitio.slug || "tu-negocio"}
+                  indexaia.com/sitio/{sitio.slug || "tu-negocio"}
                 </div>
               </div>
 

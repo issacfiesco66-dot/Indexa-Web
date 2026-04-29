@@ -54,8 +54,8 @@ export async function POST(request: NextRequest) {
 
     const ALLOWED_ORIGINS = [
       "https://indexa-web-ten.vercel.app",
-      "https://indexa.com.mx",
-      "https://www.indexa.com.mx",
+      "https://indexaia.com",
+      "https://www.indexaia.com",
       "http://localhost:3000",
     ];
     const rawOrigin = request.headers.get("origin") || "";

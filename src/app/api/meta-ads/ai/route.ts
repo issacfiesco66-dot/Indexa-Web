@@ -418,7 +418,7 @@ async function executeTool(
         const pageId = input.page_id as string;
         const adText = (input.ad_text as string) || "Visita nuestra página";
         const adHeadline = (input.headline as string) || "Descubre más";
-        const adLink = (input.link as string) || "https://indexa.com.mx";
+        const adLink = (input.link as string) || "https://indexaia.com";
         const ctaType = (input.cta_type as string) || "LEARN_MORE";
         const adName = (input.ad_name as string) || "Anuncio IA";
         const steps: string[] = [];

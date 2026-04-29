@@ -3,7 +3,7 @@
  */
 
 const INDEXA_WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "5215512345678";
-const INDEXA_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || "https://www.indexa.com.mx";
+const INDEXA_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 
 interface ProspectEmailData {
   businessName: string;
@@ -95,7 +95,7 @@ export function getProspectEmailHtml({ businessName, city, demoUrl }: ProspectEm
       <!-- Footer -->
       <div style="background-color: #002366; padding: 24px; text-align: center;">
         <p style="color: rgba(255,255,255,0.5); font-size: 12px; margin: 0;">
-          &copy; ${new Date().getFullYear()} INDEXA | www.indexa.com.mx
+          &copy; ${new Date().getFullYear()} INDEXA | indexaia.com
         </p>
         <p style="color: rgba(255,255,255,0.4); font-size: 11px; margin: 8px 0 0;">
           Si no desea recibir más correos de este tipo, simplemente responda con "NO".

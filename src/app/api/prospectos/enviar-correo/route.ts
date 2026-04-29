@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       .toLowerCase()
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-]/g, "");
-    const origin = siteOrigin || "https://www.indexa.com.mx";
+    const origin = siteOrigin || "https://indexaia.com";
     const demoUrl = `${origin}/demo/${encodeURIComponent(slug)}`;
 
     // 3. Send email via Resend

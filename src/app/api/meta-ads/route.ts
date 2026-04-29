@@ -419,11 +419,11 @@ export async function POST(request: NextRequest) {
         link_data: {
           image_hash: imageHash.hash,
           message: adText || campaignName,
-          link: adLink || "https://indexa.com.mx",
+          link: adLink || "https://indexaia.com",
           name: adHeadline || campaignName,
           call_to_action: {
             type: ctaType || "LEARN_MORE",
-            value: { link: adLink || "https://indexa.com.mx" },
+            value: { link: adLink || "https://indexaia.com" },
           },
         },
       };

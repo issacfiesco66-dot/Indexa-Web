@@ -11,7 +11,7 @@ function getResend() {
 }
 
 const FROM_EMAIL = process.env.FROM_EMAIL || "INDEXA <onboarding@resend.dev>";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.indexa.com.mx";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 
 function escapeHtml(str: string): string {
   return str

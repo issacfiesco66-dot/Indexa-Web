@@ -12,7 +12,7 @@ function getResend() {
 }
 
 const FROM_EMAIL = process.env.FROM_EMAIL || "INDEXA <onboarding@resend.dev>";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.indexa.com.mx";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 
 // One welcome email per IP per minute — prevents accidental double-sends
 const limiter = createRateLimiter({ windowMs: 60_000, max: 3 });

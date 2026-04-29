@@ -14,7 +14,7 @@ import { Resend } from "resend";
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "";
 const FROM_EMAIL = process.env.FROM_EMAIL || "INDEXA <onboarding@resend.dev>";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.indexa.com.mx";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 
 let _resend: Resend | null = null;
 function getResend(): Resend | null {

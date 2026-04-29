@@ -53,7 +53,7 @@ const DEFAULT_CONFIG: AdminConfig = {
   notifCanal: "email",
   emailSubjectTemplate: "Propuesta de presencia digital para {negocio}",
   whatsappAdmin: "",
-  firmaEmail: "Equipo INDEXA — www.indexa.com.mx",
+  firmaEmail: "Equipo INDEXA — indexaia.com",
   adminNombre: "",
   adminWhatsApp: "",
   scraperAutoRun: true,
@@ -431,10 +431,10 @@ export default function ConfiguracionPage() {
             </p>
             <div className="mt-3 flex items-center gap-2">
               <code className="flex-1 rounded-lg bg-white/80 px-3 py-2 text-xs text-amber-900 font-mono">
-                https://indexa.com.mx/api/webhooks/stripe
+                https://indexaia.com/api/webhooks/stripe
               </code>
               <button
-                onClick={() => copyToClipboard("https://indexa.com.mx/api/webhooks/stripe")}
+                onClick={() => copyToClipboard("https://indexaia.com/api/webhooks/stripe")}
                 className="rounded-lg bg-white/80 p-2 text-amber-700 transition-colors hover:bg-white"
               >
                 {copied ? <Check size={14} /> : <Copy size={14} />}
