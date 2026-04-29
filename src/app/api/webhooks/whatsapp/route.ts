@@ -78,7 +78,7 @@ function isOptOutText(text: string): boolean {
 }
 
 function verifySignature(rawBody: string, signatureHeader: string | null): boolean {
-  if (!APP_SECRET) return true; // si no se configuró, no validamos (dev)
+  if (!APP_SECRET) return false; // fail-safe: si no se configuró, rechazamos
   if (!signatureHeader) return false;
   const expected =
     "sha256=" +

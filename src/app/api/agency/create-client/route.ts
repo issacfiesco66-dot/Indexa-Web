@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAgency } from "@/lib/verifyAuth";
-import { addDocument, readDoc, queryCollection } from "@/lib/firestoreRest";
+import { addDocument, queryCollection } from "@/lib/firestoreRest";
 import { buildSearchIndex } from "@/lib/searchUtils";
 
 const FIREBASE_API_KEY = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -10,7 +10,6 @@ interface CreateClientBody {
   slug: string;
   clientEmail: string;
   clientPassword: string;
-  agencyId: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -28,9 +27,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body: CreateClientBody = await request.json();
-    const { businessName, slug, clientEmail, clientPassword, agencyId } = body;
+    const { businessName, slug, clientEmail, clientPassword } = body;
 
-    if (!businessName || !clientEmail || !clientPassword || !agencyId) {
+    if (!businessName || !clientEmail || !clientPassword) {
       return NextResponse.json({ success: false, message: "Faltan campos requeridos." }, { status: 400 });
     }
 
@@ -38,11 +37,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "La contraseña debe tener al menos 6 caracteres." }, { status: 400 });
     }
 
-    // 2. Verify the agencia exists and is active
-    const agencia = await readDoc("agencias", agencyId);
-    if (!agencia) {
-      return NextResponse.json({ success: false, message: "Agencia no encontrada." }, { status: 404 });
+    // 2. Resolve the agencyId server-side from the authenticated user.
+    //    Trust boundary: never accept agencyId from the client — that would let
+    //    one agency create clients under another agency's account (IDOR).
+    const ownAgencias = await queryCollection("agencias", "uid", agencyUser.uid, 1);
+    if (ownAgencias.length === 0) {
+      return NextResponse.json({ success: false, message: "No se encontró la agencia del usuario." }, { status: 404 });
     }
+    const agencyId = ownAgencias[0].id;
+    const agencia = { id: agencyId, data: ownAgencias[0].data };
     if (agencia.data.planConfig && (agencia.data.planConfig as Record<string, unknown>).status === "suspendido") {
       return NextResponse.json({ success: false, message: "Tu agencia está suspendida. Contacta soporte." }, { status: 403 });
     }
