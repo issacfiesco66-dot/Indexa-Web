@@ -22,14 +22,15 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="text-xs font-bold uppercase tracking-wider text-white/30">Plataforma</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-white/30">Servicios</h4>
             <ul className="mt-4 space-y-2.5">
-              <li><a href="/probar" className="text-sm text-white/50 hover:text-white transition-colors">Generar preview gratis</a></li>
-              <li><a href="#soluciones" className="text-sm text-white/50 hover:text-white transition-colors">Sitios Web con IA</a></li>
-              <li><a href="#soluciones" className="text-sm text-white/50 hover:text-white transition-colors">Marketing Automatizado</a></li>
-              <li><a href="#soluciones" className="text-sm text-white/50 hover:text-white transition-colors">SEO Inteligente</a></li>
-              <li><a href="#precios" className="text-sm text-white/50 hover:text-white transition-colors">Precios</a></li>
-              <li><a href="/casos-de-exito" className="text-sm text-white/50 hover:text-white transition-colors">Casos de Éxito</a></li>
+              <li><a href="/servicios/sitios-web-ia" className="text-sm text-white/50 hover:text-white transition-colors">Sitios Web con IA</a></li>
+              <li><a href="/servicios/marketing-automatizado" className="text-sm text-white/50 hover:text-white transition-colors">Marketing Automatizado</a></li>
+              <li><a href="/servicios/seo-inteligente" className="text-sm text-white/50 hover:text-white transition-colors">SEO Inteligente</a></li>
+              <li><a href="/servicios/analiticas-tiempo-real" className="text-sm text-white/50 hover:text-white transition-colors">Analíticas en Tiempo Real</a></li>
+              <li><a href="/servicios/chatbot-inteligente" className="text-sm text-white/50 hover:text-white transition-colors">Chatbot Inteligente</a></li>
+              <li><a href="/servicios/automatizaciones" className="text-sm text-white/50 hover:text-white transition-colors">Automatizaciones</a></li>
+              <li><a href="/probar" className="text-sm text-indexa-orange hover:text-orange-400 transition-colors">Generar preview gratis →</a></li>
             </ul>
           </div>
 

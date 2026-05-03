@@ -81,17 +81,20 @@ export default function FAQ() {
   const jsonLd = buildFAQSchema(FAQS);
 
   return (
-    <section id="faq" className="relative bg-white py-20 sm:py-28">
+    <section id="faq" className="relative overflow-hidden bg-[#040611] py-20 sm:py-28">
       {/* JSON-LD FAQPage Schema */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <div className="mx-auto max-w-3xl px-4 sm:px-6">
+      {/* Background accent */}
+      <div className="pointer-events-none absolute top-1/2 left-1/2 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-indexa-blue/10 blur-[120px]" />
+
+      <div className="relative mx-auto max-w-3xl px-4 sm:px-6">
         {/* Header */}
         <div className="text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indexa-blue/10">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indexa-orange/15 backdrop-blur">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="24"
@@ -102,23 +105,23 @@ export default function FAQ() {
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-indexa-blue"
+              className="text-indexa-orange"
             >
               <circle cx="12" cy="12" r="10" />
               <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
               <path d="M12 17h.01" />
             </svg>
           </div>
-          <h2 className="mt-5 text-3xl font-extrabold tracking-tight text-indexa-gray-dark sm:text-4xl">
+          <h2 className="mt-5 text-3xl font-extrabold tracking-tight text-white sm:text-5xl">
             Preguntas Frecuentes
           </h2>
-          <p className="mx-auto mt-3 max-w-lg text-base text-gray-500">
-            Todo lo que necesitas saber antes de crear tu sitio web profesional con INDEXA.
+          <p className="mx-auto mt-3 max-w-lg text-base text-white/55">
+            Todo lo que necesitas saber antes de empezar a recibir clientes con INDEXA.
           </p>
         </div>
 
         {/* Accordion */}
-        <div className="mt-12 rounded-2xl border border-gray-200 bg-white px-6 shadow-sm sm:px-8">
+        <div className="mt-12 rounded-2xl border border-white/10 bg-white/[0.03] px-6 backdrop-blur-sm sm:px-8">
           {FAQS.map((faq, i) => (
             <FAQItem key={i} question={faq.question} answer={faq.answer} />
           ))}
@@ -126,7 +129,7 @@ export default function FAQ() {
 
         {/* CTA */}
         <div className="mt-10 text-center">
-          <p className="text-sm text-gray-500">¿Listo para impulsar tu negocio?</p>
+          <p className="text-sm text-white/50">¿Listo para tener clientes llegando solos?</p>
           <a
             href="/registro"
             className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indexa-orange to-orange-500 px-8 py-4 text-base font-bold text-white shadow-lg shadow-indexa-orange/25 transition-all hover:shadow-xl hover:-translate-y-0.5"

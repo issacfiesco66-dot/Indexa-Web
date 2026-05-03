@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { servicios } from "@/lib/serviciosData";
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [serviciosOpen, setServiciosOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -30,8 +32,62 @@ export default function Header() {
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">
-          <a href="#soluciones" className="text-sm font-medium text-white/70 hover:text-white transition-colors">
-            Servicios
+          <div
+            className="relative"
+            onMouseEnter={() => setServiciosOpen(true)}
+            onMouseLeave={() => setServiciosOpen(false)}
+          >
+            <button className="flex items-center gap-1 text-sm font-medium text-white/70 transition-colors hover:text-white">
+              Servicios
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className={`h-4 w-4 transition-transform ${serviciosOpen ? "rotate-180" : ""}`}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+            {serviciosOpen && (
+              <div className="absolute left-1/2 top-full z-50 w-[480px] -translate-x-1/2 pt-3">
+                <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0a0e27]/95 p-3 shadow-2xl backdrop-blur-xl">
+                  <div className="grid gap-1 sm:grid-cols-2">
+                    {servicios.map((s) => (
+                      <Link
+                        key={s.slug}
+                        href={`/servicios/${s.slug}`}
+                        className="group flex items-start gap-3 rounded-xl p-3 transition-all hover:bg-white/5"
+                      >
+                        <div
+                          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg shadow-lg"
+                          style={{
+                            background: `linear-gradient(135deg, ${s.cardAccent}, ${s.cardAccent}aa)`,
+                          }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="white" className="h-5 w-5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d={s.cardIconPath} />
+                          </svg>
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-white">{s.cardTitle}</p>
+                          <p className="mt-0.5 line-clamp-1 text-xs text-white/50">{s.cardDescription}</p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  <div className="mt-2 border-t border-white/5 pt-2">
+                    <a href="#soluciones" className="block rounded-lg px-3 py-2 text-xs font-semibold text-indexa-orange hover:bg-indexa-orange/10">
+                      Ver todos los servicios →
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <a href="#por-que-converte" className="text-sm font-medium text-white/70 hover:text-white transition-colors">
+            ¿Por qué convierte?
           </a>
           <a href="#como-funciona" className="text-sm font-medium text-white/70 hover:text-white transition-colors">
             Cómo Funciona
@@ -73,6 +129,23 @@ export default function Header() {
         <div id="mobile-menu" role="navigation" aria-label="Menú principal" className="border-t border-white/10 bg-[#0a0e27]/95 backdrop-blur-xl px-4 pb-4 md:hidden">
           <div className="flex flex-col gap-3 pt-3">
             <a href="#soluciones" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Servicios</a>
+            <div className="flex flex-col gap-1.5 border-l border-white/10 pl-3">
+              {servicios.map((s) => (
+                <Link
+                  key={s.slug}
+                  href={`/servicios/${s.slug}`}
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 text-xs text-white/55 hover:text-white"
+                >
+                  <span
+                    className="inline-block h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: s.cardAccent }}
+                  />
+                  {s.cardTitle}
+                </Link>
+              ))}
+            </div>
+            <a href="#por-que-converte" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">¿Por qué convierte?</a>
             <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Cómo Funciona</a>
             <a href="#precios" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Precios</a>
             <Link href="/probar" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Probar sin cuenta</Link>

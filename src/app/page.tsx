@@ -2,6 +2,7 @@ import Header from "@/components/Header";
 
 import Hero from "@/components/Hero";
 import Solutions from "@/components/Solutions";
+import WhyConverts from "@/components/WhyConverts";
 import HowItWorks from "@/components/HowItWorks";
 import Pricing from "@/components/Pricing";
 import Reviews from "@/components/Reviews";
@@ -17,6 +18,7 @@ export default function Home() {
       <main>
         <Hero />
         <Solutions />
+        <WhyConverts />
         <HowItWorks />
         <Pricing />
         <Reviews />
