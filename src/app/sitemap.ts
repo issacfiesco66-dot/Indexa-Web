@@ -208,7 +208,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         const plan = (s.data.plan as string | undefined) ?? "";
         const status = (s.data.statusPago as string | undefined) ?? "inactivo";
         const indexable = plan === "profesional" || plan === "enterprise";
-        const active = status === "activo" || status === "trial";
+        const active = status === "activo" || status === "publicado";
         return indexable && active;
       })
       .map((s) => ({

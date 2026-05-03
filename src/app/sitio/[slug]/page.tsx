@@ -103,7 +103,7 @@ export async function generateMetadata({ params }: SitioPageProps): Promise<Meta
   // Starter / inactive / preview sites stay noindex but follow links.
   const plan = sitio.data.plan;
   const statusPago = sitio.data.statusPago;
-  const isPaidActive = statusPago === "activo" || statusPago === "trial";
+  const isPaidActive = statusPago === "activo" || statusPago === "publicado";
   const hasIndexablePlan = plan === "profesional" || plan === "enterprise";
   const shouldIndex = isPaidActive && hasIndexablePlan;
 
