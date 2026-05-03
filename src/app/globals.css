@@ -25,6 +25,13 @@ html {
   50% { transform: translateY(-12px); }
 }
 
+@keyframes float-particle {
+  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
+  25% { transform: translate(15px, -25px); opacity: 0.8; }
+  50% { transform: translate(-10px, -50px); opacity: 1; }
+  75% { transform: translate(20px, -25px); opacity: 0.8; }
+}
+
 @keyframes pulse-glow {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.8; }
@@ -46,11 +53,56 @@ html {
   100% { transform: translateY(-50px); }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(400px); opacity: 0; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes data-flow {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -40; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px var(--glow-color, rgba(255,102,0,0.3)); }
+  50% { box-shadow: 0 0 40px var(--glow-color, rgba(255,102,0,0.6)); }
+}
+
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
 .animate-float { animation: float 6s ease-in-out infinite; }
 .animate-float-delay { animation: float 6s ease-in-out infinite 2s; }
+.animate-float-particle { animation: float-particle 8s ease-in-out infinite; }
 .animate-pulse-glow { animation: pulse-glow 4s ease-in-out infinite; }
 .animate-gradient { animation: gradient-shift 8s ease infinite; background-size: 200% 200%; }
 .animate-fade-up { animation: fade-up 0.8s ease-out forwards; }
 .animate-fade-up-delay { animation: fade-up 0.8s ease-out 0.2s forwards; opacity: 0; }
 .animate-fade-up-delay-2 { animation: fade-up 0.8s ease-out 0.4s forwards; opacity: 0; }
 .animate-grid-move { animation: grid-move 20s linear infinite; }
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2.5s linear infinite;
+}
+.animate-glow-pulse { animation: glow-pulse 3s ease-in-out infinite; }
+.animate-ticker { animation: ticker 40s linear infinite; }

@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ServicesCrossLink from "@/components/ServicesCrossLink";
+import CityContentEnricher from "@/components/CityContentEnricher";
+import { getCityData } from "@/lib/citiesData";
 import { buildCityServiceSchema } from "@/lib/seoSchemas";
 
 const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
@@ -64,6 +67,7 @@ const serviceJsonLd = buildCityServiceSchema({
 });
 
 export default function PaginaWebMonterrey() {
+  const cityData = getCityData("monterrey");
   return (
     <>
       <Header />
@@ -121,6 +125,12 @@ export default function PaginaWebMonterrey() {
             ))}
           </div>
         </section>
+
+        {cityData && <CityContentEnricher data={cityData} />}
+
+
+        <ServicesCrossLink contextLabel="Negocios en Monterrey" placeName="Monterrey" />
+
 
         <section className="bg-gradient-to-r from-indexa-orange to-orange-500 py-20">
           <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">

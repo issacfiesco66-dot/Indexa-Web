@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { listCollectionFields } from "@/lib/firestoreRest";
+import { servicios } from "@/lib/serviciosData";
 
 const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 const SITE_URL = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
@@ -141,6 +142,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.9,
     },
     {
+      url: `${SITE_URL}/guia/indexa-vs-wordpress-vs-wix-pymes-mexico`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.95,
+    },
+    {
+      url: `${SITE_URL}/guia/whatsapp-business-api-precio-mexico`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.95,
+    },
+    {
+      url: `${SITE_URL}/guia/factura-pagina-web-deducible-mexico`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.95,
+    },
+    {
       url: `${SITE_URL}/directorio`,
       lastModified: new Date(),
       changeFrequency: "weekly",
@@ -159,21 +178,44 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/sitio-web-restaurante`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.85 },
     { url: `${SITE_URL}/sitio-web-dentista`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.85 },
     { url: `${SITE_URL}/sitio-web-taller-mecanico`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.85 },
+    // Service detail pages (high priority — primary commercial intent)
+    ...servicios.map((s) => ({
+      url: `${SITE_URL}/servicios/${s.slug}`,
+      lastModified: new Date(),
+      changeFrequency: "monthly" as const,
+      priority: 0.95,
+    })),
   ];
 
   // Dynamic client site pages — fetch all slugs from Firestore
   let sitioPages: MetadataRoute.Sitemap = [];
 
   try {
-    const sitios = await listCollectionFields("sitios", ["slug", "nombre"], 500);
+    const sitios = await listCollectionFields(
+      "sitios",
+      ["slug", "nombre", "plan", "statusPago"],
+      500,
+    );
 
+    // Only include in sitemap microsites that are indexable per the same
+    // policy applied in /sitio/[slug] generateMetadata: plan profesional or
+    // enterprise AND status activo/trial. This keeps the sitemap consistent
+    // with the actual robots directive and prevents wasting crawl budget
+    // on starter / inactive sites that emit noindex.
     sitioPages = sitios
-      .filter((s) => s.data.slug && typeof s.data.slug === "string")
+      .filter((s) => {
+        if (!s.data.slug || typeof s.data.slug !== "string") return false;
+        const plan = (s.data.plan as string | undefined) ?? "";
+        const status = (s.data.statusPago as string | undefined) ?? "inactivo";
+        const indexable = plan === "profesional" || plan === "enterprise";
+        const active = status === "activo" || status === "publicado";
+        return indexable && active;
+      })
       .map((s) => ({
         url: `${SITE_URL}/sitio/${s.data.slug}`,
         lastModified: new Date(),
-        changeFrequency: "weekly" as const,
-        priority: 0.8,
+        changeFrequency: "monthly" as const,
+        priority: 0.5,
       }));
   } catch (err) {
     console.error("Sitemap: error fetching sitios:", err);

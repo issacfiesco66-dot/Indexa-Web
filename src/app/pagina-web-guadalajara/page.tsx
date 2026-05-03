@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ServicesCrossLink from "@/components/ServicesCrossLink";
+import CityContentEnricher from "@/components/CityContentEnricher";
+import { getCityData } from "@/lib/citiesData";
 import { buildCityServiceSchema } from "@/lib/seoSchemas";
 
 const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
@@ -64,6 +67,7 @@ const serviceJsonLd = buildCityServiceSchema({
 });
 
 export default function PaginaWebGuadalajara() {
+  const cityData = getCityData("guadalajara");
   return (
     <>
       <Header />
@@ -125,6 +129,10 @@ export default function PaginaWebGuadalajara() {
         </section>
 
         {/* CTA */}
+        {cityData && <CityContentEnricher data={cityData} />}
+
+        <ServicesCrossLink contextLabel="Negocios en Guadalajara" placeName="Guadalajara" />
+
         <section className="bg-gradient-to-r from-indexa-orange to-orange-500 py-20">
           <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
             <h2 className="text-3xl font-extrabold text-white sm:text-4xl">

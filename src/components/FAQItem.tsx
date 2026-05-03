@@ -17,19 +17,19 @@ export default function FAQItem({ question, answer, className = "" }: FAQItemPro
   const [open, setOpen] = useState(false);
 
   return (
-    <div className={`border-b border-gray-200 last:border-b-0 ${className}`}>
+    <div className={`border-b border-white/10 last:border-b-0 ${className}`}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-4 py-5 text-left transition-colors hover:text-indexa-blue"
+        className="flex w-full items-center justify-between gap-4 py-5 text-left transition-colors hover:text-indexa-orange"
         aria-expanded={open}
       >
-        <span className="text-base font-semibold text-indexa-gray-dark sm:text-lg">
+        <span className="text-base font-semibold text-white sm:text-lg">
           {question}
         </span>
         <motion.span
           animate={{ rotate: open ? 45 : 0 }}
           transition={{ duration: 0.2 }}
-          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-indexa-blue/10 text-indexa-blue"
+          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-indexa-orange/15 text-indexa-orange"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -58,7 +58,7 @@ export default function FAQItem({ question, answer, className = "" }: FAQItemPro
             transition={{ duration: 0.3, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <p className="pb-5 text-sm leading-relaxed text-gray-500 sm:text-base">
+            <p className="pb-5 text-sm leading-relaxed text-white/65 sm:text-base">
               {answer}
             </p>
           </motion.div>
