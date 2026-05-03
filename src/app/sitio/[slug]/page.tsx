@@ -95,9 +95,24 @@ export async function generateMetadata({ params }: SitioPageProps): Promise<Meta
     ? [{ url: sitio.data.logoUrl, width: 400, height: 400, alt: `Logo de ${nombre}` }]
     : [];
 
+  // Indexability policy:
+  // Microsites of clients consumed crawl budget while attracting brand queries
+  // of the *client* (not INDEXA). To keep INDEXA's commercial pages prioritized
+  // in Google, only allow indexing of microsites whose owners pay for plans
+  // Profesional or Enterprise — i.e. those that have explicitly invested in SEO.
+  // Starter / inactive / preview sites stay noindex but follow links.
+  const plan = sitio.data.plan;
+  const statusPago = sitio.data.statusPago;
+  const isPaidActive = statusPago === "activo" || statusPago === "trial";
+  const hasIndexablePlan = plan === "profesional" || plan === "enterprise";
+  const shouldIndex = isPaidActive && hasIndexablePlan;
+
   return {
     title: seoTitle,
     description: seoDescription,
+    robots: shouldIndex
+      ? { index: true, follow: true }
+      : { index: false, follow: true, nocache: true },
     openGraph: {
       title: seoTitle,
       description: seoDescription,

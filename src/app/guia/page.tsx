@@ -102,6 +102,33 @@ const guias = [
     tiempoLectura: "6 min",
     categoria: "FAQ",
   },
+  {
+    slug: "whatsapp-business-api-precio-mexico",
+    titulo: "WhatsApp Business API: Precio en México 2026",
+    descripcion:
+      "Cuánto cuesta de verdad activar WhatsApp Business API en México: tarifas oficiales de Meta, comparativa de proveedores y pasos para conectarla sin developer.",
+    icono: "📱",
+    tiempoLectura: "11 min",
+    categoria: "Ventas",
+  },
+  {
+    slug: "factura-pagina-web-deducible-mexico",
+    titulo: "¿Es Deducible una Página Web en México? Guía SAT 2026",
+    descripcion:
+      "Sí, 100% deducible. Aprende cómo facturar tu sitio web ante el SAT, qué CFDI usar, IVA acreditable y los requisitos exactos en 2026.",
+    icono: "📊",
+    tiempoLectura: "9 min",
+    categoria: "Fundamentos",
+  },
+  {
+    slug: "indexa-vs-wordpress-vs-wix-pymes-mexico",
+    titulo: "INDEXA vs WordPress vs Wix: ¿Cuál Conviene a tu PYME?",
+    descripcion:
+      "Comparativa lado a lado para PYMES mexicanas en 2026. Costo total real, conversión, soporte español y operación. Sin marketing — datos.",
+    icono: "⚔️",
+    tiempoLectura: "13 min",
+    categoria: "Fundamentos",
+  },
 ];
 
 const categorias = [...new Set(guias.map((g) => g.categoria))];

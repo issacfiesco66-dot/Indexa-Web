@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import ServicesCrossLink from "@/components/ServicesCrossLink";
+import CityContentEnricher from "@/components/CityContentEnricher";
 import { buildCityServiceSchema } from "@/lib/seoSchemas";
+import { getCityData } from "@/lib/citiesData";
 
 const rawUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://indexaia.com";
 const SITE_URL = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
@@ -83,6 +86,7 @@ const sectores = [
 ];
 
 export default function PaginaWebCDMX() {
+  const cityData = getCityData("cdmx");
   return (
     <>
       <Header />
@@ -206,6 +210,12 @@ export default function PaginaWebCDMX() {
             ))}
           </div>
         </section>
+
+        {/* Unique per-city content (zonas, giros, testimonio, FAQ extras) */}
+        {cityData && <CityContentEnricher data={cityData} />}
+
+        {/* Cross-link to all services for internal linking + commercial intent capture */}
+        <ServicesCrossLink contextLabel="Negocios en CDMX" placeName="CDMX" />
 
         {/* CTA Final */}
         <section className="bg-gradient-to-r from-indexa-orange to-orange-500 py-20">
