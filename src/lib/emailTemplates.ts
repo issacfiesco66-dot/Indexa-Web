@@ -12,59 +12,64 @@ interface ProspectEmailData {
 }
 
 export function getProspectEmailSubject(businessName: string): string {
-  return `${businessName}: propuesta de sitio web — vista previa lista`;
+  return `${businessName}: así se vería su sitio si lo buscara un cliente desde el celular`;
 }
 
 export function getProspectEmailHtml({ businessName, city, demoUrl }: ProspectEmailData): string {
   const waUrl = `https://wa.me/${INDEXA_WHATSAPP}?text=${encodeURIComponent(`Hola, vi la propuesta de INDEXA para ${businessName} y quiero ver los detalles.`)}`;
   const optOutUrl = `${INDEXA_ORIGIN}/baja?email=`;
+  const ciudad = city || "su zona";
 
   return `
     <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333333; background-color: #F8F9FA;">
       <!-- Header -->
       <div style="background-color: #002366; padding: 32px; text-align: center;">
         <h1 style="color: #FFFFFF; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">INDEXA</h1>
-        <p style="color: rgba(255,255,255,0.7); margin: 8px 0 0; font-size: 14px;">Sitios web y captación de clientes para PYMES</p>
+        <p style="color: rgba(255,255,255,0.7); margin: 8px 0 0; font-size: 14px;">Que sus clientes los encuentren primero — y entren directo a su WhatsApp</p>
       </div>
 
       <!-- Body -->
       <div style="padding: 32px; background-color: #FFFFFF;">
         <h2 style="color: #002366; margin-top: 0; font-size: 22px;">
-          Propuesta para ${businessName}
+          Buen día, ${businessName}
         </h2>
 
         <p style="font-size: 16px; line-height: 1.7; color: #333333;">
-          Buen día. Soy Isaac, fundador de <strong>INDEXA</strong>. Busqué a <strong>${businessName}</strong> en Google
-          para mandarles cotización y la presencia digital que encontré tiene espacio para mejorar — por eso les armé
-          una vista previa de cómo se vería su sitio.
+          Soy Isaac, fundador de <strong>INDEXA</strong>. Antes de escribirles, abrí Google en el celular y busqué su negocio
+          desde la perspectiva de un cliente nuevo en <strong>${ciudad}</strong>. Salieron varios negocios parecidos al suyo
+          arriba — esa lista es la que recibe las primeras llamadas todos los días.
+        </p>
+
+        <p style="font-size: 16px; line-height: 1.7; color: #333333;">
+          Para que se den una idea de cómo se vería <strong>${businessName}</strong> ya posicionado, les armé esta vista previa:
         </p>
 
         <!-- Demo CTA -->
         <div style="text-align: center; margin: 28px 0;">
           <a href="${demoUrl}" target="_blank" rel="noopener noreferrer"
             style="display: inline-block; background-color: #002366; color: #FFFFFF; padding: 16px 40px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 16px; letter-spacing: 0.3px;">
-            Ver la propuesta
+            Ver cómo se vería su sitio
           </a>
         </div>
 
         <p style="font-size: 16px; line-height: 1.7; color: #333333;">
-          Pensada para captar más clientes en <strong>${city || "su zona"}</strong>. Lo que incluye:
+          Lo que arma INDEXA, en palabras llanas:
         </p>
 
         <!-- Benefits -->
         <div style="margin: 20px 0; padding: 20px; background-color: #F8F9FA; border-radius: 12px; border: 1px solid #e5e7eb;">
           <table style="width: 100%; border-collapse: collapse;">
-            <tr><td style="padding: 8px 12px; font-size: 15px; color: #333;">• Sitio web profesional optimizado para celular y computadora</td></tr>
-            <tr><td style="padding: 8px 12px; font-size: 15px; color: #333;">• Posicionamiento para aparecer cuando los busquen en Google</td></tr>
-            <tr><td style="padding: 8px 12px; font-size: 15px; color: #333;">• Botón de WhatsApp directo desde la página</td></tr>
-            <tr><td style="padding: 8px 12px; font-size: 15px; color: #333;">• Panel de campañas en Facebook, Instagram y TikTok Ads</td></tr>
-            <tr><td style="padding: 8px 12px; font-size: 15px; color: #333;">• Estadísticas en tiempo real de visitas, clics y contactos</td></tr>
-            <tr><td style="padding: 8px 12px; font-size: 15px; color: #333;">• Soporte directo conmigo, sin agencias intermedias</td></tr>
+            <tr><td style="padding: 8px 12px; font-size: 15px; color: #333;">• Una página que se ve bien en celular — que es donde el 90% de la gente los va a buscar</td></tr>
+            <tr><td style="padding: 8px 12px; font-size: 15px; color: #333;">• Que aparezcan cuando alguien teclee su giro + "${ciudad}" en Google, no escondidos en la página 4</td></tr>
+            <tr><td style="padding: 8px 12px; font-size: 15px; color: #333;">• Botón verde de WhatsApp en la página: el cliente toca y ya está escribiéndoles</td></tr>
+            <tr><td style="padding: 8px 12px; font-size: 15px; color: #333;">• Anuncios en Facebook, Instagram y TikTok que ustedes prenden y apagan desde el celular</td></tr>
+            <tr><td style="padding: 8px 12px; font-size: 15px; color: #333;">• Tablero simple que muestra cuánta gente entró y cuántos escribieron</td></tr>
+            <tr><td style="padding: 8px 12px; font-size: 15px; color: #333;">• Hablan directo conmigo, no con un call center</td></tr>
           </table>
         </div>
 
         <p style="font-size: 15px; line-height: 1.7; color: #555; text-align: center; margin-top: 28px;">
-          ¿Le hace sentido? Escríbame y le paso precios y plazos:
+          ¿Le hace sentido? Escríbame por WhatsApp y le paso precios y plazos sin rodeos:
         </p>
 
         <!-- WhatsApp CTA -->
