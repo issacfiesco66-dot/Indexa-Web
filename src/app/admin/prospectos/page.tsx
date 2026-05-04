@@ -96,58 +96,62 @@ function generateSlug(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
-// Mensajes WhatsApp — estructura "hook + presentación + CTA".
-// 3 partes en orden:
-//   L1 — Nombre + dolor verificable (gancho que retiene los primeros 5s).
-//   L2 — Presentación: "Soy Isaac de INDEXA, [una frase de qué hacemos]".
-//   L3 — Oferta concreta + UN solo CTA en pregunta.
-// Reglas: ≤80 palabras totales. Sin claims fabricados ("a 2 km"). Sin frases
-// pasivo-agresivas ("Ustedes no"). Inputs se normalizan adentro (acentos,
-// ciudades, nombre del negocio) — el caller pasa raw del scraper.
+// Mensajes WhatsApp — patrón "palitos y manzanas":
+//   ESCENA CONCRETA (lo que pasa en el celular del cliente final, no abstracto)
+//   + presentación corta de quién soy y qué hago en lenguaje de tianguis
+//   + UN micro-paso (ver demo) con SALIDA FÁCIL para el "no".
+// Principio rector: nunca decir "SEO técnico", "presencia digital" ni "ecosistema".
+// Siempre traducir a una escena que el dueño puede visualizar en 3 segundos.
+// Reglas duras:
+//   - ≤80 palabras totales.
+//   - Sin claims fabricados ("a 2 km", "aparecen otros antes que ustedes").
+//   - Sin frases pasivo-agresivas ("Ustedes no").
+//   - PROHIBIDO ofrecer nada gratis (ni meses, ni días, ni "sin costo", ni "sin tarjeta").
+//     INDEXA cobra desde el día 1; el valor se vende con la demo, no con regalos.
+//   - El CTA siempre incluye una salida fácil para el "no" — paradójicamente sube respuesta.
 
-const PITCH_INDEXA = "ayudamos a negocios locales en México a aparecer arriba en Google y a recibir clientes por WhatsApp";
+// Pitch traducido a "palitos y manzanas" — describe la ESCENA, no la tecnología.
+const PITCH_INDEXA = "hacemos que su negocio salga primero cuando alguien lo busca desde el celular, y que el cliente entre directo a su WhatsApp sin que ustedes muevan un dedo";
 
-function generateProspectingMessage(businessName: string, demoUrl: string): string {
+function generateProspectingMessage(
+  businessName: string,
+  demoUrl: string,
+  ciudad?: string,
+  categoria?: string
+): string {
   const nombre = normalizeNombreNegocio(businessName);
-  return `${nombre} — los busqué en Google y no aparecen. Cada cliente que hoy busca lo que ustedes venden se lo está llevando su competencia.
+  const sector = normalizeCategoria(categoria || "") || "negocios como el suyo";
+  const zona = normalizeCiudad(ciudad || "") || "su zona";
 
-Soy Isaac de INDEXA, ${PITCH_INDEXA}. Les armé una demo de cómo se vería su sitio (sin compromiso, sin tarjeta):
-${demoUrl}
+  return `${nombre}, buen día. Abrí Google en el celular y busqué "${sector} en ${zona}" — me salieron 3 ó 4 negocios antes de encontrarlos a ustedes. Esa lista es justo la que ve un cliente nuevo ahorita mismo, y el que sale primero es el que recibe la llamada.
 
-¿La revisan y me dicen qué les parece?`;
+Soy Isaac de INDEXA. ${PITCH_INDEXA}.
+
+Les armé una vista previa de cómo se vería su sitio: ${demoUrl}
+
+¿La abren y me dicen qué cambiarían? Si no aplica, dígame "no aplica" y los saco de mi lista.`;
 }
 
 const ADS_MESSAGES = [
-  // Variante 1 — claim verificable + presentación
+  // Variante 1 — escena del cliente buscando en el celular
   (nombre: string, ciudad: string, categoria: string) => {
     const zona = ciudad || "su zona";
-    const sector = categoria || "lo que ustedes ofrecen";
-    const queryPiece = categoria ? `"${sector} en ${zona}"` : `lo que ustedes venden`;
-    return `${nombre} — busqué ${queryPiece} en Google y aparecen otros antes que ustedes. Cada persona que busca eso desde el celular está llamando al primero.
+    const sector = categoria || "su giro";
+    return `${nombre}, buen día. Pensé en ustedes para una cotización y, antes de escribirles, busqué "${sector} en ${zona}" en mi celular. Su web salió, pero abajo de varios anuncios — esos anuncios son los que reciben la primera llamada cada vez que alguien teclea esa búsqueda.
 
-Soy Isaac de INDEXA, ${PITCH_INDEXA}. Les puedo armar una campaña local desde $50/día que ustedes prenden y apagan desde el celular, sin agencia.
+Soy Isaac de INDEXA. Armamos esos anuncios locales para que ustedes salgan arriba; los prenden y apagan desde el celular, sin agencia ni contratos largos.
 
-¿Les paso una demo de cómo se vería para ${nombre}?`;
+¿Les paso la demo de cómo se vería para ${nombre}? Si no aplica, dígame "no" y no insisto.`;
   },
-  // Variante 2 — diagnóstico suave + presentación
+  // Variante 2 — escena del cliente en Facebook/Instagram esperando ser encontrado
   (nombre: string, ciudad: string, categoria: string) => {
     const sector = categoria || "su giro";
     const zona = ciudad || "su ciudad";
-    return `${nombre} — vi su negocio en Maps. Su sitio está bien, pero hoy no salen en Facebook ni TikTok cuando alguien en ${zona} busca ${sector} desde el celular.
+    return `${nombre}, buen día. Vi su negocio en Maps y la web está bien armada. El detalle: cuando un señor en ${zona} está acostado a las 10 p.m. paseando Facebook o TikTok y le aparece un anuncio de ${sector}, ese anuncio no es el suyo — y ese señor mañana llama al que sí salió.
 
-Soy Isaac de INDEXA, ${PITCH_INDEXA}. Eso se arregla en 3 días con anuncios locales desde $50/día (sin agencia, sin contratos).
+Soy Isaac de INDEXA. Eso lo arreglamos en 3 días: anuncios locales que ustedes controlan desde el celular y que llegan justo a la gente de ${zona}.
 
-¿Les muestro la demo?`;
-  },
-  // Variante 3 — pregunta calificadora + presentación + CTA
-  (nombre: string, ciudad: string, categoria: string) => {
-    const sector = categoria || "su giro";
-    const zona = ciudad || "su zona";
-    return `${nombre} — pregunta directa: ¿cuántos clientes nuevos por WhatsApp les llegan a la semana?
-
-Soy Isaac de INDEXA, ${PITCH_INDEXA}. Si son menos de 10, es porque no salen en Facebook/Instagram cuando la gente de ${zona} busca ${sector}. Tenemos campañas locales desde $50/día que ustedes prenden y apagan desde el celular, sin agencia.
-
-¿Les paso la demo de 2 min?`;
+¿Les muestro la demo? Si no es para ustedes, dígame "no aplica" y listo.`;
   },
 ];
 
@@ -163,11 +167,11 @@ function generateAgencyMessage(nombre: string, ciudad: string, categoria: string
   const cleanNombre = normalizeNombreNegocio(nombre);
   const zona = normalizeCiudad(ciudad) || "su ciudad";
   const sector = normalizeCategoria(categoria) || "marketing digital";
-  return `${cleanNombre} — vi su trabajo de ${sector} en ${zona} y voy directo: no vengo a venderles pauta.
+  return `${cleanNombre}, buen día. Vi su trabajo de ${sector} en ${zona} y voy directo: no vengo a venderles pauta — lo que ustedes ya hacen bien.
 
-Soy Isaac de INDEXA. Tenemos un motor que detecta diariamente cientos de negocios con brechas digitales en su ciudad y arma el mensaje de prospección en un clic. Lo pueden rentar en marca blanca y revenderlo como software propio de ${cleanNombre}.
+Soy Isaac de INDEXA. Lo que les traemos es la lista de prospección lista: cada mañana detectamos los negocios de ${zona} que están perdiendo clientes por no aparecer en Google y armamos el mensaje en un clic. Ustedes lo rentan en marca blanca y lo revenden como software propio de ${cleanNombre} — su cliente nunca ve nuestro nombre.
 
-¿Les paso una demo de 3 min con prospectos reales detectados hoy?`;
+¿Les paso una demo de 3 min con prospectos reales detectados hoy? Si no encaja, dígame "no" y no los molesto más.`;
 }
 
 type ProspectoFilter = "todos" | "sin_web" | "con_web" | "agencias";
@@ -363,7 +367,7 @@ export default function ProspectosPage() {
     const num = digits.startsWith("+") ? digits : `+52${digits}`;
     const slug = prospecto.nombre.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     const demoUrl = `${window.location.origin}/demo/${encodeURIComponent(slug)}`;
-    const message = generateProspectingMessage(prospecto.nombre, demoUrl);
+    const message = generateProspectingMessage(prospecto.nombre, demoUrl, prospecto.ciudad, prospecto.categoria);
     const url = `https://wa.me/${num}?text=${encodeURIComponent(message)}`;
 
     window.open(url, "_blank", "noopener,noreferrer");
@@ -1062,7 +1066,7 @@ export default function ProspectosPage() {
                 <textarea
                   value={waPromoText}
                   onChange={(e) => setWaPromoText(e.target.value)}
-                  placeholder="Ej. 30% de descuento en sitio web + dominio gratis por 1 año"
+                  placeholder="Ej. Setup de sitio web + dominio incluido en el primer pago"
                   rows={3}
                   className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-indexa-gray-dark placeholder:text-gray-400 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                 />
@@ -1084,7 +1088,7 @@ export default function ProspectosPage() {
               <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
                 <strong>Vista previa del mensaje:</strong>
                 <p className="mt-1.5 leading-relaxed">
-                  Hola <em>[nombre]</em>, te escribe el equipo de INDEXA. Quedaste en que te avisáramos cuando tuviéramos novedades, así que aquí va: <strong>{waPromoText || "[promoción]"}</strong>. Esta oferta vence el <strong>{waExpiryDate || "[fecha]"}</strong>. ¿Te interesa que te mandemos los detalles?
+                  Hola <em>[nombre]</em>, soy Isaac de INDEXA. Acabamos de abrir cupo para esta condición comercial y quería que ustedes la vieran antes de cerrarla: <strong>{waPromoText || "[propuesta]"}</strong>. Aplica hasta el <strong>{waExpiryDate || "[fecha]"}</strong>. ¿Les paso los detalles para que decidan?
                 </p>
               </div>
             </div>

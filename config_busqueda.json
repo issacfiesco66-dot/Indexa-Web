@@ -17,5 +17,8 @@
     "Chicoloapan",
     "Chimalhuacán"
   ],
+  "paises": [
+    "México"
+  ],
   "max_por_busqueda": 15
 }

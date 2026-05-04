@@ -234,7 +234,7 @@ export default async function SitioPage({ params }: SitioPageProps) {
   // Build WhatsApp URL
   const cleanPhone = whatsapp.replace(/[^\d+]/g, "");
   const fullPhone = cleanPhone.startsWith("+") ? cleanPhone : `+52${cleanPhone}`;
-  const whatsAppUrl = `https://wa.me/${fullPhone}?text=${encodeURIComponent(`Hola, vi tu página en INDEXA y me interesa más información sobre ${nombre}.`)}`;
+  const whatsAppUrl = `https://wa.me/${fullPhone}?text=${encodeURIComponent(`Hola, vi su página web y me interesa más información sobre ${nombre}.`)}`;
 
   const templateProps = { data, services, whatsAppUrl };
 
