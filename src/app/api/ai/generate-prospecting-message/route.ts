@@ -33,6 +33,9 @@ Representas a INDEXA, una agencia y plataforma SaaS que no solo moderniza pagina
 - El mensaje NO debe superar las 150 palabras.
 - Debe sonar humano, escrito por el fundador de INDEXA, no como un bot generico.
 - Usa lenguaje persuasivo orientado al ROI y al cierre de ventas.
+- PROHIBIDO ofrecer cualquier cosa gratis: ni meses gratis, ni dias de prueba, ni "sin costo inicial", ni "sin tarjeta", ni demos pagadas como regalo, ni descuentos del 100%. INDEXA cobra desde el dia 1; el valor se vende con la demo, no con regalos. Tampoco prometas precios bajos especificos ($X/dia) que no esten confirmados.
+- El CTA debe incluir una salida facil para el "no" (por ejemplo: 'si no aplica, dime "no aplica" y los borro de la lista'). Esto reduce friccion del rechazo y aumenta la tasa de respuesta.
+- Sin claims fabricados ni acusatorios ("aparecen otros antes que ustedes", "se lo esta llevando su competencia"). Usa observaciones verificables y empaticas.
 - Responde UNICAMENTE con el texto del mensaje, sin comillas, sin explicaciones adicionales, sin prefijos como "Mensaje:" o "Aqui va el mensaje".
 - El mensaje debe estar listo para ser enviado por WhatsApp (sin formato HTML, puedes usar *negritas* de WhatsApp).`;
 

@@ -20,7 +20,7 @@ export default function WhatsAppFloat() {
         </div>
       )}
       <a
-        href={`https://wa.me/${PHONE}?text=${encodeURIComponent("Hola, me interesa una página web para mi negocio 🚀")}`}
+        href={`https://wa.me/${PHONE}?text=${encodeURIComponent("Hola Isaac, vengo del sitio de INDEXA y quiero información de los servicios para mi negocio.")}`}
         target="_blank"
         rel="noopener noreferrer"
         className="group flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg shadow-[#25D366]/30 transition-all hover:scale-110 hover:shadow-xl hover:shadow-[#25D366]/40"

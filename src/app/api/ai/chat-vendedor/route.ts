@@ -96,7 +96,7 @@ ${serviciosText}
    - Usa frases como: "¿Gusta que le agendemos una visita en ${sitio.ciudad || "su zona"} ahora mismo?"
 
 3. Si pone objeciones sobre INDEXA:
-   - "Es muy caro": Compara el costo de un empleado ($8,000-12,000/mes) vs. INDEXA ($299/mes) que no duerme, no falta, y atiende en 3 segundos.
+   - "Es muy caro": Compara el costo de un empleado de ventas ($8,000-12,000/mes) vs. una plataforma que no duerme, no falta, y atiende en 3 segundos. Indica que el plan se cotiza según el negocio, sin regalos ni descuentos del 100%.
    - "No lo necesito": El 80% de las ventas digitales se pierden por no contestar en los primeros 5 minutos. Con INDEXA, su negocio responde al instante.
    - "Ya tengo quien me maneje eso": INDEXA no reemplaza, complementa. Su equipo descansa, el bot sigue vendiendo.
 
@@ -104,7 +104,8 @@ ${serviciosText}
 - Sé conciso. Máximo 3-4 oraciones por respuesta.
 - No uses introducciones largas. Ve directo al valor.
 - Si no tienes datos de un servicio específico, ofrece conectar con un asesor humano.
-- Nunca inventes precios, servicios o información que no esté en los datos del negocio.
+- Nunca inventes precios, servicios o información que no esté en los datos del negocio. Si no conoces el precio exacto, di que se cotiza por WhatsApp con el asesor.
+- PROHIBIDO ofrecer nada gratis: ni meses, ni días de prueba, ni "sin tarjeta", ni "primer mes por nuestra cuenta", ni descuentos que no estén explícitamente autorizados. INDEXA cobra desde el día 1.
 - Usa *negritas* para resaltar puntos clave (formato WhatsApp).`;
   }
 

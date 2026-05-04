@@ -4,17 +4,22 @@ INDEXA — Google Maps Scraper v3 (REST API + Batch Mode)
 Busca negocios en Google Maps, filtra los que NO tienen sitio web,
 genera slugs automáticos, y sube los resultados a Firestore via REST API.
 
-Modos de uso:
-  1) Query único:
-     python scraper_indexa.py "Dentistas en CDMX"
-     python scraper_indexa.py "Plomeros en Monterrey" --max 50
+Modos de uso (buscador estilo Google: servicio / ciudad / país):
+  1) Query libre estilo Google:
+     python scraper_indexa.py "Dentistas en CDMX, México"
+     python scraper_indexa.py "Plomeros en Monterrey, México" --max 50
+     python scraper_indexa.py "Restaurantes en Bogotá, Colombia"
 
-  2) Batch autónomo (lee config_busqueda.json):
+  2) Tres campos explícitos:
+     python scraper_indexa.py --servicio "Dentistas" --ciudad "CDMX" --pais "México"
+     python scraper_indexa.py --servicio "Veterinarias" --ciudad "Lima" --pais "Perú" --max 30
+
+  3) Batch autónomo (lee config_busqueda.json):
      python scraper_indexa.py --batch
      python scraper_indexa.py --batch --max 20
 
-  3) Desde el dashboard (API SSE):
-     python scraper_indexa.py "Tacos en CDMX" --json-progress
+  4) Desde el dashboard (API SSE):
+     python scraper_indexa.py "Tacos en CDMX, México" --json-progress
 
 Requisitos:
   pip install playwright python-dotenv requests
@@ -104,7 +109,95 @@ class Prospecto:
     telefono: str = ""
     categoria: str = ""
     ciudad: str = ""
+    pais: str = ""
     tiene_web: bool = False
+
+
+# ── Búsqueda estilo Google: servicio / ciudad / país ─────────────────
+# Geolocations representativas por país, usadas para anclar Google Maps al
+# arrancar la búsqueda. Si no encontramos el país en la tabla, caemos a MX.
+COUNTRY_GEO: dict[str, dict[str, float | str]] = {
+    "México":     {"lat": 19.4326, "lon": -99.1332, "locale": "es-MX"},
+    "Mexico":     {"lat": 19.4326, "lon": -99.1332, "locale": "es-MX"},
+    "Colombia":   {"lat":  4.7110, "lon": -74.0721, "locale": "es-CO"},
+    "Argentina":  {"lat": -34.6037, "lon": -58.3816, "locale": "es-AR"},
+    "Chile":      {"lat": -33.4489, "lon": -70.6693, "locale": "es-CL"},
+    "Perú":       {"lat": -12.0464, "lon": -77.0428, "locale": "es-PE"},
+    "Peru":       {"lat": -12.0464, "lon": -77.0428, "locale": "es-PE"},
+    "España":     {"lat": 40.4168, "lon": -3.7038,  "locale": "es-ES"},
+    "Espana":     {"lat": 40.4168, "lon": -3.7038,  "locale": "es-ES"},
+    "Spain":      {"lat": 40.4168, "lon": -3.7038,  "locale": "es-ES"},
+    "Estados Unidos": {"lat": 38.9072, "lon": -77.0369, "locale": "en-US"},
+    "USA":        {"lat": 38.9072, "lon": -77.0369, "locale": "en-US"},
+}
+
+
+def geolocation_for_country(pais: str) -> dict[str, float | str]:
+    """Devuelve geolocation + locale para anclar el navegador. Default MX."""
+    if not pais:
+        return COUNTRY_GEO["México"]
+    return COUNTRY_GEO.get(pais.strip(), COUNTRY_GEO["México"])
+
+
+def build_search_query(servicio: str, ciudad: str, pais: str) -> str:
+    """
+    Construye el query como lo escribirías en Google: "servicio en ciudad, país".
+    - Si falta país: "servicio en ciudad".
+    - Si falta ciudad: "servicio" (raro, pero soportado).
+    - Si el query ya contiene la ciudad/país, se respeta tal cual.
+    """
+    s = (servicio or "").strip()
+    c = (ciudad or "").strip()
+    p = (pais or "").strip()
+    if not s:
+        return ""
+    if c and p:
+        return f"{s} en {c}, {p}"
+    if c:
+        return f"{s} en {c}"
+    return s
+
+
+def parse_search_query(
+    raw_query: str,
+    categoria_hint: str = "",
+    ciudad_hint: str = "",
+    pais_hint: str = "",
+) -> tuple[str, str, str]:
+    """
+    Parsea un query libre tipo Google a (categoria, ciudad, pais).
+    Soporta:
+      "Dentistas en Chalco, México"        → ("Dentistas", "Chalco", "México")
+      "Dentistas en Chalco"                → ("Dentistas", "Chalco", "")
+      "Restaurantes Bogotá, Colombia"      → ("Restaurantes", "Bogotá", "Colombia")
+      "Veterinarias"                       → ("Veterinarias", "", "")
+    Los hints sobrescriben lo parseado solo si no están vacíos.
+    """
+    q = (raw_query or "").strip()
+    cat, ciu, pai = "", "", ""
+    if q:
+        # Patrón principal: "<cat> en <ciudad>[, <pais>]"
+        m = re.search(r"^(.+?)\s+en\s+(.+?)(?:,\s*(.+))?$", q, re.IGNORECASE)
+        if m:
+            cat = m.group(1).strip()
+            ciu = m.group(2).strip()
+            pai = (m.group(3) or "").strip()
+        else:
+            # Sin "en": "<cat> <ciudad>[, <pais>]" — split por última coma
+            if "," in q:
+                left, right = q.rsplit(",", 1)
+                pai = right.strip()
+                cat = left.strip()
+            else:
+                cat = q
+    # Hints sobrescriben (útil cuando vienen explícitos del CLI/config)
+    if categoria_hint:
+        cat = categoria_hint.strip()
+    if ciudad_hint:
+        ciu = ciudad_hint.strip()
+    if pais_hint:
+        pai = pais_hint.strip()
+    return cat, ciu, pai
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -183,7 +276,7 @@ def obtener_telefonos_existentes(token: str) -> set[str]:
     return existentes
 
 
-def subir_prospecto(token: str, prospecto: Prospecto, categoria: str, ciudad: str) -> bool:
+def subir_prospecto(token: str, prospecto: Prospecto, categoria: str, ciudad: str, pais: str = "") -> bool:
     """Sube un prospecto a Firestore via REST API."""
     now = datetime.now(timezone.utc).isoformat()
 
@@ -195,6 +288,7 @@ def subir_prospecto(token: str, prospecto: Prospecto, categoria: str, ciudad: st
         "telefono": {"stringValue": prospecto.telefono},
         "categoria": {"stringValue": categoria or prospecto.categoria},
         "ciudad": {"stringValue": ciudad or prospecto.ciudad},
+        "pais": {"stringValue": pais or prospecto.pais},
         "status": {"stringValue": "nuevo"},
         "tieneWeb": {"booleanValue": prospecto.tiene_web},
         "importedAt": {"timestampValue": now},
@@ -612,13 +706,26 @@ def setup_logger() -> logging.Logger:
 CONFIG_PATH = ROOT / "config_busqueda.json"
 
 def load_batch_config() -> list[dict]:
-    """Load config_busqueda.json and return list of {query, categoria, ciudad}."""
+    """
+    Lee config_busqueda.json y devuelve combinaciones servicio × ciudad × país.
+
+    Formato esperado (recomendado):
+    {
+      "categorias": ["Dentistas", "Restaurantes"],
+      "ciudades":   ["Chalco", "Texcoco"],
+      "paises":     ["México"],
+      "max_por_busqueda": 15
+    }
+
+    Compatibilidad: si falta `paises`, se asume ["México"] para no romper configs viejas.
+    """
     if not CONFIG_PATH.exists():
         raise FileNotFoundError(
             f"No se encontró {CONFIG_PATH}.\n"
             "Crea el archivo con el formato:\n"
             '{\n  "categorias": ["Dentistas", "Restaurantes"],\n'
             '  "ciudades": ["CDMX", "Monterrey"],\n'
+            '  "paises": ["México"],\n'
             '  "max_por_busqueda": 15\n}'
         )
 
@@ -627,20 +734,25 @@ def load_batch_config() -> list[dict]:
 
     categorias = cfg.get("categorias", [])
     ciudades = cfg.get("ciudades", [])
+    paises = cfg.get("paises") or ["México"]
     max_per = cfg.get("max_por_busqueda", 15)
 
     if not categorias or not ciudades:
         raise ValueError("config_busqueda.json debe tener al menos una categoría y una ciudad.")
+    if not paises:
+        raise ValueError("config_busqueda.json: 'paises' no puede estar vacío.")
 
     queries = []
     for cat in categorias:
         for city in ciudades:
-            queries.append({
-                "query": f"{cat} en {city}",
-                "categoria": cat,
-                "ciudad": city,
-                "max": max_per,
-            })
+            for country in paises:
+                queries.append({
+                    "query": build_search_query(cat, city, country),
+                    "categoria": cat,
+                    "ciudad": city,
+                    "pais": country,
+                    "max": max_per,
+                })
 
     return queries
 
@@ -651,6 +763,7 @@ class QueryResult:
     query: str
     categoria: str
     ciudad: str
+    pais: str = ""
     total_extraidos: int = 0
     con_web: int = 0
     sin_web: int = 0
@@ -667,19 +780,32 @@ def run_single_query(
     ciudad: str,
     token: str | None,
     existentes: set[str],
+    pais: str = "",
     output_path: Path | None = None,
 ) -> QueryResult:
     """Run a single scraping query and return results."""
-    result = QueryResult(query=query_str, categoria=categoria, ciudad=ciudad)
+    result = QueryResult(query=query_str, categoria=categoria, ciudad=ciudad, pais=pais)
 
-    emit("start", message="=" * 60, query=query_str, max=max_results, categoria=categoria, ciudad=ciudad)
+    emit(
+        "start",
+        message="=" * 60,
+        query=query_str,
+        max=max_results,
+        categoria=categoria,
+        ciudad=ciudad,
+        pais=pais,
+    )
     if not _JSON_MODE:
         print(f"\n{'=' * 60}")
         print(f"  Búsqueda:   {query_str}")
         print(f"  Categoría:  {categoria}")
         print(f"  Ciudad:     {ciudad}")
+        print(f"  País:       {pais or '(no especificado)'}")
         print(f"  Máximo:     {max_results}")
         print(f"{'=' * 60}")
+
+    geo = geolocation_for_country(pais)
+    locale = str(geo.get("locale", "es-MX"))
 
     try:
         emit("phase", message="Iniciando navegador...", phase="browser", progress=15)
@@ -687,14 +813,14 @@ def run_single_query(
             browser = pw.chromium.launch(
                 headless=headless,
                 args=[
-                    "--lang=es-MX",
+                    f"--lang={locale}",
                     "--no-sandbox",
                     "--disable-blink-features=AutomationControlled",
                 ],
             )
             context = browser.new_context(
-                locale="es-MX",
-                geolocation={"latitude": 19.4326, "longitude": -99.1332},
+                locale=locale,
+                geolocation={"latitude": float(geo["lat"]), "longitude": float(geo["lon"])},
                 permissions=["geolocation"],
                 viewport={"width": 1280, "height": 900},
                 user_agent=(
@@ -735,6 +861,7 @@ def run_single_query(
                 d = asdict(p)
                 d["categoria"] = categoria
                 d["ciudad"] = ciudad
+                d["pais"] = pais
                 json_data.append(d)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(json_data, f, ensure_ascii=False, indent=2)
@@ -758,7 +885,7 @@ def run_single_query(
                     result.omitidos += 1
                     continue
 
-                ok = subir_prospecto(token, p, categoria, ciudad)
+                ok = subir_prospecto(token, p, categoria, ciudad, pais)
                 if ok:
                     if tel_limpio:
                         existentes.add(tel_limpio)
@@ -792,13 +919,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="INDEXA — Scraper de Google Maps v3 (REST API + Batch)"
     )
-    parser.add_argument("query", nargs="?", default="", help="Búsqueda (ej: 'Dentistas en CDMX')")
+    parser.add_argument("query", nargs="?", default="", help="Búsqueda libre (ej: 'Dentistas en CDMX, México')")
     parser.add_argument("--batch", action="store_true", help="Modo batch: lee config_busqueda.json y ejecuta todas las combinaciones")
     parser.add_argument("--max", type=int, default=15, help="Máximo de resultados por búsqueda (default: 15)")
     parser.add_argument("--headless", default="true", choices=["true", "false"], help="Sin ventana (default: true)")
     parser.add_argument("--output", default="prospectos_output.json", help="Archivo JSON local de salida")
-    parser.add_argument("--categoria", default="", help="Categoría manual (ej: 'Restaurantes')")
-    parser.add_argument("--ciudad", default="", help="Ciudad manual (ej: 'CDMX')")
+    parser.add_argument("--servicio", "--categoria", dest="servicio", default="", help="Servicio/categoría (ej: 'Restaurantes')")
+    parser.add_argument("--ciudad", default="", help="Ciudad (ej: 'CDMX')")
+    parser.add_argument("--pais", default="", help="País (ej: 'México', 'Colombia'). Default: México si no se especifica")
     parser.add_argument("--json-progress", action="store_true", help="Output JSON progress lines for API consumption")
 
     args = parser.parse_args()
@@ -843,22 +971,25 @@ def main() -> None:
             print(f"\n  ERROR: {e}")
             return
     else:
-        # Single query mode
-        ciudad = args.ciudad
-        if not ciudad:
-            m = re.search(r"\ben\s+(.+)$", args.query, re.IGNORECASE)
-            if m:
-                ciudad = m.group(1).strip()
-        categoria = args.categoria
-        if not categoria:
-            m = re.search(r"^(.+?)\s+en\b", args.query, re.IGNORECASE)
-            if m:
-                categoria = m.group(1).strip()
+        # Single query mode — buscador estilo Google: servicio / ciudad / país
+        categoria, ciudad, pais = parse_search_query(
+            args.query,
+            categoria_hint=args.servicio,
+            ciudad_hint=args.ciudad,
+            pais_hint=args.pais,
+        )
+        # Default explícito a México si no se infirió ni se pasó
+        if not pais:
+            pais = "México"
+
+        # Reconstruimos el query final como Google lo escribiría: ancla por país
+        canonical_query = build_search_query(categoria, ciudad, pais) or args.query
 
         queries = [{
-            "query": args.query,
+            "query": canonical_query,
             "categoria": categoria,
             "ciudad": ciudad,
+            "pais": pais,
             "max": args.max,
         }]
 
@@ -876,6 +1007,7 @@ def main() -> None:
             headless=headless,
             categoria=q["categoria"],
             ciudad=q["ciudad"],
+            pais=q.get("pais", ""),
             token=token,
             existentes=existentes,
             output_path=output,

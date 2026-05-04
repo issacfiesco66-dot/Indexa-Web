@@ -24,7 +24,7 @@ export default function WhatsAppButton({
 
     const digits = phone.replace(/[^\d+]/g, "");
     const num = digits.startsWith("+") ? digits : `+52${digits}`;
-    const message = `Hola, vi tu página en INDEXA y me interesa más información sobre ${businessName}.`;
+    const message = `Hola, vi su página web y me interesa más información sobre ${businessName}.`;
     window.open(
       `https://wa.me/${num}?text=${encodeURIComponent(message)}`,
       "_blank",
