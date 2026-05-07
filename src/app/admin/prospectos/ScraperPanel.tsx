@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { MapPin, Search, SearchX, Loader2, AlertTriangle, Briefcase, Globe2, Sparkles, History } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import type { ProspectoFrio } from "@/types/lead";
+import { CITIES_BY_COUNTRY, MAX_CITY_SUGGESTIONS } from "./cities";
 
 /**
  * Palabras que indican que el usuario quiere scrapear funerarias.
@@ -67,6 +68,20 @@ export default function ScraperPanel({ prospectos, onRunningChange }: ScraperPan
     () => cityClean ? prospectos.filter((p) => p.ciudad.toLowerCase() === cityClean.toLowerCase()).length : 0,
     [prospectos, cityClean]
   );
+
+  // Sugerencias de ciudades filtradas por país + lo que el usuario tipea.
+  // Se ocultan si lo escrito ya coincide exacto con alguna sugerencia
+  // (señal de que el usuario ya eligió y los chips estorban).
+  const citySuggestions = useMemo(() => {
+    const list = CITIES_BY_COUNTRY[scraperPais] || [];
+    const q = cityClean.toLowerCase();
+    if (!q) return list.slice(0, MAX_CITY_SUGGESTIONS);
+    const exact = list.find((c) => c.toLowerCase() === q);
+    if (exact) return [];
+    return list
+      .filter((c) => c.toLowerCase().includes(q))
+      .slice(0, MAX_CITY_SUGGESTIONS);
+  }, [scraperPais, cityClean]);
 
   // Si el usuario escribe "funeraria" (o variantes), este scraper NO es el correcto
   // — lo queremos en el tab "Funerarias → HI", con otro pitch y otra colección.
@@ -287,6 +302,33 @@ export default function ScraperPanel({ prospectos, onRunningChange }: ScraperPan
             </div>
           </div>
         </div>
+
+        {/* Sugerencias de ciudades por país */}
+        {citySuggestions.length > 0 && !scraperRunning && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+              <MapPin size={11} />
+              Ciudades en {scraperPais || "este país"}
+            </span>
+            {citySuggestions.map((c) => {
+              const active = cityClean.toLowerCase() === c.toLowerCase();
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setScraperCiudad(c)}
+                  className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all hover:-translate-y-0.5 hover:shadow-sm ${
+                    active
+                      ? "border-indexa-blue bg-indexa-blue/10 text-indexa-blue"
+                      : "border-gray-200 bg-gray-50 text-gray-600 hover:border-indexa-blue hover:bg-indexa-blue/5 hover:text-indexa-blue"
+                  }`}
+                >
+                  {c}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Row 2: Máx. (segmented) + Buscar button */}
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
