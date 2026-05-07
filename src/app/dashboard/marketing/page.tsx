@@ -41,6 +41,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
+import MetaConnect from "./MetaConnect";
 
 // ── Types ────────────────────────────────────────────────────────────
 interface Campaign {
@@ -189,42 +190,51 @@ export default function MarketingPage() {
     action();
   };
 
-  // ── Load saved credentials ────────────────────────────────────
+  // ── Load saved credentials (re-usable for OAuth refresh) ─────
+  const loadCredentials = useCallback(async () => {
+    if (!user) return;
+    try {
+      const authToken = await user.getIdToken();
+      const res = await fetch("/api/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ action: "load" }),
+      });
+      const { tokens: data } = await res.json();
+      if (data) {
+        if (data.metaAccessToken) {
+          setSavedToken(data.metaAccessToken);
+          setMetaToken(data.metaAccessToken);
+        }
+        if (data.metaAdAccountId) {
+          setSavedAccount(data.metaAdAccountId);
+          setAdAccountId(data.metaAdAccountId);
+        }
+        if (data.nanoBananaApiKey) {
+          setSavedNanoBananaKey(data.nanoBananaApiKey);
+          setNanoBananaKey(data.nanoBananaApiKey);
+        }
+        if (data.metaPageId) {
+          setSavedPageId(data.metaPageId);
+          setMetaPageId(data.metaPageId);
+        }
+        if (data.metaAccessToken && data.metaAdAccountId) {
+          setShowGuide(false);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading meta credentials:", err instanceof Error ? err.message : "unknown");
+    }
+  }, [user]);
+
   useEffect(() => {
     if (authLoading || !user || !db) return;
 
     (async () => {
-      try {
-        const authToken = await user.getIdToken();
-        const res = await fetch("/api/tokens", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
-          body: JSON.stringify({ action: "load" }),
-        });
-        const { tokens: data } = await res.json();
-        if (data) {
-          if (data.metaAccessToken) {
-            setSavedToken(data.metaAccessToken);
-            setMetaToken(data.metaAccessToken);
-          }
-          if (data.metaAdAccountId) {
-            setSavedAccount(data.metaAdAccountId);
-            setAdAccountId(data.metaAdAccountId);
-          }
-          if (data.nanoBananaApiKey) {
-            setSavedNanoBananaKey(data.nanoBananaApiKey);
-            setNanoBananaKey(data.nanoBananaApiKey);
-          }
-          if (data.metaPageId) {
-            setSavedPageId(data.metaPageId);
-            setMetaPageId(data.metaPageId);
-          }
-          if (data.metaAccessToken && data.metaAdAccountId) {
-            setShowGuide(false);
-          }
-        }
+      await loadCredentials();
 
-        // Load sitio for paywall gating
+      // Load sitio for paywall gating
+      try {
         const profileSnap = await getDoc(doc(db!, "usuarios", user.uid));
         if (profileSnap.exists()) {
           const profile = profileSnap.data();
@@ -235,12 +245,12 @@ export default function MarketingPage() {
           }
         }
       } catch (err) {
-        console.error("Error loading meta credentials:", err instanceof Error ? err.message : "unknown");
+        console.error("Error loading sitio:", err instanceof Error ? err.message : "unknown");
       } finally {
         setPageLoading(false);
       }
     })();
-  }, [user, authLoading]);
+  }, [user, authLoading, loadCredentials]);
 
   // ── Save credentials ──────────────────────────────────────────
   const handleSaveCredentials = useCallback(async () => {
@@ -601,6 +611,53 @@ export default function MarketingPage() {
 
           {showGuide && (
             <div className="border-t border-white/5 px-6 pb-6">
+              {/* ── OAuth (recomendado) ─────────────────────────── */}
+              <div className="mt-5 rounded-2xl border border-[#1877F2]/30 bg-gradient-to-br from-[#1877F2]/10 to-transparent p-5">
+                <div className="mb-4 flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1877F2]/15 text-[#1877F2]">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-white">Conexión rápida</h3>
+                      <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
+                        Recomendado
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-white/60">
+                      Inicia sesión con tu cuenta de Facebook y autoriza Indexa.
+                      Listamos tus cuentas publicitarias y páginas — solo eliges con cuál trabajar.
+                      Sin Graph API Explorer, sin tokens manuales.
+                    </p>
+                  </div>
+                </div>
+
+                <MetaConnect onConnected={loadCredentials} alreadyConnected={isConnected} />
+
+                <ul className="mt-4 grid gap-1.5 sm:grid-cols-3">
+                  <li className="flex items-center gap-1.5 text-[11px] text-white/50">
+                    <Check size={11} className="text-emerald-400" /> Token cifrado AES-256
+                  </li>
+                  <li className="flex items-center gap-1.5 text-[11px] text-white/50">
+                    <Check size={11} className="text-emerald-400" /> Renueva por 60 días
+                  </li>
+                  <li className="flex items-center gap-1.5 text-[11px] text-white/50">
+                    <Check size={11} className="text-emerald-400" /> Solo permisos de ads
+                  </li>
+                </ul>
+              </div>
+
+              {/* ── Manual fallback (collapsed) ─────────────────── */}
+              <details className="mt-5 group rounded-xl border border-white/10 bg-white/[0.02]">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 text-xs font-semibold text-white/60 hover:text-white">
+                  <span className="inline-flex items-center gap-2">
+                    <Key size={13} />
+                    ¿Prefieres pegar el token manual? Ver pasos
+                  </span>
+                  <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
+                </summary>
+
+                <div className="border-t border-white/5 px-5 pb-5">
               <div className="mt-4 space-y-4">
                 {GUIDE_STEPS.map((step, i) => (
                   <div key={i} className="flex gap-4">
@@ -690,6 +747,8 @@ export default function MarketingPage() {
                   {saving ? "Guardando..." : isConnected ? "Actualizar" : "Conectar"}
                 </button>
               </div>
+                </div>
+              </details>
             </div>
           )}
         </div>
