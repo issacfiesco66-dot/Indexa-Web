@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendTemplateMessage, buildBodyParams, normalizePhoneMx } from "@/lib/whatsapp";
+import {
+  sendTemplateMessage,
+  buildBodyParams,
+  normalizePhoneByCountry,
+  type PhoneCountry,
+} from "@/lib/whatsapp";
 import { verifyAdmin } from "@/lib/verifyAuth";
 import { createRateLimiter } from "@/lib/rateLimit";
 import { getAdminDb } from "@/lib/firebaseAdmin";
@@ -10,6 +15,9 @@ const limiter = createRateLimiter({ windowMs: 60_000, max: 3 });
 
 const TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_NAME || "promo_clientes_aviso";
 const TEMPLATE_LANG = process.env.WHATSAPP_TEMPLATE_LANG || "es_MX";
+const TEMPLATE_NAME_USA =
+  process.env.WHATSAPP_TEMPLATE_NAME_USA || process.env.WHATSAPP_TEMPLATE_NAME || "promo_clientes_aviso";
+const TEMPLATE_LANG_USA = process.env.WHATSAPP_TEMPLATE_LANG_USA || "es";
 const MAX_BATCH = 25;
 // Throttle entre mensajes para no quemar el tier (Meta es estricto al inicio)
 const DELAY_MS = 800;
@@ -20,18 +28,29 @@ interface ProspectoInput {
   telefono: string;
   /** Variables {{1}}..{{N}} de la plantilla. Si se omite, default = [nombre]. */
   bodyVars?: string[];
+  /** Ciudad del prospecto — usada para inferir país automáticamente si no viene `pais`. */
+  ciudad?: string;
+  /** País explícito. "US" o "MX". Si se omite se infiere de `ciudad`. */
+  pais?: string;
 }
 
 interface BulkBody {
   prospectos: ProspectoInput[];
   authToken: string;
   templateName?: string;
+  /**
+   * Si está activo, fuerza usar las plantillas USA (`WHATSAPP_TEMPLATE_NAME_USA`,
+   * `WHATSAPP_TEMPLATE_LANG_USA`) para todos los prospectos del lote.
+   * Útil para campañas dedicadas USA-Hispano sin tener que setear pais en cada item.
+   */
+  forceUsa?: boolean;
 }
 
 interface ResultItem {
   id: string;
   nombre: string;
   telefonoNormalizado?: string;
+  paisDetectado?: PhoneCountry;
   sent: boolean;
   messageId?: string;
   error?: string;
@@ -51,7 +70,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: BulkBody = await request.json();
-    const { prospectos, authToken, templateName } = body;
+    const { prospectos, authToken, templateName, forceUsa } = body;
 
     if (!prospectos?.length || !authToken) {
       return NextResponse.json(
@@ -76,19 +95,29 @@ export async function POST(request: NextRequest) {
     }
 
     const db = getAdminDb();
-    const tplName = templateName || TEMPLATE_NAME;
     const results: ResultItem[] = [];
 
     for (const p of prospectos) {
       const item: ResultItem = { id: p.id, nombre: p.nombre, sent: false };
 
-      const phone = normalizePhoneMx(p.telefono);
+      const { phone, country } = normalizePhoneByCountry(p.telefono, {
+        ciudad: p.ciudad,
+        pais: forceUsa ? "US" : p.pais,
+      });
       if (!phone) {
         item.skipped = "no_phone";
         results.push(item);
         continue;
       }
       item.telefonoNormalizado = phone;
+      item.paisDetectado = country;
+
+      // Selecciona plantilla por país: USA usa template y lang independiente
+      // (Meta exige idioma exacto registrado al aprobar el template).
+      const useUsa = country === "US";
+      const tplName =
+        templateName || (useUsa ? TEMPLATE_NAME_USA : TEMPLATE_NAME);
+      const tplLang = useUsa ? TEMPLATE_LANG_USA : TEMPLATE_LANG;
 
       // Verifica opt-out en Firestore antes de mandar
       const ref = db.collection("prospectos_frios").doc(p.id);
@@ -104,7 +133,7 @@ export async function POST(request: NextRequest) {
       const r = await sendTemplateMessage({
         to: phone,
         templateName: tplName,
-        languageCode: TEMPLATE_LANG,
+        languageCode: tplLang,
         bodyParams: buildBodyParams(vars),
       });
 
@@ -117,6 +146,8 @@ export async function POST(request: NextRequest) {
             wa_message_id: r.messageId || "",
             wa_last_sent_at: FieldValue.serverTimestamp(),
             wa_last_error: FieldValue.delete(),
+            wa_country: country,
+            wa_template: tplName,
             telefono: p.telefono,
             nombre: p.nombre,
           },

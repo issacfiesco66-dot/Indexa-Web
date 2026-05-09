@@ -178,6 +178,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/sitio-web-restaurante`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.85 },
     { url: `${SITE_URL}/sitio-web-dentista`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.85 },
     { url: `${SITE_URL}/sitio-web-taller-mecanico`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.85 },
+    // USA-Hispano hub + verticales (mercado USA, español, USD)
+    { url: `${SITE_URL}/usa`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.95 },
+    { url: `${SITE_URL}/mecanicos-usa`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.9 },
+    { url: `${SITE_URL}/landscaping-usa`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.9 },
+    { url: `${SITE_URL}/limpieza-usa`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.9 },
+    { url: `${SITE_URL}/construccion-usa`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.9 },
+    { url: `${SITE_URL}/plomeros-usa`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.9 },
     // Service detail pages (high priority — primary commercial intent)
     ...servicios.map((s) => ({
       url: `${SITE_URL}/servicios/${s.slug}`,

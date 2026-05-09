@@ -99,6 +99,13 @@ export default function Header() {
             Para Agencias
           </Link>
           <Link
+            href="/usa"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm font-semibold text-white/80 transition-colors hover:border-indexa-orange/40 hover:text-white"
+          >
+            <span>🇺🇸</span>
+            Para USA
+          </Link>
+          <Link
             href="/login"
             className="text-sm font-medium text-white/70 hover:text-white transition-colors"
           >
@@ -150,6 +157,14 @@ export default function Header() {
             <a href="#precios" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Precios</a>
             <Link href="/probar" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Probar sin cuenta</Link>
             <Link href="/agencias" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Para Agencias</Link>
+            <Link
+              href="/usa"
+              onClick={() => setMenuOpen(false)}
+              className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm font-semibold text-white/80"
+            >
+              <span>🇺🇸</span>
+              Para USA — Negocios hispanos
+            </Link>
             <Link href="/login" onClick={() => setMenuOpen(false)} className="text-sm font-medium text-white/70 hover:text-white">Iniciar Sesión</Link>
             <Link
               href="/registro"
