@@ -29,6 +29,10 @@ function getEnv() {
  * - Si tiene 11 dígitos y empieza con 1 (mobile MX viejo "1XXXXXXXXXX"), lo trata como MX.
  * - Si ya empieza con código de país (12-15 dígitos), lo deja.
  * Retorna null si no es válido.
+ *
+ * NOTA: para mercado USA-Hispano usar `normalizePhone(raw, "US")` o el
+ * helper `normalizePhoneByCountry`. Esta función deja el comportamiento legacy
+ * para no romper imports existentes en el resto del proyecto.
  */
 export function normalizePhoneMx(raw: string | undefined | null): string | null {
   if (!raw) return null;
@@ -41,6 +45,95 @@ export function normalizePhoneMx(raw: string | undefined | null): string | null 
   if (digits.length === 13 && digits.startsWith("521")) return `52${digits.slice(3)}`;
   if (digits.length >= 11 && digits.length <= 15) return digits;
   return null;
+}
+
+export type PhoneCountry = "MX" | "US";
+
+/**
+ * Normaliza para USA. 10 dígitos → 1XXXXXXXXXX (formato E.164 sin '+').
+ * Acepta números USA con o sin código de país, y rechaza si hay ambigüedad.
+ */
+function normalizePhoneUs(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const digits = String(raw).replace(/\D+/g, "");
+  if (!digits) return null;
+
+  if (digits.length === 10) return `1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return digits;
+  if (digits.length >= 11 && digits.length <= 15 && digits.startsWith("1")) return digits;
+  return null;
+}
+
+/**
+ * Normaliza un teléfono según el país objetivo.
+ * Útil para outbound multi-país (MX + USA-Hispano).
+ *
+ * @example
+ *   normalizePhone("(713) 555-0100", "US") // "17135550100"
+ *   normalizePhone("55 1234 5678", "MX")   // "525512345678"
+ */
+export function normalizePhone(
+  raw: string | undefined | null,
+  country: PhoneCountry
+): string | null {
+  if (country === "US") return normalizePhoneUs(raw);
+  return normalizePhoneMx(raw);
+}
+
+/**
+ * Detecta país por la ciudad del prospecto. Las ciudades en `usaCityHints`
+ * son las del playbook USA-Hispano. Caso default: México (legacy).
+ */
+const USA_CITY_HINTS = [
+  "houston",
+  "dallas",
+  "austin",
+  "san antonio",
+  "miami",
+  "orlando",
+  "tampa",
+  "jacksonville",
+  "los angeles",
+  "los ángeles",
+  "san diego",
+  "phoenix",
+  "tucson",
+  "las vegas",
+  "denver",
+  "chicago",
+  "atlanta",
+  "charlotte",
+  "raleigh",
+  "nashville",
+  "new york",
+  "newark",
+  "new jersey",
+  "washington",
+  "boston",
+  "philadelphia",
+  "seattle",
+  "portland",
+];
+
+export function inferPhoneCountry(opts: {
+  ciudad?: string | null;
+  pais?: string | null;
+}): PhoneCountry {
+  const explicit = opts.pais?.toLowerCase().trim();
+  if (explicit === "us" || explicit === "usa" || explicit === "estados unidos") return "US";
+  if (explicit === "mx" || explicit === "mexico" || explicit === "méxico") return "MX";
+
+  const city = opts.ciudad?.toLowerCase().trim() || "";
+  if (city && USA_CITY_HINTS.some((c) => city.includes(c))) return "US";
+  return "MX";
+}
+
+export function normalizePhoneByCountry(
+  raw: string | undefined | null,
+  ctx: { ciudad?: string | null; pais?: string | null }
+): { phone: string | null; country: PhoneCountry } {
+  const country = inferPhoneCountry(ctx);
+  return { phone: normalizePhone(raw, country), country };
 }
 
 export interface TemplateParam {

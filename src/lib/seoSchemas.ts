@@ -152,3 +152,58 @@ export function buildIndustryServiceSchema(opts: {
     url: `${INDEXA_SITE_URL}${opts.pagePath}`,
   };
 }
+
+const indexaUsaAggregateOffer = {
+  "@type": "AggregateOffer",
+  lowPrice: "497",
+  highPrice: "1997",
+  priceCurrency: "USD",
+  offerCount: "3",
+  priceValidUntil: "2026-12-31",
+} as const;
+
+/**
+ * Service schema para landings dirigidas a negocios hispanos en USA.
+ * Sirve para AI Overviews y SERPs cuando dueños buscan en español
+ * desde Houston, Miami, LA, Dallas, Phoenix, NYC, Chicago, Atlanta.
+ */
+export function buildUsaHispanicServiceSchema(opts: {
+  serviceTitle: string;
+  serviceType: string;
+  pagePath: string;
+  description: string;
+  audienceType?: string;
+  faq?: { pregunta: string; respuesta: string }[];
+}) {
+  const base: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    serviceType: opts.serviceType,
+    name: opts.serviceTitle,
+    description: opts.description,
+    provider: indexaProvider,
+    areaServed: { "@type": "Country", name: "United States" },
+    audience: {
+      "@type": "BusinessAudience",
+      audienceType:
+        opts.audienceType ??
+        "Negocios hispanos y latinos en Estados Unidos (mecánicos, landscaping, limpieza, restaurantes, construcción)",
+    },
+    offers: indexaUsaAggregateOffer,
+    url: `${INDEXA_SITE_URL}${opts.pagePath}`,
+    inLanguage: "es-US",
+  };
+
+  if (opts.faq && opts.faq.length > 0) {
+    base.mainEntityOfPage = {
+      "@type": "FAQPage",
+      mainEntity: opts.faq.map((q) => ({
+        "@type": "Question",
+        name: q.pregunta,
+        acceptedAnswer: { "@type": "Answer", text: q.respuesta },
+      })),
+    };
+  }
+
+  return base;
+}
