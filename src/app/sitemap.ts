@@ -178,6 +178,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/sitio-web-restaurante`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.85 },
     { url: `${SITE_URL}/sitio-web-dentista`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.85 },
     { url: `${SITE_URL}/sitio-web-taller-mecanico`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.85 },
+    // Pillar pages "Agencia" — alta intent comercial, máxima prioridad SEO
+    { url: `${SITE_URL}/agencia-de-marketing-digital`, lastModified: new Date(), changeFrequency: "weekly", priority: 1.0 },
+    { url: `${SITE_URL}/agencia-de-publicidad`, lastModified: new Date(), changeFrequency: "weekly", priority: 1.0 },
+    { url: `${SITE_URL}/agencia-google-ads`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.95 },
+    { url: `${SITE_URL}/agencia-de-seo`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.95 },
     // USA-Hispano hub + verticales (mercado USA, español, USD)
     { url: `${SITE_URL}/usa`, lastModified: new Date(), changeFrequency: "weekly", priority: 0.95 },
     { url: `${SITE_URL}/mecanicos-usa`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.9 },
