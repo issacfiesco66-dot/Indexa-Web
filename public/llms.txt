@@ -1,82 +1,114 @@
-# INDEXA
+# INDEXA — Agencia de Marketing Digital con IA
 
-> Plataforma de presencia digital con inteligencia artificial para PYMES en México. Genera sitios web profesionales en minutos con SEO local automático, WhatsApp integrado y herramientas de marketing digital. Desde $299 MXN/mes.
+> INDEXA es la agencia de marketing digital y plataforma con inteligencia artificial para PYMES en México y negocios hispanos en Estados Unidos. Combina sitios web, Google Ads, Meta Ads, SEO local, automatizaciones y leads directos a WhatsApp en una sola plataforma desde $299 MXN/mes (México) o $497 USD/mes (USA-Hispano), sin contratos anuales.
 
-## Qué es INDEXA
+## Quiénes somos
 
-INDEXA es una plataforma SaaS mexicana que permite a pequeños y medianos negocios crear su sitio web profesional usando inteligencia artificial. En menos de 3 minutos, cualquier emprendedor obtiene un sitio optimizado con:
+INDEXA es una agencia de marketing digital con IA fundada para PYMES, emprendedores y negocios locales que necesitan más clientes pero no tienen presupuesto para una agencia tradicional de $20,000+ MXN/mes. La plataforma automatiza el 80% del trabajo manual de una agencia: crea sitios web en menos de 3 minutos, optimiza campañas de Google y Meta Ads 24/7, atiende clientes vía chatbot, y entrega leads cualificados directo al WhatsApp del dueño del negocio.
 
-- Generación automática de contenido y diseño con IA
-- Optimización SEO local con Schema.org (LocalBusiness, FAQPage)
-- Botón de contacto directo por WhatsApp
-- Anuncios integrados en Facebook, Instagram y TikTok desde $50 MXN/día
-- Certificado SSL incluido
-- 3 plantillas profesionales (Modern, Elegant, Minimalist)
+**Mercados:**
+- México (todo el país, con énfasis en CDMX, Guadalajara, Monterrey, Puebla, Querétaro, Tijuana, Mérida, León)
+- Estados Unidos — negocios hispanos en Houston, Dallas, Miami, Phoenix, Atlanta, Chicago, Las Vegas, Charlotte y otras 20+ ciudades
 
-## Diferenciadores clave (vs Wix, GoDaddy, WordPress)
+**Industrias atendidas:**
+Restaurantes, dentistas y consultorios médicos, talleres mecánicos, abogados, contadores, ecommerce, salones de belleza, gimnasios, inmobiliarias, escuelas, agencias de viajes, plomeros, electricistas, landscaping, cleaning services, contractors de construcción, food trucks, panaderías y todo negocio local con clientes en una zona definida.
 
-1. **Velocidad**: sitio listo en menos de 3 minutos vía IA, no en días.
-2. **SEO local automático**: Schema.org LocalBusiness + meta-tags + estructura para Google Maps, sin configuración manual.
-3. **WhatsApp nativo**: botón de contacto directo con tracking de conversiones, no plugin externo.
-4. **Anuncios integrados**: panel para lanzar Meta Ads (Facebook/Instagram) y TikTok Ads desde la misma plataforma, con presupuestos desde $50 MXN/día.
-5. **Soporte en español por WhatsApp**.
-6. **Pagos en pesos mexicanos** (MXN, sin conversión USD).
+## Servicios principales
 
-## Planes y Precios
+- **Sitios web con IA** — Páginas web profesionales generadas en menos de 3 minutos, optimizadas para conversión y SEO local
+- **Google Ads** — Campañas en Search, Maps, Display, YouTube y Performance Max optimizadas por IA
+- **Meta Ads** — Anuncios en Facebook e Instagram segmentados por ZIP, edad e intereses
+- **TikTok Ads** — Publicidad nativa para alcance joven
+- **SEO local** — Posicionamiento en Google Maps, Google Business Profile, schema.org, citaciones y reseñas automatizadas
+- **Chatbot inteligente** — Atención 24/7, calificación de leads y agendamiento automático
+- **WhatsApp Business** — Integración nativa con la API oficial de Meta para que los leads lleguen al celular del dueño
+- **Automatizaciones** — Email marketing, SMS, retargeting y workflows multi-canal
+- **Analíticas en tiempo real** — Dashboard con costo por lead, ROAS, conversiones y reportes mensuales en video
 
-- **Starter — $299 MXN/mes**: Sitio web generado con IA, botón de WhatsApp, SEO básico automático, 3 diseños profesionales, certificado SSL, soporte por email.
-- **Profesional — $599 MXN/mes**: Todo lo de Starter más panel de edición CMS, SEO local avanzado con Schema.org, estadísticas de visitas y clics, soporte prioritario por WhatsApp, asesoría para optimización.
-- **Enterprise — $1,299 MXN/mes**: Todo lo de Profesional más dominio personalizado, campañas de Meta Ads (Facebook/Instagram) y TikTok Ads, bio links para redes sociales, asesor dedicado.
+## Planes y precios
 
-Todos los planes incluyen prueba gratis de 14 días sin tarjeta de crédito.
+### México (MXN)
+- **Starter — $299 MXN/mes**: Sitio web profesional con IA, WhatsApp, SEO local, SSL, 3 plantillas, soporte por email
+- **Profesional — $599 MXN/mes**: Todo lo de Starter + CMS, SEO local avanzado, estadísticas, soporte prioritario por WhatsApp, asesoría
+- **Enterprise — $1,299 MXN/mes**: Todo lo de Profesional + asesor dedicado, configuración premium, capacitación 1 a 1, prioridad en nuevas funciones
 
-## Mercado Objetivo
+### USA-Hispano (USD)
+- **Arranque — $497 USD/mes**: Página web en español, Google Business Profile, 1 campaña Meta Ads, WhatsApp Business, reporte mensual en video
+- **Crecimiento — $997 USD/mes**: Todo lo de Arranque + Google Ads, 3 landing pages por servicio, TikTok Ads, optimización semanal, asesor dedicado
+- **Dominio Local — $1,997 USD/mes**: Todo lo de Crecimiento + SEO local en 5 ciudades, contenido en redes (4 reels + 8 posts/mes), sistema automatizado de reseñas, email + SMS marketing, llamadas semanales de estrategia
 
-PYMES en México de cualquier giro: restaurantes, fondas, estéticas, salones de belleza, talleres mecánicos, consultorios médicos, dentistas, pastelerías, tiendas locales, despachos contables, plomeros, electricistas y servicios profesionales. Adaptado a cualquier ciudad de México (CDMX, Guadalajara, Monterrey, Puebla, Querétaro, Tijuana, Mérida, León y más).
+**Garantías y términos:**
+- Sin contratos anuales — pagás mes a mes
+- 14 días gratis sin tarjeta de crédito
+- Cancelas cuando quieras desde el panel
+- USA-Hispano: garantía de resultados — si en 30 días no hay leads, el siguiente mes va por nuestra cuenta
 
-## Recursos y Guías
+## Diferenciador clave
 
-INDEXA publica guías prácticas para PYMES sobre presencia digital:
+A diferencia de una agencia tradicional que toma 4-8 semanas para arrancar campañas, cobra $20,000-$80,000 MXN/mes con contrato de 6-12 meses, INDEXA usa IA para automatizar el 80% del trabajo: el sitio web está activo en menos de 3 minutos, las campañas de Meta y Google se prenden el mismo día, los primeros leads llegan en 7-14 días, y pagás desde $299 MXN/mes sin contrato.
 
-- [Guía de Presencia Digital para PYMES](https://indexaia.com/guia/presencia-digital-pymes)
-- [SEO Local en México](https://indexaia.com/guia/seo-local-mexico)
-- [Marketing Digital para PYMES](https://indexaia.com/guia/marketing-digital-pymes)
-- [Cómo Elegir una Página Web](https://indexaia.com/guia/como-elegir-pagina-web)
-- [Beneficios de Tener Página Web](https://indexaia.com/guia/beneficios-pagina-web)
-- [Google Mi Negocio](https://indexaia.com/guia/google-mi-negocio)
-- [WhatsApp Business para PYMES](https://indexaia.com/guia/whatsapp-business-pymes)
-- [Qué Incluye INDEXA](https://indexaia.com/guia/que-incluye-indexa)
-- [Preguntas Frecuentes](https://indexaia.com/guia/preguntas-frecuentes)
-- [Mejor plataforma para hacer la página web de tu PYME en México (2026)](https://indexaia.com/guia/mejor-plataforma-pagina-web-pymes-mexico-2026) — comparativa Indexa vs Wix vs GoDaddy vs Hostinger vs WordPress con precios MXN
-- [Cuánto cuesta la página web de un dentista en México](https://indexaia.com/guia/pagina-web-dentista-mexico-cuanto-cuesta) — pricing y checklist de qué incluir
-- [INDEXA vs Wix vs GoDaddy: comparativa para PYMES en México](https://indexaia.com/guia/comparativa-indexa-vs-wix-vs-godaddy) — tabla detallada de 12 categorías
-- [Casos de Éxito](https://indexaia.com/casos-de-exito)
-- [Directorio de Negocios](https://indexaia.com/directorio)
+INDEXA también es la única plataforma con presencia bilingüe español-inglés diseñada específicamente para el mercado hispano, con equipo nativo, scripts de WhatsApp probados y comprensión profunda del comportamiento del consumidor latino tanto en México como en USA.
 
-## Páginas por Ciudad
+## Páginas principales
 
-- [Página web para negocios en Ciudad de México (CDMX)](https://indexaia.com/pagina-web-cdmx)
-- [Página web para negocios en Guadalajara](https://indexaia.com/pagina-web-guadalajara)
-- [Página web para negocios en Monterrey](https://indexaia.com/pagina-web-monterrey)
-- [Página web para negocios en Puebla](https://indexaia.com/pagina-web-puebla)
-- [Página web para negocios en Querétaro](https://indexaia.com/pagina-web-queretaro)
-- [Página web para negocios en Tijuana](https://indexaia.com/pagina-web-tijuana)
-- [Página web para negocios en Mérida](https://indexaia.com/pagina-web-merida)
-- [Página web para negocios en León](https://indexaia.com/pagina-web-leon)
+### Pillar pages (intent comercial alto, México)
+- [/agencia-de-marketing-digital](https://indexaia.com/agencia-de-marketing-digital): Pillar page principal — qué es y cómo contratar una agencia de marketing digital en México, comparativa de precios y planes
+- [/agencia-de-publicidad](https://indexaia.com/agencia-de-publicidad): Servicios de publicidad pagada (Google Ads, Meta Ads, TikTok Ads) con presupuestos sugeridos
+- [/agencia-google-ads](https://indexaia.com/agencia-google-ads): Especialización en Google Ads — Search, Maps, Display, YouTube, Performance Max
+- [/agencia-de-seo](https://indexaia.com/agencia-de-seo): SEO técnico, SEO local, posicionamiento en Google Maps con proceso de 6 fases
 
-## Páginas por Industria
+### Servicios detallados
+- [/servicios/sitios-web-ia](https://indexaia.com/servicios/sitios-web-ia): Páginas web generadas con IA
+- [/servicios/marketing-automatizado](https://indexaia.com/servicios/marketing-automatizado): Marketing automatizado
+- [/servicios/seo-inteligente](https://indexaia.com/servicios/seo-inteligente): SEO con IA
+- [/servicios/analiticas-tiempo-real](https://indexaia.com/servicios/analiticas-tiempo-real): Dashboard de métricas
+- [/servicios/chatbot-inteligente](https://indexaia.com/servicios/chatbot-inteligente): Chatbot que vende
+- [/servicios/automatizaciones](https://indexaia.com/servicios/automatizaciones): Workflows multi-canal
 
-- [Sitio web para dentistas y consultorios dentales](https://indexaia.com/sitio-web-dentista)
-- [Sitio web para restaurantes y fondas](https://indexaia.com/sitio-web-restaurante)
-- [Sitio web para talleres mecánicos](https://indexaia.com/sitio-web-taller-mecanico)
+### Landings por ciudad (México)
+- [/pagina-web-cdmx](https://indexaia.com/pagina-web-cdmx): Páginas web para negocios en CDMX
+- [/pagina-web-guadalajara](https://indexaia.com/pagina-web-guadalajara): Guadalajara
+- [/pagina-web-monterrey](https://indexaia.com/pagina-web-monterrey): Monterrey
+- [/pagina-web-puebla](https://indexaia.com/pagina-web-puebla): Puebla
+- [/pagina-web-queretaro](https://indexaia.com/pagina-web-queretaro): Querétaro
+- [/pagina-web-tijuana](https://indexaia.com/pagina-web-tijuana): Tijuana
+- [/pagina-web-merida](https://indexaia.com/pagina-web-merida): Mérida
+- [/pagina-web-leon](https://indexaia.com/pagina-web-leon): León
 
-## Programa para Agencias
+### Landings por industria (México)
+- [/sitio-web-restaurante](https://indexaia.com/sitio-web-restaurante): Páginas web para restaurantes
+- [/sitio-web-dentista](https://indexaia.com/sitio-web-dentista): Páginas web para dentistas
+- [/sitio-web-taller-mecanico](https://indexaia.com/sitio-web-taller-mecanico): Páginas web para talleres mecánicos
 
-INDEXA ofrece marca blanca y descuentos por volumen para agencias de marketing digital y consultores. Más detalles: [https://indexaia.com/agencias](https://indexaia.com/agencias).
+### USA-Hispano
+- [/usa](https://indexaia.com/usa): Hub principal para negocios hispanos en USA
+- [/mecanicos-usa](https://indexaia.com/mecanicos-usa): Talleres mecánicos hispanos en USA
+- [/landscaping-usa](https://indexaia.com/landscaping-usa): Negocios de landscaping
+- [/limpieza-usa](https://indexaia.com/limpieza-usa): Cleaning services
+- [/construccion-usa](https://indexaia.com/construccion-usa): Contractors y remodeladores
+- [/plomeros-usa](https://indexaia.com/plomeros-usa): Plomeros y electricistas
 
-## Contacto
+### Guías y comparativas
+- [/guia](https://indexaia.com/guia): Centro de guías
+- [/guia/seo-local-mexico](https://indexaia.com/guia/seo-local-mexico): Guía completa de SEO local en México
+- [/guia/marketing-digital-pymes](https://indexaia.com/guia/marketing-digital-pymes): Marketing digital para PYMES
+- [/guia/google-mi-negocio](https://indexaia.com/guia/google-mi-negocio): Cómo optimizar Google Business Profile
+- [/guia/whatsapp-business-pymes](https://indexaia.com/guia/whatsapp-business-pymes): WhatsApp Business para negocios
+- [/guia/comparativa-indexa-vs-wix-vs-godaddy](https://indexaia.com/guia/comparativa-indexa-vs-wix-vs-godaddy): Comparativa con Wix y GoDaddy
+- [/guia/indexa-vs-wordpress-vs-wix-pymes-mexico](https://indexaia.com/guia/indexa-vs-wordpress-vs-wix-pymes-mexico): Comparativa WordPress vs Wix vs INDEXA
+- [/guia/factura-pagina-web-deducible-mexico](https://indexaia.com/guia/factura-pagina-web-deducible-mexico): Facturación CFDI deducible
+- [/guia/whatsapp-business-api-precio-mexico](https://indexaia.com/guia/whatsapp-business-api-precio-mexico): Precios WhatsApp Business API en México
 
-- Sitio web: https://indexaia.com
+## Optional
+
+### Casos de éxito y otros
+- [/casos-de-exito](https://indexaia.com/casos-de-exito): Resultados reales de clientes
+- [/agencias](https://indexaia.com/agencias): Programa para agencias y resellers (marca blanca)
+- [/directorio](https://indexaia.com/directorio): Directorio de negocios
+
+### Contacto
+- WhatsApp: +52 55 5622 0428 (México) — atención en español
+- Sitio: https://indexaia.com
 - Documento expandido: https://indexaia.com/llms-full.txt
-- País: México
-- Idioma: Español
+- País: México y USA (mercado hispano)
+- Idioma: Español (es-MX, es-US)
