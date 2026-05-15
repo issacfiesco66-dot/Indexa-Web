@@ -82,12 +82,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-
       if (u) {
-        // Await the HttpOnly auth cookie set — must complete before loading
-        // flips to false, otherwise the login page redirects to /admin/dashboard
-        // before middleware can see the cookie and bounces back to login.
+        // Do NOT setUser(u) here yet — if we did, consumers (e.g. the login
+        // page) would see the user before cookies are set and redirect into
+        // /admin/* before middleware can see firebaseAuthToken + indexa_role,
+        // bouncing back to login. We expose user only after everything below
+        // has resolved.
+
         try {
           const token = await u.getIdToken();
           await fetch("/api/auth/session", {
@@ -176,6 +177,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fetch("/api/auth/session", { method: "DELETE" }).catch(() => {});
         document.cookie = "indexa_role=; path=/; max-age=0";
       }
+
+      // Expose user to consumers LAST so the login page only sees the new
+      // user once cookies are in place and middleware will admit the redirect.
+      setUser(u);
 
       setLoading(false);
     });
