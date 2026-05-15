@@ -32,6 +32,10 @@ function LoginForm() {
             router.replace("/admin/dashboard");
             setChecking(false);
             return;
+          } else if (rawRole === "subadmin") {
+            router.replace("/admin/prospectos");
+            setChecking(false);
+            return;
           } else if (rawRole === "agency") {
             router.replace("/agency/dashboard");
             setChecking(false);

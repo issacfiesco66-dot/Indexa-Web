@@ -8,6 +8,7 @@
  *
  * Roles:
  *   superadmin — Full platform access (/admin/*)
+ *   subadmin   — Cold prospecting only (/admin/prospectos, /admin/seguimientos, /admin/mensajeria)
  *   agency     — White-label reseller (/agency/*), manages own clients
  *   client     — End-user with a single site (/dashboard/*)
  *
@@ -16,11 +17,12 @@
 
 // ── Roles ────────────────────────────────────────────────────────────
 
-export type UserRole = "superadmin" | "agency" | "client";
+export type UserRole = "superadmin" | "subadmin" | "agency" | "client";
 
 /** Maps legacy role strings to the canonical enum */
 export function normalizeRole(raw: string | undefined): UserRole {
   if (raw === "admin" || raw === "superadmin") return "superadmin";
+  if (raw === "subadmin") return "subadmin";
   if (raw === "agency") return "agency";
   return "client"; // "cliente" | "client" | undefined → client
 }

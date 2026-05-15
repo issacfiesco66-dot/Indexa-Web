@@ -85,27 +85,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(u);
 
       if (u) {
-        const token = await u.getIdToken();
-        // Set auth cookie via server endpoint (HttpOnly, not accessible to JS/XSS)
-        fetch("/api/auth/session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token }),
-        }).catch(() => { /* session cookie best-effort */ });
+        // Await the HttpOnly auth cookie set — must complete before loading
+        // flips to false, otherwise the login page redirects to /admin/dashboard
+        // before middleware can see the cookie and bounces back to login.
+        try {
+          const token = await u.getIdToken();
+          await fetch("/api/auth/session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token }),
+          });
+        } catch (err) {
+          console.error("Session cookie set failed:", err);
+        }
 
         if (db) {
-          try {
-            const snap = await getDoc(doc(db, "usuarios", u.uid));
-            if (snap.exists()) {
-              const data = snap.data();
-              const normalized = normalizeRole(data.role);
-              setRole(normalized);
-              setTrial(computeTrialStatus(data.trialEndsAt, data.trialStatus));
-              document.cookie = `indexa_role=${normalized}; path=/; max-age=${60 * 60}; SameSite=Strict; Secure`;
+          // Retry up to 3 times — Firestore can reject reads right after login
+          // because the auth token hasn't propagated yet.
+          let snap: Awaited<ReturnType<typeof getDoc>> | null = null;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              if (attempt > 0) await new Promise((r) => setTimeout(r, 500));
+              snap = await getDoc(doc(db, "usuarios", u.uid));
+              break;
+            } catch (err) {
+              console.error(`Auth role read attempt ${attempt + 1} failed:`, err);
+            }
+          }
 
-              // Resolve agency branding from agencias collection
-              let resolvedAgencyId: string | null = null;
+          if (snap && snap.exists()) {
+            const data = snap.data();
+            const normalized = normalizeRole(data.role);
+            setRole(normalized);
+            setTrial(computeTrialStatus(data.trialEndsAt, data.trialStatus));
+            document.cookie = `indexa_role=${normalized}; path=/; max-age=${60 * 60}; SameSite=Strict; Secure`;
 
+            // Resolve agency branding from agencias collection
+            let resolvedAgencyId: string | null = null;
+
+            try {
               if (normalized === "agency") {
                 // Agency user: find their agencia doc by uid
                 const { getDocs: gd, query: q, where: w, collection: col } = await import("firebase/firestore");
@@ -135,16 +153,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setAgencyBranding(null);
                 setAgencyName("");
               }
-
-              setAgencyId(resolvedAgencyId);
-            } else {
-              setRole("client");
-              setTrial(DEFAULT_TRIAL);
-              document.cookie = `indexa_role=client; path=/; max-age=${60 * 60}; SameSite=Strict; Secure`;
+            } catch (err) {
+              console.error("Agency branding fetch failed:", err);
             }
-          } catch {
-            // Firestore may not be ready yet
+
+            setAgencyId(resolvedAgencyId);
+          } else if (snap) {
+            setRole("client");
+            setTrial(DEFAULT_TRIAL);
+            document.cookie = `indexa_role=client; path=/; max-age=${60 * 60}; SameSite=Strict; Secure`;
           }
+          // If snap is null (all 3 attempts failed), leave role cookie unset;
+          // the consumer page can decide whether to retry or surface an error.
         }
       } else {
         setRole("client");

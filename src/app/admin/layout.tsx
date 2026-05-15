@@ -45,8 +45,15 @@ const NAV_ITEMS = [
   { href: "/admin/configuracion", label: "Configuración", icon: Settings },
 ];
 
+// Items visibles para el rol "subadmin" (cold outreach only).
+const SUBADMIN_HREFS = new Set([
+  "/admin/prospectos",
+  "/admin/seguimientos",
+  "/admin/mensajeria",
+]);
+
 function AdminShell({ children }: { children: React.ReactNode }) {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading, role, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -143,7 +150,9 @@ function AdminShell({ children }: { children: React.ReactNode }) {
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="space-y-1">
-            {NAV_ITEMS.map((item) => {
+            {NAV_ITEMS.filter((item) =>
+              role === "subadmin" ? SUBADMIN_HREFS.has(item.href) : true
+            ).map((item) => {
               const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
               return (
                 <li key={item.href}>

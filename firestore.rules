@@ -9,6 +9,12 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role in ["admin", "superadmin"];
     }
 
+    // Subadmin: rol restringido a cold outreach (prospectos / seguimientos / mensajería).
+    function isSubadmin() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == "subadmin";
+    }
+
     function isOwner(ownerId) {
       return request.auth != null && request.auth.uid == ownerId;
     }
@@ -36,7 +42,7 @@ service cloud.firestore {
     // ── prospectos_frios (CRM / Scraper) ────────────────────────────────────
     // TODAS las operaciones: solo admin
     match /prospectos_frios/{docId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() || isSubadmin();
     }
 
     // ── funeraria_leads (scraper_funerarias.py → Historias Infinitas) ──────
@@ -44,7 +50,7 @@ service cloud.firestore {
     // Lo escribe el scraper autenticado como usuario admin vía REST API, y
     // lo lee /admin/prospectos (pestaña Funerarias).
     match /funeraria_leads/{docId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() || isSubadmin();
     }
 
     // ── usuarios (perfiles) ─────────────────────────────────────────────────

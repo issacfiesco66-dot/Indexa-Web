@@ -23,6 +23,13 @@ const MAINTENANCE_BYPASS_PREFIXES = [
 
 const PUBLIC_ADMIN_PATHS = ["/admin/login"];
 
+// Paths a "subadmin" puede ver dentro de /admin — cold outreach only.
+const SUBADMIN_ALLOWED_PREFIXES = [
+  "/admin/prospectos",
+  "/admin/seguimientos",
+  "/admin/mensajeria",
+];
+
 // API routes exempt from CSRF (webhooks need external access)
 const CSRF_EXEMPT_PREFIXES = [
   "/api/webhooks",
@@ -104,9 +111,19 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Require both auth cookie AND superadmin role cookie
+    // Require both auth cookie AND a role cookie that may access /admin
     // Note: role cookie is a convenience check — API routes verify server-side via Firebase Admin SDK
-    if (roleCookie !== "superadmin") {
+    if (roleCookie === "superadmin") {
+      // full access
+    } else if (roleCookie === "subadmin") {
+      const allowed = SUBADMIN_ALLOWED_PREFIXES.some(
+        (p) => pathname === p || pathname.startsWith(p + "/")
+      );
+      if (!allowed) {
+        if (isRSC) return NextResponse.next();
+        return NextResponse.redirect(new URL("/admin/prospectos", request.url));
+      }
+    } else {
       if (isRSC) return NextResponse.next();
       if (roleCookie === "agency") {
         return NextResponse.redirect(new URL("/agency/dashboard", request.url));
