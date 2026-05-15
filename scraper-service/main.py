@@ -68,16 +68,22 @@ def verify_firebase_token(token: str) -> dict | None:
         return None
 
 
+ALLOWED_SCRAPER_ROLES = ("admin", "superadmin", "subadmin")
+
+
 def verify_firebase_admin(token: str) -> dict | None:
     """
     Verifica el ID token Y consulta Firestore para confirmar que el usuario
-    tiene rol 'admin' o 'superadmin' en /usuarios/{uid}.
+    tiene un rol permitido para usar el scraper:
+      - admin / superadmin  -> acceso completo
+      - subadmin            -> cold outreach (prospectos / seguimientos / mensajeria)
 
     Usa el propio ID token del usuario para leer su documento — las reglas
     Firestore permiten `allow read: if isOwner(userId) || isAdmin();`,
     así que no requiere service account.
 
-    Devuelve el dict del usuario (con 'role' agregado) o None si no es admin.
+    Devuelve el dict del usuario (con 'role' agregado) o None si el rol no
+    está autorizado.
     """
     user = verify_firebase_token(token)
     if not user:
@@ -102,7 +108,7 @@ def verify_firebase_admin(token: str) -> dict | None:
             return None
         fields = (res.json() or {}).get("fields", {}) or {}
         role = (fields.get("role") or {}).get("stringValue", "")
-        if role not in ("admin", "superadmin"):
+        if role not in ALLOWED_SCRAPER_ROLES:
             return None
         user["role"] = role
         return user
@@ -402,7 +408,7 @@ async def scrape_funerarias_async(body: FunerariasScrapeRequest):
     """
     user = verify_firebase_admin(body.token)
     if not user:
-        raise HTTPException(status_code=403, detail="Acceso denegado: se requiere rol admin/superadmin.")
+        raise HTTPException(status_code=403, detail="Acceso denegado: se requiere rol admin, superadmin o subadmin.")
 
     if not FUNERARIAS_SCRIPT.exists():
         raise HTTPException(status_code=500, detail="scraper_funerarias.py no encontrado.")
@@ -458,7 +464,7 @@ async def scrape_async(body: ScrapeRequest):
     # CPU/RAM del servicio de Railway).
     user = verify_firebase_admin(body.token)
     if not user:
-        raise HTTPException(status_code=403, detail="Acceso denegado: se requiere rol admin/superadmin.")
+        raise HTTPException(status_code=403, detail="Acceso denegado: se requiere rol admin, superadmin o subadmin.")
 
     if not SCRAPER_SCRIPT.exists():
         raise HTTPException(status_code=500, detail="scraper_indexa.py not found.")
