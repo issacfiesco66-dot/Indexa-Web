@@ -8,7 +8,7 @@ import {
   type User,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, type DocumentSnapshot, type DocumentData } from "firebase/firestore";
 import { normalizeRole, type UserRole, type AgencyBranding } from "@/types/tenant";
 
 export interface TrialStatus {
@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (db) {
           // Retry up to 3 times — Firestore can reject reads right after login
           // because the auth token hasn't propagated yet.
-          let snap: Awaited<ReturnType<typeof getDoc>> | null = null;
+          let snap: DocumentSnapshot<DocumentData> | null = null;
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
               if (attempt > 0) await new Promise((r) => setTimeout(r, 500));
